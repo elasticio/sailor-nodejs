@@ -1,0 +1,59 @@
+{
+  "title": "Client component",
+  "description": "Client component description",
+  "external": true,
+  "credentials": {
+  },
+  "triggers": {
+    "data_trigger": {
+      "main": "./triggers/data_trigger.js",
+      "title": "Get data"
+    },
+    "rebound_trigger": {
+      "main": "./triggers/rebound_trigger.js",
+      "title": "Rebound"
+    },
+    "error_trigger": {
+      "main": "./triggers/error_trigger.js",
+      "title": "Error"
+    },
+    "datas_and_errors": {
+      "main": "./triggers/datas_and_errors.js",
+      "title": "Both data and error"
+    },
+    "passthrough": {
+      "main": "./triggers/passthrough.js",
+      "title": "Emit the same message which received"
+    },
+    "missing_trigger": {
+      "main": "./triggers/missing_trigger.js",
+      "title": "Error"
+    },
+    "invalid_trigger": {
+      "title": "Error"
+    }
+  },
+  "actions": {
+    "update": {
+      "main": "./actions/update.js",
+      "title": "Update a record",
+      "metadata": {
+        "in": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "Customer id",
+              "type": "string",
+              "required": true
+            },
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "required": false
+            }
+          }
+        }
+      }
+    }
+  }
+}
