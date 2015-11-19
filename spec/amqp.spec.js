@@ -1,9 +1,10 @@
 describe('AMQP', function () {
 
-    process.env.MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
-    process.env.MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
-
     var envVars = {};
+
+    envVars.MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+    envVars.MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+
     envVars.AMQP_URI = 'amqp://test2/test2';
     envVars.TASK = '{"_id":"5559edd38968ec0736000003","data":{"step_1":{"account":"1234567890"}},"recipe":{"nodes":[{"id":"step_1","function":"list"}]}}';
     envVars.STEP_ID = 'step_1';
@@ -19,9 +20,10 @@ describe('AMQP', function () {
     envVars.API_USERNAME = 'test@test.com';
     envVars.API_KEY = '5559edd';
 
+    var settings = require('../lib/settings.js').initSailor(envVars);
     var AMQPConnection = require('../lib/amqp.js').AMQPConnection;
-    var settings = require('../lib/settings.js').readFrom(envVars);
-    var encryptor = require('../lib/encryptor.js');
+    var cipher = require('../lib/cipher.js');
+    cipher.init(envVars.MESSAGE_CRYPTO_PASSWORD, envVars.MESSAGE_CRYPTO_IV);
     var _ = require('lodash');
 
     var message = {
@@ -51,12 +53,12 @@ describe('AMQP', function () {
             mandatory: true,
             clusterId: ''
         },
-        content: encryptor.encryptMessageContent({"content": "Message content"})
+        content: cipher.encryptMessageContent({"content": "Message content"})
     };
 
     it('Should send message to outgoing channel when process data', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         amqp.sendData({"content": "Message content"}, {
@@ -69,8 +71,8 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         expect(publishParameters).toEqual([
-            settings.PUBLISH_MESSAGES_TO,
-            settings.DATA_ROUTING_KEY,
+            envVars.PUBLISH_MESSAGES_TO,
+            envVars.DATA_ROUTING_KEY,
             jasmine.any(Object),
             {
                 contentType : 'application/json',
@@ -83,13 +85,13 @@ describe('AMQP', function () {
             }
         ]);
 
-        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        var payload = cipher.decryptMessageContent(publishParameters[2].toString());
         expect(payload).toEqual({ content : 'Message content' });
     });
 
     it('Should send message to errors when process error', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         amqp.sendError(new Error('Test error'), {
@@ -102,8 +104,8 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         expect(publishParameters).toEqual([
-            settings.PUBLISH_MESSAGES_TO,
-            settings.ERROR_ROUTING_KEY,
+            envVars.PUBLISH_MESSAGES_TO,
+            envVars.ERROR_ROUTING_KEY,
             jasmine.any(Object),
             {
                 contentType : 'application/json',
@@ -117,8 +119,8 @@ describe('AMQP', function () {
         ]);
 
         var payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
-        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
+        payload.error = cipher.decryptMessageContent(payload.error);
+        payload.errorInput = cipher.decryptMessageContent(payload.errorInput);
 
         expect(payload).toEqual({
             error: {
@@ -134,7 +136,7 @@ describe('AMQP', function () {
 
     it('Should not provide errorInput if errorInput was empty', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         amqp.sendError(new Error('Test error'), {
@@ -147,7 +149,7 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         var payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
+        payload.error = cipher.decryptMessageContent(payload.error);
 
         expect(payload).toEqual({
             error: {
@@ -161,7 +163,7 @@ describe('AMQP', function () {
 
     it('Should not provide errorInput if errorInput was null', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         amqp.sendError(new Error('Test error'), {
@@ -174,7 +176,7 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         var payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
+        payload.error = cipher.decryptMessageContent(payload.error);
 
         expect(payload).toEqual({
             error: {
@@ -188,7 +190,7 @@ describe('AMQP', function () {
 
     it('Should send message to rebounds when rebound happened', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         var outgoingMessageHeaders = {
@@ -207,8 +209,8 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         expect(publishParameters).toEqual([
-            settings.PUBLISH_MESSAGES_TO,
-            settings.REBOUND_ROUTING_KEY,
+            envVars.PUBLISH_MESSAGES_TO,
+            envVars.REBOUND_ROUTING_KEY,
             jasmine.any(Object),
             {
                 contentType : 'application/json',
@@ -227,13 +229,13 @@ describe('AMQP', function () {
             }
         ]);
 
-        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        var payload = cipher.decryptMessageContent(publishParameters[2].toString());
         expect(payload).toEqual({content: 'Message content'});
     });
 
     it('Should send message to rebounds with reboundIteration=3', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         var outgoingMessageHeaders = {
@@ -255,8 +257,8 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         expect(publishParameters).toEqual([
-            settings.PUBLISH_MESSAGES_TO,
-            settings.REBOUND_ROUTING_KEY,
+            envVars.PUBLISH_MESSAGES_TO,
+            envVars.REBOUND_ROUTING_KEY,
             jasmine.any(Object),
             {
                 contentType : 'application/json',
@@ -275,13 +277,13 @@ describe('AMQP', function () {
             }
         ]);
 
-        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        var payload = cipher.decryptMessageContent(publishParameters[2].toString());
         expect(payload).toEqual({content: 'Message content'});
     });
 
     it('Should send message to errors when rebound limit exceeded', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
         var outgoingMessageHeaders = {
@@ -303,8 +305,8 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         expect(publishParameters).toEqual([
-            settings.PUBLISH_MESSAGES_TO,
-            settings.ERROR_ROUTING_KEY,
+            envVars.PUBLISH_MESSAGES_TO,
+            envVars.ERROR_ROUTING_KEY,
             jasmine.any(Object),
             {
                 contentType : 'application/json',
@@ -323,8 +325,8 @@ describe('AMQP', function () {
 
         var payload = JSON.parse(publishParameters[2].toString());
         console.log(payload);
-        payload.error = encryptor.decryptMessageContent(payload.error);
-        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
+        payload.error = cipher.decryptMessageContent(payload.error);
+        payload.errorInput = cipher.decryptMessageContent(payload.errorInput);
 
         expect(payload.error.message).toEqual('Rebound limit exceeded');
         expect(payload.errorInput).toEqual({content : 'Message content'});
@@ -345,7 +347,7 @@ describe('AMQP', function () {
 
     it('Should reject message when ack is called with false', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['reject']);
         amqp.reject(message);
 
@@ -357,7 +359,7 @@ describe('AMQP', function () {
 
     it('Should listen queue and pass decrypted message to client function', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         var clientFunction = jasmine.createSpy('clientFunction');
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['consume', 'prefetch']);
         amqp.subscribeChannel.consume.andCallFake(function(queueName, callback){
@@ -377,13 +379,13 @@ describe('AMQP', function () {
             expect(clientFunction.callCount).toEqual(1);
             expect(clientFunction.calls[0].args[0]).toEqual({"content": "Message content"});
             expect(clientFunction.calls[0].args[1]).toEqual(message);
-            expect(clientFunction.calls[0].args[1].content).toEqual(encryptor.encryptMessageContent({"content": "Message content"}));
+            expect(clientFunction.calls[0].args[1].content).toEqual(cipher.encryptMessageContent({"content": "Message content"}));
         });
     });
 
     it('Should disconnect from all channels and connection', function () {
 
-        var amqp = new AMQPConnection(settings);
+        var amqp = new AMQPConnection();
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['close']);
         amqp.publishChannel = jasmine.createSpyObj('subscribeChannel', ['close']);
         amqp.amqp = jasmine.createSpyObj('amqp', ['close']);
