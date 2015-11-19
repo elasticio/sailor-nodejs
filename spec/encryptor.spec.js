@@ -3,7 +3,7 @@ describe('Cipher', function () {
     var password = 'testCryptoPassword';
     var vector = 'iv=any16_symbols';
 
-    var cipher = require('../lib/cipher.js');
+    var cipher = require('../lib/encryptor.js');
     cipher.init(password, vector);
 
     it('should encrypt & decrypt strings', function () {

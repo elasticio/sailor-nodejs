@@ -22,8 +22,8 @@ describe('AMQP', function () {
 
     var settings = require('../lib/settings.js').initSailor(envVars);
     var AMQPConnection = require('../lib/amqp.js').AMQPConnection;
-    var cipher = require('../lib/cipher.js');
-    cipher.init(envVars.MESSAGE_CRYPTO_PASSWORD, envVars.MESSAGE_CRYPTO_IV);
+    var encryptor = require('../lib/encryptor.js');
+    encryptor.init(envVars.MESSAGE_CRYPTO_PASSWORD, envVars.MESSAGE_CRYPTO_IV);
     var _ = require('lodash');
 
     var message = {
@@ -53,7 +53,7 @@ describe('AMQP', function () {
             mandatory: true,
             clusterId: ''
         },
-        content: cipher.encryptMessageContent({"content": "Message content"})
+        content: encryptor.encryptMessageContent({"content": "Message content"})
     };
 
     it('Should send message to outgoing channel when process data', function () {
@@ -85,7 +85,7 @@ describe('AMQP', function () {
             }
         ]);
 
-        var payload = cipher.decryptMessageContent(publishParameters[2].toString());
+        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
         expect(payload).toEqual({ content : 'Message content' });
     });
 
@@ -119,8 +119,8 @@ describe('AMQP', function () {
         ]);
 
         var payload = JSON.parse(publishParameters[2].toString());
-        payload.error = cipher.decryptMessageContent(payload.error);
-        payload.errorInput = cipher.decryptMessageContent(payload.errorInput);
+        payload.error = encryptor.decryptMessageContent(payload.error);
+        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
 
         expect(payload).toEqual({
             error: {
@@ -149,7 +149,7 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         var payload = JSON.parse(publishParameters[2].toString());
-        payload.error = cipher.decryptMessageContent(payload.error);
+        payload.error = encryptor.decryptMessageContent(payload.error);
 
         expect(payload).toEqual({
             error: {
@@ -176,7 +176,7 @@ describe('AMQP', function () {
 
         var publishParameters = amqp.publishChannel.publish.calls[0].args;
         var payload = JSON.parse(publishParameters[2].toString());
-        payload.error = cipher.decryptMessageContent(payload.error);
+        payload.error = encryptor.decryptMessageContent(payload.error);
 
         expect(payload).toEqual({
             error: {
@@ -229,7 +229,7 @@ describe('AMQP', function () {
             }
         ]);
 
-        var payload = cipher.decryptMessageContent(publishParameters[2].toString());
+        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
         expect(payload).toEqual({content: 'Message content'});
     });
 
@@ -277,7 +277,7 @@ describe('AMQP', function () {
             }
         ]);
 
-        var payload = cipher.decryptMessageContent(publishParameters[2].toString());
+        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
         expect(payload).toEqual({content: 'Message content'});
     });
 
@@ -325,8 +325,8 @@ describe('AMQP', function () {
 
         var payload = JSON.parse(publishParameters[2].toString());
         console.log(payload);
-        payload.error = cipher.decryptMessageContent(payload.error);
-        payload.errorInput = cipher.decryptMessageContent(payload.errorInput);
+        payload.error = encryptor.decryptMessageContent(payload.error);
+        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
 
         expect(payload.error.message).toEqual('Rebound limit exceeded');
         expect(payload.errorInput).toEqual({content : 'Message content'});
@@ -379,7 +379,7 @@ describe('AMQP', function () {
             expect(clientFunction.callCount).toEqual(1);
             expect(clientFunction.calls[0].args[0]).toEqual({"content": "Message content"});
             expect(clientFunction.calls[0].args[1]).toEqual(message);
-            expect(clientFunction.calls[0].args[1].content).toEqual(cipher.encryptMessageContent({"content": "Message content"}));
+            expect(clientFunction.calls[0].args[1].content).toEqual(encryptor.encryptMessageContent({"content": "Message content"}));
         });
     });
 
