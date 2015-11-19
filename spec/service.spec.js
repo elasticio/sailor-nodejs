@@ -1,20 +1,20 @@
 process.env.COMPONENT_PATH = '/spec/component';
 describe('Service', function(){
-    var Q = require('q');
     var request = require('request');
     var service = require('../lib/service');
+    var env = require('../lib/settings.js');
     var nock = require('nock');
 
     describe('execService', function(){
 
-        function makeEnv(env) {
-            env.CFG = env.CFG || '{}';
-            env.COMPONENT_PATH = '/spec/component';
-            env.POST_RESULT_URL = env.POST_RESULT_URL || 'http://test.com/123/456';
-            env.API_URI = 'http://apihost.com';
-            env.API_USERNAME = 'test@test.com';
-            env.API_KEY = '5559edd';
-            return env;
+        function prepareEnv(envVars) {
+            envVars.CFG = envVars.CFG || '{}';
+            envVars.COMPONENT_PATH = '/spec/component';
+            envVars.POST_RESULT_URL = envVars.POST_RESULT_URL || 'http://test.com/123/456';
+            envVars.API_URI = 'http://apihost.com';
+            envVars.API_USERNAME = 'test@test.com';
+            envVars.API_KEY = '5559edd';
+            env.init(envVars);
         }
 
         describe('error cases', function(){
@@ -27,7 +27,9 @@ describe('Service', function(){
 
             it('should fail if no POST_RESULT_URL provided', function(done){
 
-                service.processService('verifyCredentials', {})
+                env.init({});
+
+                service.processService('verifyCredentials')
                     .catch(checkError)
                     .done();
 
@@ -39,7 +41,9 @@ describe('Service', function(){
 
             it('should throw an error when there is no such service method', function(done){
 
-                service.processService('unknownMethod', makeEnv({}))
+                prepareEnv({});
+
+                service.processService('unknownMethod')
                     .then(checkResult)
                     .done();
 
@@ -52,7 +56,9 @@ describe('Service', function(){
 
             it('should send error response if no CFG provided', function(done){
 
-                service.processService('verifyCredentials', {'POST_RESULT_URL':'http://test.com/123/456'})
+                env.init({'POST_RESULT_URL':'http://test.com/123/456'});
+
+                service.processService('verifyCredentials')
                     .then(checkResult)
                     .done();
 
@@ -65,7 +71,9 @@ describe('Service', function(){
 
             it('should send error response if failed to parse CFG', function(done){
 
-                service.processService('verifyCredentials', {'POST_RESULT_URL':'http://test.com/123/456', CFG: 'test'})
+                env.init({'POST_RESULT_URL':'http://test.com/123/456', CFG: 'test'});
+
+                service.processService('verifyCredentials')
                     .then(checkResult)
                     .done();
 
@@ -78,7 +86,9 @@ describe('Service', function(){
 
             it('should send error response if component is not found', function(done){
 
-                service.processService('verifyCredentials', {'POST_RESULT_URL':'http://test.com/123/456', CFG: '{"param1":"param2"}'})
+                env.init({'POST_RESULT_URL':'http://test.com/123/456', CFG: '{"param1":"param2"}'});
+
+                service.processService('verifyCredentials')
                     .then(checkResult)
                     .done();
 
@@ -91,7 +101,9 @@ describe('Service', function(){
 
             it('should throw an error when ACTION_OR_TRIGGER is not provided', function(done){
 
-                service.processService('getMetaModel', makeEnv({}))
+                prepareEnv({});
+
+                service.processService('getMetaModel')
                     .then(checkResult)
                     .done();
 
@@ -104,7 +116,9 @@ describe('Service', function(){
 
             it('should throw an error when ACTION_OR_TRIGGER is not found', function(done){
 
-                service.processService('getMetaModel', makeEnv({ACTION_OR_TRIGGER: 'unknown'}))
+                prepareEnv({ACTION_OR_TRIGGER: 'unknown'});
+
+                service.processService('getMetaModel')
                     .then(checkResult)
                     .done();
 
@@ -117,7 +131,9 @@ describe('Service', function(){
 
             it('should throw an error when GET_MODEL_METHOD is not provided', function(done){
 
-                service.processService('selectModel', makeEnv({ACTION_OR_TRIGGER: 'update'}))
+                prepareEnv({ACTION_OR_TRIGGER: 'update'});
+
+                service.processService('selectModel')
                     .then(checkResult)
                     .done();
 
@@ -130,7 +146,9 @@ describe('Service', function(){
 
             it('should throw an error when GET_MODEL_METHOD is not found', function(done){
 
-                service.processService('selectModel', makeEnv({ACTION_OR_TRIGGER: 'update', GET_MODEL_METHOD: 'unknown'}))
+                prepareEnv({ACTION_OR_TRIGGER: 'update', GET_MODEL_METHOD: 'unknown'});
+
+                service.processService('selectModel')
                     .then(checkResult)
                     .done();
 
@@ -153,7 +171,9 @@ describe('Service', function(){
 
             it('verifyCredentials', function(done){
 
-                service.processService('verifyCredentials', makeEnv({}))
+                prepareEnv({});
+
+                service.processService('verifyCredentials')
                     .then(checkResult)
                     .done();
 
@@ -166,7 +186,9 @@ describe('Service', function(){
 
             it('getMetaModel', function(done){
 
-                service.processService('getMetaModel', makeEnv({ACTION_OR_TRIGGER: 'update'}))
+                prepareEnv({ACTION_OR_TRIGGER: 'update'});
+
+                service.processService('getMetaModel')
                     .then(checkResult)
                     .done();
 
@@ -179,7 +201,9 @@ describe('Service', function(){
 
             it('selectModel', function(done){
 
-                service.processService('selectModel', makeEnv({ACTION_OR_TRIGGER: 'update', GET_MODEL_METHOD: 'getModel'}))
+                prepareEnv({ACTION_OR_TRIGGER: 'update', GET_MODEL_METHOD: 'getModel'});
+
+                service.processService('selectModel')
                     .then(checkResult)
                     .done();
 
@@ -192,7 +216,7 @@ describe('Service', function(){
 
             it('selectModel with updateKeys event', function(done){
 
-                var env = makeEnv({
+                prepareEnv({
                     ACTION_OR_TRIGGER: 'update',
                     GET_MODEL_METHOD: 'getModelWithKeysUpdate',
                     CFG: '{"_account":"1234567890"}',
@@ -205,7 +229,7 @@ describe('Service', function(){
                     .put('/v1/accounts/1234567890', {keys: {oauth: {access_token: 'newAccessToken'}}})
                     .reply(200, "Success");
 
-                service.processService('selectModel', env)
+                service.processService('selectModel')
                     .then(checkResult)
                     .done();
 
@@ -219,7 +243,7 @@ describe('Service', function(){
 
             it('selectModel with failed updateKeys event should return result anyway', function(done){
 
-                var env = makeEnv({
+                prepareEnv({
                     ACTION_OR_TRIGGER: 'update',
                     GET_MODEL_METHOD: 'getModelWithKeysUpdate',
                     CFG: '{"_account":"1234567890"}',
@@ -232,7 +256,7 @@ describe('Service', function(){
                     .put('/v1/accounts/1234567890', {keys: {oauth: {access_token: 'newAccessToken'}}})
                     .reply(400, "Success");
 
-                service.processService('selectModel', env)
+                service.processService('selectModel')
                     .then(checkResult)
                     .done();
 
@@ -256,7 +280,9 @@ describe('Service', function(){
 
             it('verifyCredentials', function(done){
 
-                service.processService('verifyCredentials', makeEnv({POST_RESULT_URL: 'http://test.com/111/222'}))
+                prepareEnv({POST_RESULT_URL: 'http://test.com/111/222'});
+
+                service.processService('verifyCredentials')
                     .catch(checkError)
                     .done();
 

@@ -1,9 +1,10 @@
 describe('Cipher', function () {
 
-    process.env.MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
-    process.env.MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+    var password = 'testCryptoPassword';
+    var vector = 'iv=any16_symbols';
 
     var cipher = require('../lib/encryptor.js');
+    cipher.init(password, vector);
 
     it('should encrypt & decrypt strings', function () {
         var content = 'Hello world';
