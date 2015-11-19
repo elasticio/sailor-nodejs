@@ -1,4 +1,4 @@
-var settings = require('./lib/settings.js').init(process.env);
+var settings = require('./lib/settings.js').initSailor(process.env);
 var logging = require('./lib/logging.js');
 var Sailor = require('./lib/sailor.js').Sailor;
 

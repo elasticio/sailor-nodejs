@@ -20,8 +20,8 @@ describe('AMQP', function () {
     envVars.API_USERNAME = 'test@test.com';
     envVars.API_KEY = '5559edd';
 
-    var settings = require('../lib/settings.js').initSailor(envVars);
     var AMQPConnection = require('../lib/amqp.js').AMQPConnection;
+    var settings = require('../lib/settings.js').initSailor(envVars);
     var encryptor = require('../lib/encryptor.js');
     encryptor.init(envVars.MESSAGE_CRYPTO_PASSWORD, envVars.MESSAGE_CRYPTO_IV);
     var _ = require('lodash');
