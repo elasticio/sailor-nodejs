@@ -96,6 +96,48 @@ describe('AMQP', function () {
         expect(payload).toEqual({ content : 'Message content' });
     });
 
+    it('Should send message to outgoing channel using routing key from headers when process data', function () {
+
+        var amqp = new AMQPConnection(settings);
+        amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
+
+        var msg = {
+            headers: {
+                'X-EIO-Routing-Key': 'my-special-routing-key'
+            },
+            body: {
+                "content": "Message content"
+            }
+        };
+
+        amqp.sendData(msg, {
+            taskId : 'task1234567890',
+            stepId : 'step_456'
+        });
+
+        expect(amqp.publishChannel.publish).toHaveBeenCalled();
+        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+
+        var publishParameters = amqp.publishChannel.publish.calls[0].args;
+        expect(publishParameters).toEqual([
+            settings.PUBLISH_MESSAGES_TO,
+            'my-special-routing-key',
+            jasmine.any(Object),
+            {
+                contentType : 'application/json',
+                contentEncoding : 'utf8',
+                mandatory : true,
+                headers : {
+                    taskId : 'task1234567890',
+                    stepId : 'step_456'
+                }
+            }
+        ]);
+
+        var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        expect(payload).toEqual(msg);
+    });
+
     it('Should send message to errors when process error', function () {
 
         var amqp = new AMQPConnection(settings);
