@@ -41,7 +41,8 @@ describe('AMQP', function () {
             contentEncoding: 'utf8',
             headers: {
                 taskId: "task1234567890",
-                execId: "exec1234567890"
+                execId: "exec1234567890",
+                reply_to: "replyTo1234567890"
             },
             deliveryMode: undefined,
             priority: undefined,
@@ -426,7 +427,14 @@ describe('AMQP', function () {
         runs(function(){
             expect(amqp.subscribeChannel.prefetch).toHaveBeenCalledWith(1);
             expect(clientFunction.callCount).toEqual(1);
-            expect(clientFunction.calls[0].args[0]).toEqual({"content": "Message content"});
+            expect(clientFunction.calls[0].args[0]).toEqual(
+                {
+                    headers : {
+                        reply_to : 'replyTo1234567890'
+                    },
+                    "content": "Message content"
+                }
+            );
             expect(clientFunction.calls[0].args[1]).toEqual(message);
             expect(clientFunction.calls[0].args[1].content).toEqual(encryptor.encryptMessageContent({"content": "Message content"}));
 
