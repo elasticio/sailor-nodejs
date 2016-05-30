@@ -184,6 +184,52 @@ describe('AMQP', function () {
         });
     });
 
+    it('Should send message to errors using routing key from headers when process error', function () {
+
+        var amqp = new AMQPConnection(settings);
+        amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
+
+        amqp.sendError(new Error('Test error'), {
+            taskId : 'task1234567890',
+            stepId : 'step_456',
+            'X-EIO-Routing-Key': 'my-special-routing-key'
+        }, message.content);
+
+        expect(amqp.publishChannel.publish).toHaveBeenCalled();
+        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+
+        var publishParameters = amqp.publishChannel.publish.calls[0].args;
+        expect(publishParameters.length).toEqual(4);
+        expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
+        expect(publishParameters[1]).toEqual('my-special-routing-key');
+        expect(publishParameters[3]).toEqual({
+            contentType : 'application/json',
+            contentEncoding : 'utf8',
+            mandatory : true,
+            headers : {
+                taskId : 'task1234567890',
+                stepId : 'step_456',
+                'X-EIO-Routing-Key' : 'my-special-routing-key',
+                'x-eio-error-response' : true
+            }
+        });
+
+        var payload = JSON.parse(publishParameters[2].toString());
+        payload.error = encryptor.decryptMessageContent(payload.error);
+        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
+
+        expect(payload).toEqual({
+            error: {
+                name: 'Error',
+                message: 'Test error',
+                stack: jasmine.any(String)
+            },
+            errorInput : {
+                "content": "Message content"
+            }
+        });
+    });
+
     it('Should not provide errorInput if errorInput was empty', function () {
 
         var amqp = new AMQPConnection(settings);
