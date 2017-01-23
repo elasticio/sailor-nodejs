@@ -9,6 +9,10 @@
       "main": "./triggers/data_trigger.js",
       "title": "Get data"
     },
+    "data_trigger_alternate_flow_id": {
+      "main": "./triggers/data_trigger_alternate_flow_id.js",
+      "title": "Get data"
+    },
     "init_trigger": {
       "main": "./triggers/init_trigger.js",
       "title": "Init data"
