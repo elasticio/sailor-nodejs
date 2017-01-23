@@ -216,6 +216,48 @@ describe('Sailor', function () {
                 .catch(done); //todo: use done.fail after migration to Jasmine 2.x
         });
 
+        it('should call sendData() and ack() if success with alternative flow-id', function (done) {
+            settings.FUNCTION = 'data_trigger_alternate_flow_id';
+            var sailor = new Sailor(settings);
+
+            spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake(function(taskId, stepId) {
+                expect(taskId).toEqual('5559edd38968ec0736000003');
+                expect(stepId).toEqual('step_1');
+                return Q({});
+            });
+
+            sailor.prepare()
+                .then(() => sailor.connect())
+            .then(() => sailor.processMessage(payload, message))
+            .then(() => {
+                expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+
+            var sendDataCalls = fakeAMQPConnection.sendData.calls;
+
+            expect(sendDataCalls[0].args[0]).toEqual({items: [1,2,3,4,5,6]});
+            expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
+            expect(sendDataCalls[0].args[1]).toEqual({
+                execId: 'exec1',
+                taskId: 'alternative-flow-id',
+                userId: '5559edd38968ec0736000002',
+                stepId: 'step_1',
+                compId: '5559edd38968ec0736000456',
+                function: 'data_trigger_alternate_flow_id',
+                start: jasmine.any(Number),
+                cid: 1,
+                end: jasmine.any(Number)
+            });
+
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
+            done();
+        })
+            .catch(done); //todo: use done.fail after migration to Jasmine 2.x
+        });
+
         it('should send request to API server to update keys', function (done) {
             settings.FUNCTION = 'keys_trigger';
             var sailor = new Sailor(settings);
