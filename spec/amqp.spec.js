@@ -136,7 +136,8 @@ describe('AMQP', function () {
         ]);
 
         var payload = encryptor.decryptMessageContent(publishParameters[2].toString());
-        expect(payload).toEqual(msg);
+        console.log('foo=%j',payload);
+        expect(payload).toEqual({"headers":{},"body":{"content":"Message content"}});
     });
 
     it('Should send message to errors when process error', function () {
