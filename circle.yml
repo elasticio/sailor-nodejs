@@ -4,3 +4,7 @@ machine:
 
   services:
     - rabbitmq-server
+test:
+  override:
+    - nvm use v5.12.0 && npm test
+    - nvm use v6.10.0 && npm test
