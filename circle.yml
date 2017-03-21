@@ -1,10 +1,11 @@
 machine:
   node:
-    version: 6.1.0
+    version: 5.12.0
+    version: 6.10.0
 
   services:
     - rabbitmq-server
 test:
   override:
-    - nvm use v5.12.0 && npm test
-    - nvm use v6.10.0 && npm test
+    - nvm use 5.12.0 && npm test
+    - nvm use 6.10.0 && npm test
