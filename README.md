@@ -71,7 +71,7 @@ Startup state data - either return value or the result of the promise
  - OK
     - Results will be stored as the startup state, previous will be overwritten with warning
     - After that init hook will be run, etc
-  - NOK initialisation
+  - NOK
    - Sailor will exit the process
    - Platform will restart the component immediately
    - If init wont' happen it will be removed after 5 minutes (see restart policy)
