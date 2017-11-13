@@ -55,7 +55,25 @@ Here is a list of components build on Node.js:
 
 ### Init hook
 
+```javascript
+/**
+* cfg - config object with credentials and other stuff like datasamples
+*/
+exports.init = function(cfg) {
+    //do stuff
+}
+```
+
 ### Startup hook
+
+```javascript
+/**
+* cfg - config object with credentials and other stuff like datasamples
+*/
+exports.startup = function(cfg) {
+    //do stuff
+}
+```
 
 - Only on the first trigger
 - Called without ``this``
@@ -64,7 +82,7 @@ Here is a list of components build on Node.js:
 - May throw - not recommended
 - May return a promise that will fail
 
-- TBD - Startup logs, where to find it?
+- Startup logs can be found in the tab of the component on execution page
 - TBD - Separate them under different tab in UI
 - TBD - Where to see restart errors?overwritten
 
@@ -80,6 +98,16 @@ Startup state data - either return value or the result of the promise
   - In the next scheduling interval initialisation will repeat
 
 ### Shutdown hook
+
+```javascript
+/**
+* cfg - config object with credentials and other stuff like datasamples
+* startData - result from the startup
+*/
+exports.shutdown = function(cfg, startData) {
+    //do stuff
+}
+```
 
  - Only on the first trigger
  - One stop is pressed
