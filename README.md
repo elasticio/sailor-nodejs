@@ -61,6 +61,7 @@ Here is a list of components build on Node.js:
 */
 exports.init = function(cfg) {
     //do stuff
+    return Promise.resolve();
 }
 ```
 
@@ -72,6 +73,10 @@ exports.init = function(cfg) {
 */
 exports.startup = function(cfg) {
     //do stuff
+    const data = messages.newMessageWithBody({
+        message: 'Hello from STARTUP_HOOK'
+    });
+    return Promise.resolve(data);
 }
 ```
 
@@ -106,6 +111,7 @@ Startup state data - either return value or the result of the promise
 */
 exports.shutdown = function(cfg, startData) {
     //do stuff
+    return Promise.resolve();
 }
 ```
 
