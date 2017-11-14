@@ -9,7 +9,7 @@
 ```json
     "dependencies": {
         "q": "^1.4.1",
-        "elasticio-sailor-nodejs": "^2.0.0",
+        "elasticio-sailor-nodejs": "^2.2.1",
         "elasticio-node": "^0.0.8"
     }
 ```
