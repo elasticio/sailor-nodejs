@@ -57,7 +57,7 @@ Here is a list of components build on Node.js:
 
 ```javascript
 /**
-* cfg - config object with credentials and other stuff like datasamples
+* cfg - This is the same config as the one passed to "processMessage" method of the trigger or action
 */
 exports.init = function(cfg) {
     //do stuff
@@ -69,14 +69,16 @@ exports.init = function(cfg) {
 
 ```javascript
 /**
-* cfg - config object with credentials and other stuff like datasamples
+* cfg - This is the same config as the one passed to "processMessage" method of the trigger or action
 */
 exports.startup = function(cfg) {
     //do stuff
-    const data = messages.newMessageWithBody({
+    const data = {
         message: 'Hello from STARTUP_HOOK'
+    };
+    return Promise.resolve({
+        body: data
     });
-    return Promise.resolve(data);
 }
 ```
 
@@ -106,7 +108,7 @@ Startup state data - either return value or the result of the promise
 
 ```javascript
 /**
-* cfg - config object with credentials and other stuff like datasamples
+* cfg - This is the same config as the one passed to "processMessage" method of the trigger or action
 * startData - result from the startup
 */
 exports.shutdown = function(cfg, startData) {
@@ -126,6 +128,6 @@ exports.shutdown = function(cfg, startData) {
  - Call the shutdown hook, parameters that are passed is from the startup results or ``{}`` if nothing was returned
  - Errors are ignored
  - If shutdown hook won't complete within 60 seconds then container will be killed
- - As soon as user pressed stop, task is marked as inactive and hooks will start responding with the error to possible data
+ - As soon as user pressed stop, task is marked as inactive and 'webhooks gateway' will start responding with the error to possible data
 
 TBD - log for shutdown hooks?
