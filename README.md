@@ -76,9 +76,7 @@ exports.startup = function(cfg) {
     const data = {
         message: 'Hello from STARTUP_HOOK'
     };
-    return Promise.resolve({
-        body: data
-    });
+    return Promise.resolve(data);
 }
 ```
 
@@ -112,6 +110,7 @@ Startup state data - either return value or the result of the promise
 * startData - result from the startup
 */
 exports.shutdown = function(cfg, startData) {
+    //corresponding to the startup example above, startData is { message: 'Hello from STARTUP_HOOK' }
     //do stuff
     return Promise.resolve();
 }
@@ -128,6 +127,6 @@ exports.shutdown = function(cfg, startData) {
  - Call the shutdown hook, parameters that are passed is from the startup results or ``{}`` if nothing was returned
  - Errors are ignored
  - If shutdown hook won't complete within 60 seconds then container will be killed
- - As soon as user pressed stop, task is marked as inactive and 'webhooks gateway' will start responding with the error to possible data
+ - As soon as user pressed stop, task is marked as inactive and 'webhooks gateway' will start responding with the error (Task either does not exist or is inactive) to possible data
 
 TBD - log for shutdown hooks?
