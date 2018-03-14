@@ -1,6 +1,7 @@
 'use strict';
 
 const ERROR = 'error';
+const WARN = 'warn';
 const ALWAYS = 'always';
 const NEVER = 'never';
 
@@ -126,16 +127,16 @@ module.exports = {
         'no-sparse-arrays': ERROR,
         'array-callback-return': ERROR,
         'eqeqeq': ERROR,
-        'no-use-before-define': ERROR,
+        'no-use-before-define': WARN,
         'no-undef': ERROR,
-        'no-unused-vars': ERROR,
+        'no-unused-vars': WARN,
         'no-mixed-spaces-and-tabs': ERROR,
         'operator-linebreak': [
             ERROR,
             'before'
         ],
         'no-console': [
-            ERROR,
+            WARN,
             {
                 'allow': [
                     'warn',
