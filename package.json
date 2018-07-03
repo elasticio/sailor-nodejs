@@ -37,7 +37,7 @@
     "gulp": "3.9.1",
     "gulp-istanbul": "1.1.1",
     "gulp-jasmine": "0.2.0",
-    "jasmine-node": "^1.14.5",
+    "jasmine-node": "^1.15.0",
     "mocha": "3.3.0",
     "nock": "9.0.13",
     "nsp": "^2.8.1",
