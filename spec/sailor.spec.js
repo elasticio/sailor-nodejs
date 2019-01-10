@@ -124,25 +124,79 @@ describe('Sailor', () => {
     });
 
     describe('prepare', () => {
+        let sailor;
+        const retryCount = 5;
 
-        it('should fail if unable to retrieve step info', done => {
-            const sailor = new Sailor(settings);
-
-            spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
-                expect(taskId).toEqual('5559edd38968ec0736000003');
-                expect(stepId).toEqual('step_1');
-                return Q.reject(new Error('Cant find step info'));
+        beforeEach(() => {
+            sailor = new Sailor(
+                Object.assign(
+                    { STEP_DATA_REQUEST_RETRY_COUNT: retryCount },
+                    settings
+                )
+            );
+        });
+        describe('when step data retrieved', () => {
+            let stepData;
+            beforeEach(() => {
+                stepData = {
+                    snapshot: {}
+                };
             });
 
-            sailor.prepare()
-                .then(() => {
-                    throw new Error('Error is expected');
-                })
-                .catch(err => {
-                    expect(err.message).toEqual('Cant find step info');
-                    done();
-                });
+            [1, 2, retryCount - 1, retryCount].forEach(attempts => {
+                describe(
+                    `on ${attempts}-th attempt when STEP_DATA_REQUEST_RETRY_COUNT = ${retryCount}`,
+                    () => {
+                        beforeEach(() => {
+                            let cnt = 0;
+                            spyOn(sailor.componentReader, 'init').andReturn(Promise.resolve());
+                            spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake(() => {
+                                cnt++;
+                                if (cnt < attempts) {
+                                    return Promise.reject(new Error('Failed'));
+                                }
+                                return Promise.resolve(stepData);
+                            });
+                        });
+
+                        it('should init component', done => {
+                            sailor.prepare()
+                                .then(() => {
+                                    expect(sailor.stepData).toEqual(stepData);
+                                    expect(sailor.snapshot).toEqual(stepData.snapshot);
+                                    expect(sailor.apiClient.tasks.retrieveStep)
+                                        .toHaveBeenCalledWith(settings.FLOW_ID, settings.STEP_ID);
+                                    expect(sailor.apiClient.tasks.retrieveStep.callCount).toEqual(attempts);
+                                    expect(sailor.componentReader.init).toHaveBeenCalledWith(settings.COMPONENT_PATH);
+                                    done();
+                                })
+                                .catch(done);
+                        });
+                    }
+                );
+
+            });
         });
+
+        describe(
+            `when step data is not retrieved for STEP_DATA_REQUEST_RETRY_COUNT + 1`, () => {
+                beforeEach(() => {
+                    spyOn(sailor.apiClient.tasks, 'retrieveStep')
+                        .andReturn(Promise.reject(new Error('failed')));
+                });
+
+                it('should fail', done => {
+                    sailor.prepare()
+                        .then(() => {
+                            throw new Error('Error is expected');
+                        })
+                        .catch(err => {
+                            expect(err.message).toEqual('failed');
+                            done();
+                        });
+                });
+            }
+        );
     });
 
     describe('disconnection', () => {
