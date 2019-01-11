@@ -4,7 +4,7 @@ jobs: # a collection of steps
     working_directory: ~/elasticio-rest-node # directory where steps will run
     docker: # run the steps with Docker
       - image: circleci/node:10.15 # ...with this image as the primary container; this is where all `steps` will run
-      - image: rabbitmq-server:3.5
+      - image: rabbitmq:3.5
     steps: # a collection of executable commands
       - checkout # special step to check out source code to working directory
       - run:
