@@ -125,16 +125,11 @@ describe('Sailor', () => {
 
     describe('prepare', () => {
         let sailor;
-        const retryCount = 5;
 
         beforeEach(() => {
-            sailor = new Sailor(
-                Object.assign(
-                    { STEP_DATA_REQUEST_RETRY_COUNT: retryCount },
-                    settings
-                )
-            );
+            sailor = new Sailor(settings);
         });
+
         describe('when step data retrieved', () => {
             let stepData;
             beforeEach(() => {
@@ -143,60 +138,44 @@ describe('Sailor', () => {
                 };
             });
 
-            [1, 2, retryCount - 1, retryCount].forEach(attempts => {
-                describe(
-                    `on ${attempts}-th attempt when STEP_DATA_REQUEST_RETRY_COUNT = ${retryCount}`,
-                    () => {
-                        beforeEach(() => {
-                            let cnt = 0;
-                            spyOn(sailor.componentReader, 'init').andReturn(Promise.resolve());
-                            spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake(() => {
-                                cnt++;
-                                if (cnt < attempts) {
-                                    return Promise.reject(new Error('Failed'));
-                                }
-                                return Promise.resolve(stepData);
-                            });
-                        });
+            describe(`when step data retreived`, () => {
+                beforeEach(() => {
+                    spyOn(sailor.componentReader, 'init').andReturn(Promise.resolve());
+                    spyOn(sailor.apiClient.tasks, 'retrieveStep').andReturn(Promise.resolve(stepData));
+                });
 
-                        it('should init component', done => {
-                            sailor.prepare()
-                                .then(() => {
-                                    expect(sailor.stepData).toEqual(stepData);
-                                    expect(sailor.snapshot).toEqual(stepData.snapshot);
-                                    expect(sailor.apiClient.tasks.retrieveStep)
-                                        .toHaveBeenCalledWith(settings.FLOW_ID, settings.STEP_ID);
-                                    expect(sailor.apiClient.tasks.retrieveStep.callCount).toEqual(attempts);
-                                    expect(sailor.componentReader.init).toHaveBeenCalledWith(settings.COMPONENT_PATH);
-                                    done();
-                                })
-                                .catch(done);
-                        });
-                    }
-                );
-
+                it('should init component', done => {
+                    sailor.prepare()
+                        .then(() => {
+                            expect(sailor.stepData).toEqual(stepData);
+                            expect(sailor.snapshot).toEqual(stepData.snapshot);
+                            expect(sailor.apiClient.tasks.retrieveStep)
+                                .toHaveBeenCalledWith(settings.FLOW_ID, settings.STEP_ID);
+                            expect(sailor.componentReader.init).toHaveBeenCalledWith(settings.COMPONENT_PATH);
+                            done();
+                        })
+                        .catch(done);
+                });
             });
         });
 
-        describe(
-            `when step data is not retrieved for STEP_DATA_REQUEST_RETRY_COUNT + 1`, () => {
-                beforeEach(() => {
-                    spyOn(sailor.apiClient.tasks, 'retrieveStep')
-                        .andReturn(Promise.reject(new Error('failed')));
-                });
+        describe('when step data is not retrieved', () => {
+            beforeEach(() => {
+                spyOn(sailor.apiClient.tasks, 'retrieveStep')
+                    .andReturn(Promise.reject(new Error('failed')));
+            });
 
-                it('should fail', done => {
-                    sailor.prepare()
-                        .then(() => {
-                            throw new Error('Error is expected');
-                        })
-                        .catch(err => {
-                            expect(err.message).toEqual('failed');
-                            done();
-                        });
-                });
-            }
-        );
+            it('should fail', done => {
+                sailor.prepare()
+                    .then(() => {
+                        throw new Error('Error is expected');
+                    })
+                    .catch(err => {
+                        expect(err.message).toEqual('failed');
+                        done();
+                    });
+            });
+        });
     });
 
     describe('disconnection', () => {
