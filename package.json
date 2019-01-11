@@ -40,6 +40,7 @@
     "mocha": "3.3.0",
     "nock": "10.0.6",
     "nsp": "^2.8.1",
+    "request": "^2.88.0",
     "sinon": "^2.1.0"
   },
   "repository": "elasticio/sailor-nodejs",
