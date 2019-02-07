@@ -24,6 +24,10 @@ describe('AMQP', () => {
     envVars.ELASTICIO_API_USERNAME = 'test@test.com';
     envVars.ELASTICIO_API_KEY = '5559edd';
 
+    envVars.ELASTICIO_DATA_RATE_LIMIT = 200;
+    envVars.ELASTICIO_ERROR_RATE_LIMIT = 20;
+    envVars.ELASTICIO_SNAPSHOT_RATE_LIMIT = 20;
+
     const Amqp = require('../lib/amqp.js').Amqp;
     const settings = require('../lib/settings.js').readFrom(envVars);
     const encryptor = require('../lib/encryptor.js');
