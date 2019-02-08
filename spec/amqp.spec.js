@@ -143,7 +143,7 @@ describe('AMQP', () => {
         expect(payload).toEqual(msg);
     });
 
-    it('Should throw error in sendHttpReply if reply_to header not found', () => {
+    it('Should throw error in sendHttpReply if reply_to header not found', done => {
 
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
@@ -155,9 +155,8 @@ describe('AMQP', () => {
             },
             body: 'OK'
         };
-
-        expect(() => {
-            amqp.sendHttpReply(msg, {
+        async function test() {
+            await amqp.sendHttpReply(msg, {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
@@ -166,11 +165,12 @@ describe('AMQP', () => {
                     stepId: 'step_456'
                 }
             });
+        }
+        test().then(() => done(new Error('should throw')),(err) => {
+            expect(amqp.publishChannel.publish).not.toHaveBeenCalled();
+            done();
+        });
 
-        }).toThrow('Component emitted \'httpReply\' event but \'reply_to\' was not found in AMQP headers');
-
-
-        expect(amqp.publishChannel.publish).not.toHaveBeenCalled();
     });
 
     it('Should send message to outgoing channel using routing key from headers when process data', () => {
@@ -262,7 +262,7 @@ describe('AMQP', () => {
         });
     });
 
-    it('Should send message to errors using routing key from headers when process error', () => {
+    it('Should send message to errors using routing key from headers when process error', async () => {
 
         const expectedErrorPayload = {
             error: {
@@ -289,7 +289,7 @@ describe('AMQP', () => {
             }
         };
 
-        amqp.sendError(new Error('Test error'), props, message.content);
+        await amqp.sendError(new Error('Test error'), props, message.content);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish.callCount).toEqual(2);
