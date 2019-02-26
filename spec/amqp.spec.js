@@ -111,6 +111,7 @@ describe('AMQP', () => {
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['on']);
         amqp.publishChannel.publish = () => true;
         spyOn(amqp.publishChannel, 'publish').andReturn(true);
+        amqp.publishChannel.waitForConfirms = () => Promise.resolve([null]);
 
         const props = {
             contentType: 'application/json',
