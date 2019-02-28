@@ -1,1 +1,2 @@
-syntax_error_trigger.js
+spec-jasmine/component/triggers/syntax_error_trigger.js
+spec-jasmine/component/triggers/trigger_with_wrong_dependency.js

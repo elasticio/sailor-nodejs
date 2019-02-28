@@ -1,0 +1,4 @@
+./spec-mocha/**/*.spec.js
+--timeout 0
+--recursive
+--exit

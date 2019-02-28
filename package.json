@@ -1,49 +1,45 @@
 {
   "name": "elasticio-sailor-nodejs",
   "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-  "version": "2.2.2",
-  "main": "run.js",
+  "version": "3.0.0",
+  "main": "src/run.js",
+  "repository": "elasticio/sailor-nodejs",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=8"
+  },
   "scripts": {
-    "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
+    "lint": "eslint .",
     "pretest": "npm run lint",
     "test": "npm run test:jasmine && npm run test:mocha",
-    "test:jasmine": "NODE_ENV=test jasmine-node spec",
-    "test:mocha": "NODE_ENV=test mocha mocha_spec/**/*.js",
-    "postpublish": "./postpublish.js"
-  },
-  "engines": {
-    "node": ">=10.15.0"
+    "test:jasmine": "NODE_ENV=test jasmine-node spec-jasmine",
+    "test:mocha": "NODE_ENV=test mocha --opts spec-mocha/mocha.opts",
+    "postpublish": ".circleci/postpublish.js"
   },
   "dependencies": {
-    "amqplib": "0.5.1",
-    "bunyan": "^1.8.10",
-    "co": "4.6.0",
+    "amqplib-as-promised": "3.15.1",
+    "bunyan": "1.8.10",
     "debug": "3.1.0",
     "elasticio-rest-node": "1.2.2",
     "lodash": "4.17.4",
-    "q": "1.4.1",
-    "request-promise-native": "^1.0.5",
-    "requestretry": "^3.1.0",
+    "request": "2.88.0",
+    "request-promise-native": "1.0.5",
+    "requestretry": "3.1.0",
     "uuid": "3.0.1"
   },
   "devDependencies": {
-    "body-parser": "1.16.1",
     "chai": "3.5.0",
-    "code-quality-js": "2.0.2",
-    "del": "2.2.2",
-    "eslint": "^4.19.1",
-    "eslint-plugin-mocha": "^4.12.1",
-    "express": "4.14.1",
-    "gulp": "3.9.1",
-    "gulp-istanbul": "1.1.1",
-    "gulp-jasmine": "0.2.0",
-    "jasmine-node": "^1.15.0",
+    "eslint": "5.14.1",
+    "eslint-config-standard": "12.0.0",
+    "eslint-plugin-import": "2.16.0",
+    "eslint-plugin-mocha": "4.12.1",
+    "eslint-plugin-node": "8.0.1",
+    "eslint-plugin-promise": "4.0.1",
+    "eslint-plugin-standard": "4.0.0",
+    "heapdump": "0.3.12",
+    "jasmine-node": "1.15.0",
     "mocha": "3.3.0",
     "nock": "10.0.6",
-    "nsp": "^2.8.1",
-    "request": "^2.88.0",
-    "sinon": "^2.1.0"
-  },
-  "repository": "elasticio/sailor-nodejs",
-  "license": "Apache-2.0"
+    "sinon": "2.1.0"
+  }
 }

@@ -1,0 +1,10 @@
+{
+    "extends": "../.eslintrc.json",
+    "env": {
+        "node": true,
+        "jasmine": true
+    },
+    "parserOptions": {
+        "ecmaVersion": 8
+    }
+}
