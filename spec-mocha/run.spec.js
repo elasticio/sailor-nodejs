@@ -683,9 +683,7 @@ describe('Integration Test', () => {
 
                 amqpHelper.on('data', ({ properties, emittedMessage }, queueName) => {
                     expect(queueName).to.eql(amqpHelper.nextStepErrorQueue);
-
                     expect(JSON.parse(emittedMessage.error).message).to.equal('OMG. I cannot init');
-
                     expect(properties.headers).to.eql({
                         execId: env.ELASTICIO_EXEC_ID,
                         taskId: env.ELASTICIO_FLOW_ID,

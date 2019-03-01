@@ -11,7 +11,7 @@ function ComponentReader () {
     this.componentJson = null;
 }
 
-ComponentReader.prototype.init = function init (componentPath) {
+ComponentReader.prototype.init = async function init (componentPath) {
     this.componentPath = path.join(process.cwd(), componentPath || '');
     log.debug('Component path is: %s', this.componentPath);
 
@@ -21,7 +21,7 @@ ComponentReader.prototype.init = function init (componentPath) {
     return this.promiseLoadJson(componentJsonPath);
 };
 
-ComponentReader.prototype.promiseLoadJson = function promiseLoadJson (jsonFilePath) {
+ComponentReader.prototype.promiseLoadJson = async function promiseLoadJson (jsonFilePath) {
     try {
         this.componentJson = require(jsonFilePath);
         log.debug('Successfully loaded %s', jsonFilePath);

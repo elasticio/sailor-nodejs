@@ -1,4 +1,9 @@
-'use strict';
+const _ = require('lodash');
+const amqp = require('../src/amqp.js');
+const encryptor = require('../src/encryptor.js');
+const Sailor = require('../src/sailor.js').Sailor;
+
+process.env.ELASTICIO_TIMEOUT = 3000;
 
 describe('Sailor', () => {
     const envVars = {};
@@ -25,17 +30,9 @@ describe('Sailor', () => {
     envVars.ELASTICIO_API_USERNAME = 'test@test.com';
     envVars.ELASTICIO_API_KEY = '5559edd';
 
-    process.env.ELASTICIO_TIMEOUT = 3000;
-
-    const amqp = require('../src/amqp.js');
     let settings;
-    const encryptor = require('../src/encryptor.js');
-    const Sailor = require('../src/sailor.js').Sailor;
-    const _ = require('lodash');
-    const Q = require('q');
 
     const payload = { param1: 'Value1' };
-
     const message = {
         fields: {
             consumerTag: 'abcde',
@@ -72,7 +69,7 @@ describe('Sailor', () => {
     });
 
     describe('init', () => {
-        it('should init properly if developer returned a plain string in init', done => {
+        it('should init properly if developer returned a plain string in init', async () => {
             settings.FUNCTION = 'init_trigger_returns_string';
 
             const sailor = new Sailor(settings);
@@ -87,15 +84,13 @@ describe('Sailor', () => {
                 });
             });
 
-            sailor.prepare()
-                .then(() => sailor.init({}))
-                .then((result) => {
-                    expect(result).toEqual('this_is_a_string');
-                    done();
-                })
-                .catch(done);
+            await sailor.prepare();
+            const result = await sailor.init();
+
+            expect(result).toEqual('this_is_a_string');
         });
-        it('should init properly if developer returned a promise', done => {
+
+        it('should init properly if developer returned a promise', async () => {
             settings.FUNCTION = 'init_trigger';
 
             const sailor = new Sailor(settings);
@@ -110,15 +105,10 @@ describe('Sailor', () => {
                 });
             });
 
-            sailor.prepare()
-                .then(() => sailor.init({}))
-                .then((result) => {
-                    expect(result).toEqual({
-                        subscriptionId: '_subscription_123'
-                    });
-                    done();
-                })
-                .catch(done);
+            await sailor.prepare();
+            const result = await sailor.init();
+
+            expect(result).toEqual({ subscriptionId: '_subscription_123' });
         });
     });
 
@@ -131,10 +121,9 @@ describe('Sailor', () => {
 
         describe('when step data retrieved', () => {
             let stepData;
+
             beforeEach(() => {
-                stepData = {
-                    snapshot: {}
-                };
+                stepData = { snapshot: {} };
             });
 
             describe(`when step data retreived`, () => {
@@ -143,56 +132,44 @@ describe('Sailor', () => {
                     spyOn(sailor.apiClient.tasks, 'retrieveStep').andReturn(Promise.resolve(stepData));
                 });
 
-                it('should init component', done => {
-                    sailor.prepare()
-                        .then(() => {
-                            expect(sailor.stepData).toEqual(stepData);
-                            expect(sailor.snapshot).toEqual(stepData.snapshot);
-                            expect(sailor.apiClient.tasks.retrieveStep)
-                                .toHaveBeenCalledWith(settings.FLOW_ID, settings.STEP_ID);
-                            expect(sailor.componentReader.init).toHaveBeenCalledWith(settings.COMPONENT_PATH);
-                            done();
-                        })
-                        .catch(done);
+                it('should init component', async () => {
+                    await sailor.prepare();
+
+                    expect(sailor.stepData).toEqual(stepData);
+                    expect(sailor.snapshot).toEqual(stepData.snapshot);
+                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalledWith(settings.FLOW_ID, settings.STEP_ID);
+                    expect(sailor.componentReader.init).toHaveBeenCalledWith(settings.COMPONENT_PATH);
                 });
             });
         });
 
         describe('when step data is not retrieved', () => {
             beforeEach(() => {
-                spyOn(sailor.apiClient.tasks, 'retrieveStep')
-                    .andReturn(Promise.reject(new Error('failed')));
+                spyOn(sailor.apiClient.tasks, 'retrieveStep').andReturn(Promise.reject(new Error('failed')));
             });
 
-            it('should fail', done => {
-                sailor.prepare()
-                    .then(() => {
-                        throw new Error('Error is expected');
-                    })
-                    .catch(err => {
-                        expect(err.message).toEqual('failed');
-                        done();
-                    });
+            it('should fail', async () => {
+                try {
+                    await sailor.prepare();
+                } catch (err) {
+                    expect(err.message).toEqual('failed');
+                }
             });
         });
     });
 
     describe('disconnection', () => {
-        it('should disconnect Mongo and RabbitMQ, and exit process', done => {
+        it('should disconnect Mongo and RabbitMQ, and exit process', async () => {
             const fakeAMQPConnection = jasmine.createSpyObj('AMQPConnection', ['disconnect']);
-            fakeAMQPConnection.disconnect.andReturn(Q.resolve());
+            fakeAMQPConnection.disconnect.andReturn(Promise.resolve());
 
             spyOn(amqp, 'Amqp').andReturn(fakeAMQPConnection);
             spyOn(process, 'exit').andReturn(0);
 
             const sailor = new Sailor(settings);
 
-            sailor.disconnect()
-                .then(() => {
-                    expect(fakeAMQPConnection.disconnect).toHaveBeenCalled();
-                    done();
-                })
-                .catch(done);
+            await sailor.disconnect();
+            expect(fakeAMQPConnection.disconnect).toHaveBeenCalled();
         });
     });
 
@@ -201,97 +178,87 @@ describe('Sailor', () => {
 
         beforeEach(() => {
             fakeAMQPConnection = jasmine.createSpyObj('AMQPConnection', [
-                'connect', 'sendData', 'sendError', 'sendRebound', 'ack', 'reject',
-                'sendSnapshot', 'sendHttpReply'
+                'connect', 'sendData', 'sendError', 'sendRebound', 'ack', 'reject', 'sendSnapshot', 'sendHttpReply'
             ]);
 
             spyOn(amqp, 'Amqp').andReturn(fakeAMQPConnection);
         });
 
-        it('should call sendData() and ack() if success', done => {
+        it('should call sendData() and ack() if success', async () => {
             settings.FUNCTION = 'data_trigger';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.connect()
-                .then(() => sailor.prepare())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+            await sailor.connect();
+            await sailor.prepare();
+            await sailor.processMessage(payload, message);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
 
-                    const sendDataCalls = fakeAMQPConnection.sendData.calls;
+            const sendDataCalls = fakeAMQPConnection.sendData.calls;
 
-                    expect(sendDataCalls[0].args[0]).toEqual({ items: [1, 2, 3, 4, 5, 6] });
-                    expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
-                    expect(sendDataCalls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            execId: 'exec1',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'data_trigger',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            end: jasmine.any(Number),
-                            messageId: jasmine.any(String)
-                        }
-                    });
+            expect(sendDataCalls[0].args[0]).toEqual({ items: [1, 2, 3, 4, 5, 6] });
+            expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
+            expect(sendDataCalls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    execId: 'exec1',
+                    taskId: '5559edd38968ec0736000003',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'data_trigger',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    end: jasmine.any(Number),
+                    messageId: jasmine.any(String)
+                }
+            });
 
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done); // todo: use done.fail after migration to Jasmine 2.x
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should call sendData() and ack() only once', done => {
+        it('should call sendData() and ack() only once', async () => {
             settings.FUNCTION = 'end_after_data_twice';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.connect()
-                .then(() => sailor.prepare())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+            await sailor.connect();
+            await sailor.prepare();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.sendData.callCount).toEqual(1);
-
-                    expect(fakeAMQPConnection.reject).not.toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    done();
-                })
-                .catch(done); // todo: use done.fail after migration to Jasmine 2.x
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData.callCount).toEqual(1);
+            expect(fakeAMQPConnection.reject).not.toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
         });
 
-        it('should augment emitted message with passthrough data', done => {
+        it('should augment emitted message with passthrough data', async () => {
             settings.FUNCTION = 'passthrough';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({ is_passthrough: true });
+                return Promise.resolve({ is_passthrough: true });
             });
 
             const psPayload = {
@@ -303,66 +270,63 @@ describe('Sailor', () => {
                 }
             };
 
-            sailor.connect()
-                .then(() => sailor.prepare())
-                .then(() => sailor.processMessage(psPayload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+            await sailor.connect();
+            await sailor.prepare();
+            await sailor.processMessage(psPayload, message);
 
-                    const sendDataCalls = fakeAMQPConnection.sendData.calls;
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
 
-                    expect(sendDataCalls[0].args[0]).toEqual({
+            const sendDataCalls = fakeAMQPConnection.sendData.calls;
+
+            expect(sendDataCalls[0].args[0]).toEqual({
+                body: {
+                    param1: 'Value1'
+                },
+                passthrough: {
+                    step_0: {
                         body: {
-                            param1: 'Value1'
-                        },
-                        passthrough: {
-                            step_0: {
-                                body: {
-                                    key: 'value'
-                                }
-                            },
-                            step_1: {
-                                body: { param1: 'Value1' }
-                            }
+                            key: 'value'
                         }
-                    });
-                    expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
-                    expect(sendDataCalls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            execId: 'exec1',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'passthrough',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            end: jasmine.any(Number),
-                            messageId: jasmine.any(String)
-                        }
-                    });
+                    },
+                    step_1: {
+                        body: { param1: 'Value1' }
+                    }
+                }
+            });
+            expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
+            expect(sendDataCalls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    execId: 'exec1',
+                    taskId: '5559edd38968ec0736000003',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'passthrough',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    end: jasmine.any(Number),
+                    messageId: jasmine.any(String)
+                }
+            });
 
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done); // todo: use done.fail after migration to Jasmine 2.x
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should send request to API server to update keys', done => {
+        it('should send request to API server to update keys', async () => {
             settings.FUNCTION = 'keys_trigger';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({
+                return Promise.resolve({
                     config: {
                         _account: '1234567890'
                     }
@@ -372,33 +336,29 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.accounts, 'update').andCallFake((accountId, keys) => {
                 expect(accountId).toEqual('1234567890');
                 expect(keys).toEqual({ keys: { oauth: { access_token: 'newAccessToken' } } });
-                return Q();
+                return Promise.resolve();
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
-                    expect(sailor.apiClient.accounts.update).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done); // todo: use done.fail after migration to Jasmine 2.x
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(sailor.apiClient.accounts.update).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should emit error if failed to update keys', done => {
+        it('should emit error if failed to update keys', async () => {
             settings.FUNCTION = 'keys_trigger';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({
+                return Promise.resolve({
                     config: {
                         _account: '1234567890'
                     }
@@ -408,259 +368,209 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.accounts, 'update').andCallFake((accountId, keys) => {
                 expect(accountId).toEqual('1234567890');
                 expect(keys).toEqual({ keys: { oauth: { access_token: 'newAccessToken' } } });
-                return Q.reject(new Error('Update keys error'));
+                return Promise.reject(new Error('Update keys error'));
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
-                    expect(sailor.apiClient.accounts.update).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendError.calls[0].args[0].message).toEqual('Update keys error');
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(sailor.apiClient.accounts.update).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError.calls[0].args[0].message).toEqual('Update keys error');
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should call sendRebound() and ack()', done => {
+        it('should call sendRebound() and ack()', async () => {
             settings.FUNCTION = 'rebound_trigger';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    expect(fakeAMQPConnection.sendRebound).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendRebound.calls[0].args[0].message).toEqual('Rebound reason');
-                    expect(fakeAMQPConnection.sendRebound.calls[0].args[1]).toEqual(message);
-
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendRebound).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendRebound.calls[0].args[0].message).toEqual('Rebound reason');
+            expect(fakeAMQPConnection.sendRebound.calls[0].args[1]).toEqual(message);
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should call sendSnapshot() and ack() after a `snapshot` event', done => {
+        it('should call sendSnapshot() and ack() after a `snapshot` event', async () => {
             settings.FUNCTION = 'update';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => {
-                    const payload = {
-                        snapshot: { blabla: 'blablabla' }
-                    };
-                    return sailor.processMessage(payload, message);
-                })
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage({ snapshot: { blabla: 'blablabla' } }, message);
 
-                    const expectedSnapshot = { blabla: 'blablabla' };
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    expect(fakeAMQPConnection.sendSnapshot.callCount).toBe(1);
-                    expect(fakeAMQPConnection.sendSnapshot.calls[0].args[0]).toEqual(expectedSnapshot);
-                    expect(fakeAMQPConnection.sendSnapshot.calls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            taskId: '5559edd38968ec0736000003',
-                            execId: 'exec1',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'update',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            snapshotEvent: 'snapshot',
-                            messageId: jasmine.any(String)
-                        }
-                    });
-                    expect(sailor.snapshot).toEqual(expectedSnapshot);
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            const expectedSnapshot = { blabla: 'blablabla' };
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendSnapshot.callCount).toBe(1);
+            expect(fakeAMQPConnection.sendSnapshot.calls[0].args[0]).toEqual(expectedSnapshot);
+            expect(fakeAMQPConnection.sendSnapshot.calls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    taskId: '5559edd38968ec0736000003',
+                    execId: 'exec1',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'update',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    snapshotEvent: 'snapshot',
+                    messageId: jasmine.any(String)
+                }
+            });
+            expect(sailor.snapshot).toEqual(expectedSnapshot);
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should call sendSnapshot() and ack() after an `updateSnapshot` event', done => {
+        it('should call sendSnapshot() and ack() after an `updateSnapshot` event', async () => {
             settings.FUNCTION = 'update';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({
+                return Promise.resolve({
                     snapshot: {
                         someId: 'someData'
                     }
                 });
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => {
-                    const payload = {
-                        updateSnapshot: { updated: 'value' }
-                    };
-                    return sailor.processMessage(payload, message);
-                })
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage({ updateSnapshot: { updated: 'value' } }, message);
 
-                    const expectedSnapshot = { someId: 'someData', updated: 'value' };
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    expect(fakeAMQPConnection.sendSnapshot.callCount).toBe(1);
-                    expect(fakeAMQPConnection.sendSnapshot.calls[0].args[0]).toEqual({ updated: 'value' });
-                    expect(fakeAMQPConnection.sendSnapshot.calls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            taskId: '5559edd38968ec0736000003',
-                            execId: 'exec1',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'update',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            snapshotEvent: 'updateSnapshot',
-                            messageId: jasmine.any(String)
-                        }
-                    });
-                    expect(sailor.snapshot).toEqual(expectedSnapshot);
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            const expectedSnapshot = { someId: 'someData', updated: 'value' };
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendSnapshot.callCount).toBe(1);
+            expect(fakeAMQPConnection.sendSnapshot.calls[0].args[0]).toEqual({ updated: 'value' });
+            expect(fakeAMQPConnection.sendSnapshot.calls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    taskId: '5559edd38968ec0736000003',
+                    execId: 'exec1',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'update',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    snapshotEvent: 'updateSnapshot',
+                    messageId: jasmine.any(String)
+                }
+            });
+            expect(sailor.snapshot).toEqual(expectedSnapshot);
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should send error if error happened', done => {
+        it('should send error if error happened', async () => {
             settings.FUNCTION = 'error_trigger';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendError.calls[0].args[0].message).toEqual('Some component error');
-                    expect(fakeAMQPConnection.sendError.calls[0].args[0].stack).not.toBeUndefined();
-                    expect(fakeAMQPConnection.sendError.calls[0].args[2]).toEqual(message.content);
-
-                    expect(fakeAMQPConnection.reject).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError.calls[0].args[0].message).toEqual('Some component error');
+            expect(fakeAMQPConnection.sendError.calls[0].args[0].stack).not.toBeUndefined();
+            expect(fakeAMQPConnection.sendError.calls[0].args[2]).toEqual(message.content);
+            expect(fakeAMQPConnection.reject).toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject.callCount).toEqual(1);
+            expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
         });
 
-        it('should send error and reject only once()', done => {
+        it('should send error and reject only once()', async () => {
             settings.FUNCTION = 'end_after_error_twice';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendError.callCount).toEqual(1);
-
-                    expect(fakeAMQPConnection.ack).not.toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject.callCount).toEqual(1);
-                    done();
-                })
-                .catch(done);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack).not.toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject).toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject.callCount).toEqual(1);
         });
 
-        it('should reject message if trigger is missing', done => {
+        it('should reject message if trigger is missing', async () => {
             settings.FUNCTION = 'missing_trigger';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendError.calls[0].args[0].message).toMatch(
-                        /Failed to load file '.\/triggers\/missing_trigger.js': Cannot find module.+missing_trigger\.js/
-                    );
-                    expect(fakeAMQPConnection.sendError.calls[0].args[0].stack).not.toBeUndefined();
-                    expect(fakeAMQPConnection.sendError.calls[0].args[2]).toEqual(message.content);
-
-                    expect(fakeAMQPConnection.reject).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError.calls[0].args[0].message).toMatch(/Failed to load file '.\/triggers\/missing_trigger.js': Cannot find module.+missing_trigger\.js/);
+            expect(fakeAMQPConnection.sendError.calls[0].args[0].stack).not.toBeUndefined();
+            expect(fakeAMQPConnection.sendError.calls[0].args[2]).toEqual(message.content);
+            expect(fakeAMQPConnection.reject).toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject.callCount).toEqual(1);
+            expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
         });
 
-        it('should not process message if taskId in header is not equal to task._id', done => {
+        it('should not process message if taskId in header is not equal to task._id', async () => {
             const message2 = _.cloneDeep(message);
             message2.properties.headers.taskId = 'othertaskid';
 
@@ -670,134 +580,110 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message2))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject).toHaveBeenCalled();
-                    done();
-                })
-                .catch(done);
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message2);
+
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject).toHaveBeenCalled();
         });
 
-        it('should catch all data calls and all error calls', done => {
+        it('should catch all data calls and all error calls', async () => {
             settings.FUNCTION = 'datas_and_errors';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
-            sailor.prepare()
-                .then(() => sailor.connect())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            await sailor.prepare();
+            await sailor.connect();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-
-                    // data
-                    expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendData.calls.length).toEqual(3);
-
-                    // error
-                    expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendError.calls.length).toEqual(2);
-
-                    // ack
-                    expect(fakeAMQPConnection.reject).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
-                    done();
-                })
-                .catch(done);
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendData.calls.length).toEqual(3);
+            expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError.calls.length).toEqual(2);
+            expect(fakeAMQPConnection.reject).toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject.callCount).toEqual(1);
+            expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
         });
 
-        it('should handle errors in httpReply properly', done => {
+        it('should handle errors in httpReply properly', async () => {
             settings.FUNCTION = 'http_reply';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => Promise.resolve({}));
 
-            sailor.connect()
-                .then(() => sailor.prepare())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep)
-                        .toHaveBeenCalledWith('5559edd38968ec0736000003', 'step_1');
+            await sailor.connect();
+            await sailor.prepare();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendHttpReply).toHaveBeenCalled();
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalledWith('5559edd38968ec0736000003', 'step_1');
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendHttpReply).toHaveBeenCalled();
 
-                    const sendHttpReplyCalls = fakeAMQPConnection.sendHttpReply.calls;
+            const sendHttpReplyCalls = fakeAMQPConnection.sendHttpReply.calls;
+            expect(sendHttpReplyCalls[0].args[0]).toEqual({
+                statusCode: 200,
+                body: 'Ok',
+                headers: {
+                    'content-type': 'text/plain'
+                }
+            });
+            expect(sendHttpReplyCalls[0].args[1]).toEqual(jasmine.any(Object));
+            expect(sendHttpReplyCalls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    execId: 'exec1',
+                    taskId: '5559edd38968ec0736000003',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'http_reply',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    messageId: jasmine.any(String)
+                }
+            });
+            expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
 
-                    expect(sendHttpReplyCalls[0].args[0]).toEqual({
-                        statusCode: 200,
-                        body: 'Ok',
-                        headers: {
-                            'content-type': 'text/plain'
-                        }
-                    });
-                    expect(sendHttpReplyCalls[0].args[1]).toEqual(jasmine.any(Object));
-                    expect(sendHttpReplyCalls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            execId: 'exec1',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'http_reply',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            messageId: jasmine.any(String)
-                        }
-                    });
+            const sendDataCalls = fakeAMQPConnection.sendData.calls;
+            expect(sendDataCalls[0].args[0]).toEqual({ body: {} });
+            expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
+            expect(sendDataCalls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    execId: 'exec1',
+                    taskId: '5559edd38968ec0736000003',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'http_reply',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    end: jasmine.any(Number),
+                    messageId: jasmine.any(String)
+                }
+            });
 
-                    expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
-
-                    const sendDataCalls = fakeAMQPConnection.sendData.calls;
-
-                    expect(sendDataCalls[0].args[0]).toEqual({
-                        body: {}
-                    });
-                    expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
-                    expect(sendDataCalls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            execId: 'exec1',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'http_reply',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            end: jasmine.any(Number),
-                            messageId: jasmine.any(String)
-                        }
-                    });
-
-                    expect(fakeAMQPConnection.ack).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
-
-                    done();
-                })
-                .catch(done); // todo: use done.fail after migration to Jasmine 2.x
+            expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+            expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
         });
 
-        it('should handle errors in httpReply properly', done => {
+        it('should handle errors in httpReply properly', async () => {
             settings.FUNCTION = 'http_reply';
             const sailor = new Sailor(settings);
 
@@ -807,60 +693,49 @@ describe('Sailor', () => {
                 throw new Error('Failed to send HTTP reply');
             });
 
-            sailor.connect()
-                .then(() => sailor.prepare())
-                .then(() => sailor.processMessage(payload, message))
-                .then(() => {
-                    expect(sailor.apiClient.tasks.retrieveStep)
-                        .toHaveBeenCalledWith('5559edd38968ec0736000003', 'step_1');
+            await sailor.connect();
+            await sailor.prepare();
+            await sailor.processMessage(payload, message);
 
-                    expect(fakeAMQPConnection.connect).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.sendHttpReply).toHaveBeenCalled();
+            expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalledWith('5559edd38968ec0736000003', 'step_1');
+            expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendHttpReply).toHaveBeenCalled();
 
-                    const sendHttpReplyCalls = fakeAMQPConnection.sendHttpReply.calls;
+            const sendHttpReplyCalls = fakeAMQPConnection.sendHttpReply.calls;
+            expect(sendHttpReplyCalls[0].args[0]).toEqual({
+                statusCode: 200,
+                body: 'Ok',
+                headers: {
+                    'content-type': 'text/plain'
+                }
+            });
+            expect(sendHttpReplyCalls[0].args[1]).toEqual(jasmine.any(Object));
+            expect(sendHttpReplyCalls[0].args[1]).toEqual({
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    execId: 'exec1',
+                    taskId: '5559edd38968ec0736000003',
+                    userId: '5559edd38968ec0736000002',
+                    stepId: 'step_1',
+                    compId: '5559edd38968ec0736000456',
+                    function: 'http_reply',
+                    start: jasmine.any(Number),
+                    cid: 1,
+                    messageId: jasmine.any(String)
+                }
+            });
 
-                    expect(sendHttpReplyCalls[0].args[0]).toEqual({
-                        statusCode: 200,
-                        body: 'Ok',
-                        headers: {
-                            'content-type': 'text/plain'
-                        }
-                    });
-                    expect(sendHttpReplyCalls[0].args[1]).toEqual(jasmine.any(Object));
-                    expect(sendHttpReplyCalls[0].args[1]).toEqual({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        mandatory: true,
-                        headers: {
-                            execId: 'exec1',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
-                            stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
-                            function: 'http_reply',
-                            start: jasmine.any(Number),
-                            cid: 1,
-                            messageId: jasmine.any(String)
-                        }
-                    });
+            expect(fakeAMQPConnection.sendData).not.toHaveBeenCalled();
+            expect(fakeAMQPConnection.ack).not.toHaveBeenCalled();
+            expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
 
-                    expect(fakeAMQPConnection.sendData).not.toHaveBeenCalled();
-                    expect(fakeAMQPConnection.ack).not.toHaveBeenCalled();
-
-                    // error
-                    expect(fakeAMQPConnection.sendError).toHaveBeenCalled();
-
-                    const sendErrorCalls = fakeAMQPConnection.sendError.calls;
-                    expect(sendErrorCalls[0].args[0].message).toEqual('Failed to send HTTP reply');
-
-                    // ack
-                    expect(fakeAMQPConnection.reject).toHaveBeenCalled();
-                    expect(fakeAMQPConnection.reject.callCount).toEqual(1);
-                    expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
-
-                    done();
-                })
-                .catch(done); // todo: use done.fail after migration to Jasmine 2.x
+            const sendErrorCalls = fakeAMQPConnection.sendError.calls;
+            expect(sendErrorCalls[0].args[0].message).toEqual('Failed to send HTTP reply');
+            expect(fakeAMQPConnection.reject).toHaveBeenCalled();
+            expect(fakeAMQPConnection.reject.callCount).toEqual(1);
+            expect(fakeAMQPConnection.reject.calls[0].args[0]).toEqual(message);
         });
     });
 

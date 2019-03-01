@@ -56,7 +56,7 @@ class Sailor {
 
         this.stepData = stepData;
 
-        await componentReader.init(compPath);
+        return componentReader.init(compPath);
     }
 
     async disconnect () {
@@ -72,7 +72,7 @@ class Sailor {
             userId: process.env.ELASTICIO_USER_ID
         };
         const props = createDefaultAmqpProperties(headers);
-        await this.amqpConnection.sendError(err, props);
+        return this.amqpConnection.sendError(err, props);
     }
 
     async startup () {
@@ -114,10 +114,10 @@ class Sailor {
 
     async init () {
         log.info('About to initialize component for execution');
-        const res = await this.invokeModuleFunction('init');
+        const result = await this.invokeModuleFunction('init');
         log.info('Component execution initialized successfully');
 
-        return res;
+        return result;
     }
 
     async invokeModuleFunction (moduleFunction, data) {
@@ -126,19 +126,12 @@ class Sailor {
         const module = await this.componentReader.loadTriggerOrAction(settings.FUNCTION);
 
         if (!module[moduleFunction]) {
-            console.error(`invokeModuleFunction – ${moduleFunction} is not found`);
+            log.error(`invokeModuleFunction – ${moduleFunction} is not found`);
             return Promise.resolve();
         }
 
         const cfg = _.cloneDeep(stepData.config) || {};
-
-        return new Promise((resolve, reject) => {
-            try {
-                resolve(module[moduleFunction](cfg, data));
-            } catch (e) {
-                reject(e);
-            }
-        });
+        return module[moduleFunction](cfg, data);
     }
 
     async run () {
@@ -201,7 +194,7 @@ class Sailor {
         try {
             incomingMessageHeaders = this.readIncomingMessageHeaders(message);
         } catch (err) {
-            console.error('Invalid message headers:', err.stack);
+            log.error('Invalid message headers:', err.stack);
             return this.amqpConnection.reject(message);
         }
 
@@ -229,11 +222,11 @@ class Sailor {
             const module = await this.componentReader.loadTriggerOrAction(settings.FUNCTION);
             return processMessageWithModule.call(this, module);
         } catch (e) {
-            await onModuleNotFound();
+            await onModuleNotFound(e);
         }
 
         async function processMessageWithModule (module) {
-            const executionTimeout = setTimeout(onTimeout, TIMEOUT);
+            const executionTimeout = setTimeout(onTimeout.bind(this), TIMEOUT);
             const subPromises = [];
             let endWasEmitted;
 
@@ -247,7 +240,7 @@ class Sailor {
                     messageProcessingTime: Date.now() - timeStart
                 }, 'processMessage timeout');
 
-                return onEnd();
+                return onEnd.call(this);
             }
 
             function promise (p) {
@@ -257,14 +250,14 @@ class Sailor {
 
             const taskExec = new TaskExec();
             taskExec
-                .on('data', onData)
-                .on('error', onError)
-                .on('rebound', onRebound)
-                .on('snapshot', onSnapshot)
-                .on('updateSnapshot', onUpdateSnapshot)
-                .on('updateKeys', onUpdateKeys)
-                .on('httpReply', onHttpReply)
-                .on('end', onEnd);
+                .on('data', onData.bind(this))
+                .on('error', onError.bind(this))
+                .on('rebound', onRebound.bind(this))
+                .on('snapshot', onSnapshot.bind(this))
+                .on('updateSnapshot', onUpdateSnapshot.bind(this))
+                .on('updateKeys', onUpdateKeys.bind(this))
+                .on('httpReply', onHttpReply.bind(this))
+                .on('end', onEnd.bind(this));
 
             await taskExec.process(module, payload, cfg, snapshot);
 
@@ -356,13 +349,13 @@ class Sailor {
 
                 if (_.isPlainObject(data)) {
                     if (data.$set) {
-                        return console.error('ERROR: $set is not supported any more in `updateSnapshot` event');
+                        return log.error('ERROR: $set is not supported any more in `updateSnapshot` event');
                     }
                     _.extend(this.snapshot, data); // updating `local` snapshot
                     const props = createAmqpProperties(headers);
                     return promise(this.amqpConnection.sendSnapshot(data, props));
                 } else {
-                    console.error('You should pass an object to the `updateSnapshot` event');
+                    log.error('You should pass an object to the `updateSnapshot` event');
                 }
             }
 
@@ -401,7 +394,7 @@ class Sailor {
                         promises: subPromises.length,
                         messageProcessingTime: Date.now() - timeStart
                     }, 'processMessage emit end was called more than once');
-                    console.error('WARNING: End was emitted more than once!');
+                    log.error('WARNING: End was emitted more than once!');
                     return;
                 }
 
@@ -431,7 +424,7 @@ class Sailor {
         }
 
         async function onModuleNotFound (err) {
-            console.error(err.stack);
+            log.error(err.stack);
             outgoingMessageHeaders.end = new Date().getTime();
             await this.amqpConnection.sendError(err, outgoingMessageHeaders, message.content);
             await this.amqpConnection.reject(message);

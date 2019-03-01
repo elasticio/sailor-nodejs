@@ -147,32 +147,30 @@ class Amqp {
         }
     }
 
-    prepareMessageAndSendToExchange (data, properties, routingKey) {
+    async prepareMessageAndSendToExchange (data, properties, routingKey) {
         const settings = this.settings;
         data.headers = filterMessageHeaders(data.headers);
         const encryptedData = encryptor.encryptMessageContent(data);
 
-        this.sendToExchange(settings.PUBLISH_MESSAGES_TO, routingKey, encryptedData, properties);
+        return this.sendToExchange(settings.PUBLISH_MESSAGES_TO, routingKey, encryptedData, properties);
     }
 
-    sendData (data, properties) {
+    async sendData (data, properties) {
         const settings = this.settings;
-
         const msgHeaders = data.headers || {};
-
         const routingKey = getRoutingKeyFromHeaders(msgHeaders) || settings.DATA_ROUTING_KEY;
 
-        this.prepareMessageAndSendToExchange(data, properties, routingKey);
+        return this.prepareMessageAndSendToExchange(data, properties, routingKey);
     }
 
-    sendHttpReply (data, properties) {
+    async sendHttpReply (data, properties) {
         const routingKey = properties.headers.reply_to;
-
         if (!routingKey) {
             throw new Error(
                 `Component emitted 'httpReply' event but 'reply_to' was not found in AMQP headers`);
         }
-        this.prepareMessageAndSendToExchange(data, properties, routingKey);
+
+        return this.prepareMessageAndSendToExchange(data, properties, routingKey);
     }
 
     async sendError (err, properties, originalMessageContent) {
@@ -204,7 +202,7 @@ class Amqp {
         }
     }
 
-    sendRebound (reboundError, originalMessage, properties) {
+    async sendRebound (reboundError, originalMessage, properties) {
         const settings = this.settings;
 
         function getReboundIteration (previousIteration) {
@@ -232,7 +230,7 @@ class Amqp {
             properties.expiration = getExpiration(reboundIteration);
             properties.headers.reboundIteration = reboundIteration;
 
-            this.sendToExchange(
+            return this.sendToExchange(
                 settings.PUBLISH_MESSAGES_TO,
                 settings.REBOUND_ROUTING_KEY,
                 originalMessage.content,
@@ -241,7 +239,7 @@ class Amqp {
         }
     }
 
-    sendSnapshot (data, properties) {
+    async sendSnapshot (data, properties) {
         const settings = this.settings;
         const exchange = settings.PUBLISH_MESSAGES_TO;
         const routingKey = settings.SNAPSHOT_ROUTING_KEY;
@@ -251,7 +249,8 @@ class Amqp {
         } catch (e) {
             return log.error('A snapshot should be a valid JSON');
         }
-        this.sendToExchange(exchange, routingKey, payload, properties);
+
+        return this.sendToExchange(exchange, routingKey, payload, properties);
     }
 }
 

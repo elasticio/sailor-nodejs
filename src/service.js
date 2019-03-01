@@ -6,6 +6,7 @@ const request = require('requestretry');
 const util = require('util');
 const debug = require('debug')('sailor');
 const ComponentReader = require('./component_reader').ComponentReader;
+const log = require('./logging');
 
 exports.processService = processService;
 
@@ -37,7 +38,7 @@ async function processService (serviceMethod, env) {
         }
 
         const errorData = { message: err.message };
-        console.error(err, err.stack);
+        log.error(err, err.stack);
         return sendResponse({ status: 'error', data: errorData });
     }
 
@@ -184,7 +185,7 @@ async function processService (serviceMethod, env) {
             _(response)
                 .filter({ state: 'rejected' })
                 .map(result => result.reason)
-                .each(console.error.bind(console));
+                .each(log.error.bind(log));
 
             return data;
         } catch (e) {

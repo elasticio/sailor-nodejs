@@ -1,4 +1,5 @@
 const cipher = require('./cipher.js');
+const log = require('./logging');
 
 exports.encryptMessageContent = encryptMessageContent;
 exports.decryptMessageContent = decryptMessageContent;
@@ -15,7 +16,7 @@ function decryptMessageContent (messagePayload, messageHeaders) {
     try {
         return JSON.parse(cipher.decrypt(messagePayload.toString(), messageHeaders));
     } catch (err) {
-        console.error(err.stack);
+        log.error(err.stack);
         throw Error('Failed to decrypt message: ' + err.message);
     }
 }

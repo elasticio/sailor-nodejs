@@ -9,17 +9,6 @@ if (process.env.NODE_ENV === 'test') {
     level = process.env.LOG_LEVEL || 'info';
 }
 
-function criticalErrorAndExit (err) {
-    if (err.message) {
-        console.error('Error happened: %s', err.message);
-        console.error(err.stack);
-    } else {
-        console.error(String(err));
-    }
-
-    process.exit(1);
-}
-
 const data = Object.assign(
     _.pick(process.env, [
         'ELASTICIO_TASK_ID',
@@ -31,13 +20,22 @@ const data = Object.assign(
     { tag: process.env.ELASTICIO_TASK_ID }
 );
 
-const log = bunyan.createLogger({
-    name: 'sailor',
-    level: level,
-    serializers: bunyan.stdSerializers
-}).child(data);
+const log = bunyan.createLogger({ name: 'sailor', level: level, serializers: bunyan.stdSerializers }).child(data);
 
 _.bindAll(log, ['error', 'warn', 'info', 'debug', 'trace']);
+
+function criticalErrorAndExit (err) {
+    if (err.message) {
+        log.error('Error happened: %s', err.message);
+        log.error(err.stack);
+    } else {
+        log.error(String(err));
+    }
+
+    if (process.env.NODE_ENV !== 'test') {
+        process.exit(1);
+    }
+}
 
 module.exports = log;
 module.exports.criticalErrorAndExit = criticalErrorAndExit;
