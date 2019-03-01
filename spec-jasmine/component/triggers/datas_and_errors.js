@@ -1,15 +1,15 @@
 exports.process = processTrigger;
 
 function processTrigger (msg, cfg) {
-    var that = this;
+    this.emit('data', { content: 'Data 1' });
+    this.emit('error', new Error('Error 1'));
 
-    that.emit('data', { content: 'Data 1' });
-    that.emit('error', new Error('Error 1'));
-
-    setTimeout(() => {
-        that.emit('data', { content: 'Data 2' });
-        that.emit('error', new Error('Error 2'));
-        that.emit('data', { content: 'Data 3' });
-        // throw new Error('Error 4');
-    }, 1000);
+    return new Promise(resolve => {
+        setTimeout(() => {
+            this.emit('data', { content: 'Data 2' });
+            this.emit('error', new Error('Error 2'));
+            this.emit('data', { content: 'Data 3' });
+            resolve();
+        }, 1000);
+    });
 }

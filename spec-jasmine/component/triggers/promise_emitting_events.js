@@ -1,4 +1,4 @@
-const request = require('request');
+const request = require('request-promise-native');
 
 exports.process = processTrigger;
 
@@ -12,8 +12,7 @@ async function processTrigger (msg, cfg) {
         }
     };
 
-    const [, newToken] = await request.post(tokenOptions);
-
+    const newToken = await request.post(tokenOptions);
     this.emit('updateKeys', { oauth: newToken });
 
     const options = {
@@ -21,7 +20,7 @@ async function processTrigger (msg, cfg) {
         json: true
     };
 
-    const [, body] = await request.get(options);
+    const body = await request.get(options);
 
     return { body };
 }

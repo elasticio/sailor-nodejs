@@ -1,6 +1,6 @@
 const ComponentReader = require('../src/component_reader.js').ComponentReader;
 
-describe('Component reader', async () => {
+describe('Component reader', () => {
     it('Should find component located on the path', async () => {
         let reader = new ComponentReader();
         await reader.init('/spec-jasmine/component/');

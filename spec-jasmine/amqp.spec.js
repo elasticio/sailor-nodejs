@@ -60,7 +60,7 @@ describe('AMQP', () => {
     };
 
     beforeEach(() => {
-        spyOn(encryptor, 'decryptMessageContent').andCallThrough();
+        spyOn(encryptor, 'decryptMessageContent').and.callThrough();
     });
 
     it('Should send message to outgoing channel when process data', async () => {
@@ -85,9 +85,9 @@ describe('AMQP', () => {
         }, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             settings.DATA_ROUTING_KEY,
@@ -129,9 +129,9 @@ describe('AMQP', () => {
         await amqp.sendHttpReply(msg, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
         expect(publishParameters[1]).toEqual('my-special-routing-key');
         expect(publishParameters[2].toString()).toEqual(encryptor.encryptMessageContent(msg));
@@ -196,9 +196,9 @@ describe('AMQP', () => {
         await amqp.sendData(msg, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             'my-special-routing-key',
@@ -232,9 +232,9 @@ describe('AMQP', () => {
         await amqp.sendError(new Error('Test error'), props, message.content);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             settings.ERROR_ROUTING_KEY,
@@ -287,9 +287,9 @@ describe('AMQP', () => {
         await amqp.sendError(new Error('Test error'), props, message.content);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(2);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(2);
 
-        let publishParameters = amqp.publishChannel.publish.calls[0].args;
+        let publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters.length).toEqual(4);
         expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
         expect(publishParameters[1]).toEqual('5559edd38968ec0736000003:step_1:1432205514864:error');
@@ -301,7 +301,7 @@ describe('AMQP', () => {
 
         expect(payload).toEqual(expectedErrorPayload);
 
-        publishParameters = amqp.publishChannel.publish.calls[1].args;
+        publishParameters = amqp.publishChannel.publish.calls.argsFor(1);
         expect(publishParameters.length).toEqual(4);
         expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
         expect(publishParameters[1]).toEqual('my-special-routing-key');
@@ -339,9 +339,9 @@ describe('AMQP', () => {
         await amqp.sendError(new Error('Test error'), props, '');
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
         expect(publishParameters[1]).toEqual('5559edd38968ec0736000003:step_1:1432205514864:error');
 
@@ -377,9 +377,9 @@ describe('AMQP', () => {
         await amqp.sendError(new Error('Test error'), props, null);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
 
         expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
         expect(publishParameters[1]).toEqual('5559edd38968ec0736000003:step_1:1432205514864:error');
@@ -420,9 +420,9 @@ describe('AMQP', () => {
         await amqp.sendRebound(new Error('Rebound error'), message, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             settings.REBOUND_ROUTING_KEY,
@@ -472,9 +472,9 @@ describe('AMQP', () => {
         await amqp.sendRebound(new Error('Rebound error'), clonedMessage, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             settings.REBOUND_ROUTING_KEY,
@@ -524,9 +524,9 @@ describe('AMQP', () => {
         await amqp.sendRebound(new Error('Rebound error'), clonedMessage, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+        expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
 
-        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        const publishParameters = amqp.publishChannel.publish.calls.argsFor(0);
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             settings.ERROR_ROUTING_KEY,
@@ -549,8 +549,8 @@ describe('AMQP', () => {
         amqp.ack(message);
 
         expect(amqp.subscribeChannel.ack).toHaveBeenCalled();
-        expect(amqp.subscribeChannel.ack.callCount).toEqual(1);
-        expect(amqp.subscribeChannel.ack.calls[0].args[0]).toEqual(message);
+        expect(amqp.subscribeChannel.ack).toHaveBeenCalledTimes(1);
+        expect(amqp.subscribeChannel.ack.calls.argsFor(0)[0]).toEqual(message);
     });
 
     it('Should reject message when ack is called with false', () => {
@@ -559,40 +559,34 @@ describe('AMQP', () => {
         amqp.reject(message);
 
         expect(amqp.subscribeChannel.reject).toHaveBeenCalled();
-        expect(amqp.subscribeChannel.reject.callCount).toEqual(1);
-        expect(amqp.subscribeChannel.reject.calls[0].args[0]).toEqual(message);
-        expect(amqp.subscribeChannel.reject.calls[0].args[1]).toEqual(false);
+        expect(amqp.subscribeChannel.reject).toHaveBeenCalledTimes(1);
+        expect(amqp.subscribeChannel.reject.calls.argsFor(0)[0]).toEqual(message);
+        expect(amqp.subscribeChannel.reject.calls.argsFor(0)[1]).toEqual(false);
     });
 
     it('Should listen queue and pass decrypted message to client function', async () => {
         const amqp = new Amqp(settings);
         const clientFunction = jasmine.createSpy('clientFunction');
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['consume', 'prefetch']);
-        await amqp.subscribeChannel.consume.andCallFake((queueName, callback) => {
+        await amqp.subscribeChannel.consume.and.callFake((queueName, callback) => {
             callback(message);
         });
 
-        runs(async () => {
-            await amqp.listenQueue('testQueue', clientFunction);
-        });
+        await amqp.listenQueue('testQueue', clientFunction);
 
-        waitsFor(() => clientFunction.callCount > 0);
-
-        runs(() => {
-            expect(amqp.subscribeChannel.prefetch).toHaveBeenCalledWith(1);
-            expect(clientFunction.callCount).toEqual(1);
-            expect(clientFunction.calls[0].args[0]).toEqual(
-                {
-                    headers: {
-                        reply_to: 'replyTo1234567890'
-                    },
-                    content: 'Message content'
-                }
-            );
-            expect(clientFunction.calls[0].args[1]).toEqual(message);
-            expect(clientFunction.calls[0].args[1].content).toEqual(encryptor.encryptMessageContent({ content: 'Message content' }));
-            expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(message.content, message.properties.headers);
-        });
+        expect(amqp.subscribeChannel.prefetch).toHaveBeenCalledWith(1);
+        expect(clientFunction).toHaveBeenCalledTimes(1);
+        expect(clientFunction.calls.argsFor(0)[0]).toEqual(
+            {
+                headers: {
+                    reply_to: 'replyTo1234567890'
+                },
+                content: 'Message content'
+            }
+        );
+        expect(clientFunction.calls.argsFor(0)[1]).toEqual(message);
+        expect(clientFunction.calls.argsFor(0)[1].content).toEqual(encryptor.encryptMessageContent({ content: 'Message content' }));
+        expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(message.content, message.properties.headers);
     });
 
     it('Should disconnect from all channels and connection', async () => {
@@ -603,8 +597,8 @@ describe('AMQP', () => {
 
         await amqp.disconnect();
 
-        expect(amqp.subscribeChannel.close.callCount).toEqual(1);
-        expect(amqp.publishChannel.close.callCount).toEqual(1);
-        expect(amqp.amqp.close.callCount).toEqual(1);
+        expect(amqp.subscribeChannel.close).toHaveBeenCalledTimes(1);
+        expect(amqp.publishChannel.close).toHaveBeenCalledTimes(1);
+        expect(amqp.amqp.close).toHaveBeenCalledTimes(1);
     });
 });

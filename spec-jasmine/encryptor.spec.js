@@ -5,8 +5,8 @@ process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
 
 describe('Cipher', () => {
     beforeEach(() => {
-        spyOn(global, 'decodeURIComponent').andCallThrough();
-        spyOn(global, 'encodeURIComponent').andCallThrough();
+        spyOn(global, 'decodeURIComponent').and.callThrough();
+        spyOn(global, 'encodeURIComponent').and.callThrough();
     });
 
     it('should encrypt & decrypt strings', () => {

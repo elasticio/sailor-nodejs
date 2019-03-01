@@ -1,4 +1,4 @@
-const request = require('request');
+const request = require('request-promise-native');
 
 exports.process = processTrigger;
 
@@ -8,7 +8,7 @@ async function processTrigger (msg, cfg) {
         json: true
     };
 
-    const [, body] = await request.get(options);
+    const body = await request.get(options);
 
     return { body };
 }

@@ -222,7 +222,7 @@ class Sailor {
             const module = await this.componentReader.loadTriggerOrAction(settings.FUNCTION);
             return processMessageWithModule.call(this, module);
         } catch (e) {
-            await onModuleNotFound(e);
+            await onModuleNotFound.call(this, e);
         }
 
         async function processMessageWithModule (module) {
@@ -369,8 +369,8 @@ class Sailor {
                 }, 'processMessage emit updateKeys');
 
                 return promise(this.apiClient.accounts.update(cfg._account, { keys: keys })
-                    .then(onKeysUpdateSuccess)
-                    .fail(onKeysUpdateError));
+                    .then(onKeysUpdateSuccess.bind(this))
+                    .catch(onKeysUpdateError.bind(this)));
 
                 function onKeysUpdateSuccess () {
                     log.debug('Successfully updated keys #%s', message.fields.deliveryTag);
@@ -378,7 +378,7 @@ class Sailor {
 
                 function onKeysUpdateError (err) {
                     log.error('Failed to updated keys #%s', message.fields.deliveryTag);
-                    return onError(err);
+                    return onError.call(this, err);
                 }
             }
 

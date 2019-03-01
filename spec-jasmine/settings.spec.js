@@ -4,7 +4,7 @@ describe('Settings', () => {
     it('should throw error if no important settings provided', () => {
         expect(() => {
             settings.readFrom({});
-        }).toThrow('ELASTICIO_FLOW_ID is missing');
+        }).toThrowError('ELASTICIO_FLOW_ID is missing');
     });
 
     it('should not throw error if all important settings provided', () => {

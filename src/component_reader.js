@@ -47,7 +47,7 @@ ComponentReader.prototype.findTriggerOrAction = function findTriggerOrAction (na
     }
 };
 
-ComponentReader.prototype.loadTriggerOrAction = function loadTriggerOrAction (name) {
+ComponentReader.prototype.loadTriggerOrAction = async function loadTriggerOrAction (name) {
     let filename;
     let modulePath;
     let result;

@@ -166,6 +166,7 @@ describe('Service', () => {
 
                 it('should return promise based model successfully', async () => {
                     const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update1' }));
+
                     expect(result.status).toEqual('success');
                     expect(result.data).toEqual({
                         in: {
@@ -287,6 +288,7 @@ describe('Service', () => {
                     });
 
                     const result = await service.processService('selectModel', env);
+
                     expect(result.status).toEqual('error');
                     expect(result.data.message).toEqual('Ouch. This promise is rejected');
                 });

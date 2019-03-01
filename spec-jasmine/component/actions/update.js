@@ -1,4 +1,4 @@
-const request = require('request');
+const request = require('request-promise-native');
 
 exports.process = processAction;
 exports.getMetaModel = getMetaModel;
@@ -61,8 +61,7 @@ async function promiseRequestSelectModel (cfg) {
         json: true
     };
 
-    const response = await request.get(options);
-    return response.body;
+    return request.get(options);
 }
 
 function promiseSelectModelRejected (cfg) {

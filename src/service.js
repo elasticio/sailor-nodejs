@@ -162,43 +162,41 @@ async function processService (serviceMethod, env) {
             .catch(error);
     }
 
-    function getMetaModel (cfg, params) {
+    async function getMetaModel (cfg, params) {
         return callModuleMethod(params.triggerOrAction, 'getMetaModel', cfg);
     }
 
-    function selectModel (cfg, params) {
+    async function selectModel (cfg, params) {
         return callModuleMethod(params.triggerOrAction, params.getModelMethod, cfg);
     }
 
     async function callModuleMethod (triggerOrAction, method, cfg) {
-        const subPromises = [];
+        let data;
+        let updateKeysPromise;
+
         const callScope = new EventEmitter();
-        callScope.on('updateKeys', onUpdateKeys);
+        callScope.on('updateKeys', keys => (updateKeysPromise = RestApiClient(API_USERNAME, API_KEY).accounts.update(cfg._account, { keys: keys })));
 
         try {
             const module = await compReader.loadTriggerOrAction(triggerOrAction);
             assert(_.isFunction(module[method]), `Method "${method}" is not found in "${triggerOrAction}" action or trigger`);
 
-            const data = await new Promise((resolve, reject) => module[method].bind(callScope)(cfg, (error, result) => error ? reject(error) : resolve(result)));
-            const [response] = await Promise.all(subPromises);
+            data = await new Promise((resolve, reject) => {
+                const result = module[method].call(callScope, cfg, (error, result) => error ? reject(error) : resolve(result));
+                if (result) {
+                    resolve(result);
+                }
+            });
 
-            _(response)
-                .filter({ state: 'rejected' })
-                .map(result => result.reason)
-                .each(log.error.bind(log));
+            try {
+                await updateKeysPromise;
+            } catch (e) {
+                log.error(e);
+            }
 
             return data;
         } catch (e) {
             throw e;
-        }
-
-        function onUpdateKeys (keys) {
-            const apiClient = RestApiClient(API_USERNAME, API_KEY);
-            addPromise(apiClient.accounts.update(cfg._account, { keys: keys }));
-        }
-
-        function addPromise (p) {
-            subPromises.push(p);
         }
     }
 }
