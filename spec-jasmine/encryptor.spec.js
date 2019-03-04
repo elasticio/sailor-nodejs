@@ -54,22 +54,4 @@ describe('Cipher', () => {
 
         expect(error.message).toMatch('Failed to decrypt message');
     });
-
-    // eslint-disable-next-line
-    xit('should be compatible with Java-Sailor', () => {
-        const javaResult = 'wXTeSuonL1KvG7eKJ1Dk/hUHeLOhr7GMC1mGa7JyGQ9ZGg6AdjrKKn0ktoFMNVU77uB9dRd+tqqe0GNKlH8yuJrM2JWNdMbAWFHDLK5PvSRgL/negMTlmEnk/5/V5wharU8Qs9SW6rFI/E78Nkqlmqgwbd7ovHyzuOQIZj3kT4h6CW7S2fWJ559jpByhwXU1T8ZcGPOs4T+356AqYTXj8q2QgnkduKY7sNTrXNDsQUIZpm7tbBmMkoWuE6BXTitN/56TI2SVpo7TEQ/ef4c11fnrnCkpremZl4qPCCQcXD/47gMTSbSIydZCFQ584PE64pAwwn7UxloSen059tKKYF1BtGmBaqj97mHAL8izh3wsDoG8GuMRo2GhKopHnZTm';
-
-        const data = {
-            body: {
-                incomingProperty1: 'incomingValue1',
-                incomingProperty2: 'incomingValue2'
-            },
-            attachments: {
-                incomingAttachment2: 'incomingAttachment2Content',
-                incomingAttachment1: 'incomingAttachment1Content'
-            }
-        };
-
-        expect(cipher.decryptMessageContent(javaResult)).toEqual(data);
-    });
 });

@@ -749,15 +749,6 @@ describe('Integration Test', () => {
                 run = requireRun();
             });
         });
-
-        describe('when request for hooksdata is failed with an error', () => {
-            // @todo
-            it('should not execute shutdown');
-        });
-        describe('when shutdown hook method is not found', () => {
-            // @todo
-            it('should not thrown error and just finish process');
-        });
     });
 });
 
