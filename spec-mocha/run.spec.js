@@ -38,7 +38,7 @@ describe('Integration Test', () => {
 
     let sinon;
     beforeEach(() => {
-        sinon = sinonjs.sandbox.create();
+        sinon = sinonjs.createSandbox();
     });
     afterEach(() => {
         sinon.restore();
