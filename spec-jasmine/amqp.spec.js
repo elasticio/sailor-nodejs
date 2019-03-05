@@ -1,64 +1,62 @@
+const envVars = {};
+envVars.ELASTICIO_AMQP_URI = 'amqp://localhost';
+envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+envVars.ELASTICIO_STEP_ID = 'step_1';
+envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
+envVars.ELASTICIO_USER_ID = '5559edd38968ec0736000002';
+envVars.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
+envVars.ELASTICIO_FUNCTION = 'list';
+envVars.ELASTICIO_LISTEN_MESSAGES_ON = '5559edd38968ec0736000003:step_1:1432205514864:messages';
+envVars.ELASTICIO_PUBLISH_MESSAGES_TO = 'userexchange:5527f0ea43238e5d5f000001';
+envVars.ELASTICIO_DATA_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:message';
+envVars.ELASTICIO_ERROR_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:error';
+envVars.ELASTICIO_REBOUND_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:rebound';
+envVars.ELASTICIO_SNAPSHOT_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:snapshot';
+envVars.ELASTICIO_API_URI = 'http://apihost.com';
+envVars.ELASTICIO_API_USERNAME = 'test@test.com';
+envVars.ELASTICIO_API_KEY = '5559edd';
+
+const Amqp = require('../src/amqp.js').Amqp;
+const settings = require('../src/settings.js').readFrom(envVars);
+const encryptor = require('../src/encryptor.js');
+const _ = require('lodash');
+const HUGE_JSON = require('./fixtures/huge_json.json');
+
+process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+
+const MESSAGE = {
+    fields: {
+        consumerTag: 'abcde',
+        deliveryTag: 12345,
+        exchange: 'test',
+        routingKey: 'test.hello'
+    },
+    properties: {
+        contentType: 'application/json',
+        contentEncoding: 'utf8',
+        headers: {
+            taskId: 'task1234567890',
+            execId: 'exec1234567890',
+            reply_to: 'replyTo1234567890'
+        },
+        deliveryMode: undefined,
+        priority: undefined,
+        correlationId: undefined,
+        replyTo: undefined,
+        expiration: undefined,
+        messageId: undefined,
+        timestamp: undefined,
+        type: undefined,
+        userId: undefined,
+        appId: undefined,
+        mandatory: true,
+        clusterId: ''
+    },
+    content: encryptor.encryptMessageContent({ content: 'Message content' })
+};
+
 describe('AMQP', () => {
-    process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
-    process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
-
-    const envVars = {};
-    envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
-    envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
-    envVars.ELASTICIO_STEP_ID = 'step_1';
-    envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
-
-    envVars.ELASTICIO_USER_ID = '5559edd38968ec0736000002';
-    envVars.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
-    envVars.ELASTICIO_FUNCTION = 'list';
-
-    envVars.ELASTICIO_LISTEN_MESSAGES_ON = '5559edd38968ec0736000003:step_1:1432205514864:messages';
-    envVars.ELASTICIO_PUBLISH_MESSAGES_TO = 'userexchange:5527f0ea43238e5d5f000001';
-    envVars.ELASTICIO_DATA_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:message';
-    envVars.ELASTICIO_ERROR_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:error';
-    envVars.ELASTICIO_REBOUND_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:rebound';
-    envVars.ELASTICIO_SNAPSHOT_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:snapshot';
-
-    envVars.ELASTICIO_API_URI = 'http://apihost.com';
-    envVars.ELASTICIO_API_USERNAME = 'test@test.com';
-    envVars.ELASTICIO_API_KEY = '5559edd';
-
-    const Amqp = require('../src/amqp.js').Amqp;
-    const settings = require('../src/settings.js').readFrom(envVars);
-    const encryptor = require('../src/encryptor.js');
-    const _ = require('lodash');
-
-    const message = {
-        fields: {
-            consumerTag: 'abcde',
-            deliveryTag: 12345,
-            exchange: 'test',
-            routingKey: 'test.hello'
-        },
-        properties: {
-            contentType: 'application/json',
-            contentEncoding: 'utf8',
-            headers: {
-                taskId: 'task1234567890',
-                execId: 'exec1234567890',
-                reply_to: 'replyTo1234567890'
-            },
-            deliveryMode: undefined,
-            priority: undefined,
-            correlationId: undefined,
-            replyTo: undefined,
-            expiration: undefined,
-            messageId: undefined,
-            timestamp: undefined,
-            type: undefined,
-            userId: undefined,
-            appId: undefined,
-            mandatory: true,
-            clusterId: ''
-        },
-        content: encryptor.encryptMessageContent({ content: 'Message content' })
-    };
-
     beforeEach(() => {
         spyOn(encryptor, 'decryptMessageContent').and.callThrough();
     });
@@ -95,13 +93,32 @@ describe('AMQP', () => {
             props
         ]);
 
-        const payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        const payload = encryptor.decryptMessageContent(publishParameters[2]);
         expect(payload).toEqual({
             headers: {
                 'some-other-header': 'headerValue'
             },
             body: 'Message content'
         });
+    });
+
+    it('Should send huge message to outgoing channel when process data', async () => {
+        const amqp = new Amqp(settings);
+        const props = {
+            contentType: 'application/json',
+            contentEncoding: 'utf8',
+            mandatory: true,
+            headers: {
+                taskId: 'task1234567890',
+                stepId: 'step_456'
+            }
+        };
+
+        await amqp.connect(envVars.ELASTICIO_AMQP_URI);
+        await amqp.sendData({
+            headers: { 'some-other-header': 'headerValue', 'x-eio-routing-key': 'nowhere' },
+            body: HUGE_JSON
+        }, props);
     });
 
     it('Should sendHttpReply to outgoing channel using routing key from headers when process data', async () => {
@@ -137,7 +154,7 @@ describe('AMQP', () => {
         expect(publishParameters[2].toString()).toEqual(encryptor.encryptMessageContent(msg));
         expect(publishParameters[3]).toEqual(props);
 
-        const payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        const payload = encryptor.decryptMessageContent(publishParameters[2]);
         expect(payload).toEqual(msg);
     });
 
@@ -206,7 +223,7 @@ describe('AMQP', () => {
             props
         ]);
 
-        const payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        const payload = encryptor.decryptMessageContent(publishParameters[2]);
         expect(payload).toEqual({
             headers: {},
             body: {
@@ -229,7 +246,7 @@ describe('AMQP', () => {
             }
         };
 
-        await amqp.sendError(new Error('Test error'), props, message.content);
+        await amqp.sendError(new Error('Test error'), props, MESSAGE.content);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
@@ -243,8 +260,8 @@ describe('AMQP', () => {
         ]);
 
         const payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
-        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
+        payload.error = encryptor.decryptMessageContent(Buffer.from(payload.error));
+        payload.errorInput = encryptor.decryptMessageContent(Buffer.from(payload.errorInput));
 
         expect(payload).toEqual({
             error: {
@@ -284,7 +301,7 @@ describe('AMQP', () => {
             }
         };
 
-        await amqp.sendError(new Error('Test error'), props, message.content);
+        await amqp.sendError(new Error('Test error'), props, MESSAGE.content);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(2);
@@ -296,8 +313,8 @@ describe('AMQP', () => {
         expect(publishParameters[3]).toEqual(props);
 
         let payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
-        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
+        payload.error = encryptor.decryptMessageContent(Buffer.from(payload.error));
+        payload.errorInput = encryptor.decryptMessageContent(Buffer.from(payload.errorInput));
 
         expect(payload).toEqual(expectedErrorPayload);
 
@@ -317,7 +334,7 @@ describe('AMQP', () => {
             }
         });
 
-        payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        payload = encryptor.decryptMessageContent(publishParameters[2]);
 
         expect(payload).toEqual(expectedErrorPayload.error);
     });
@@ -345,8 +362,8 @@ describe('AMQP', () => {
         expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
         expect(publishParameters[1]).toEqual('5559edd38968ec0736000003:step_1:1432205514864:error');
 
-        const payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
+        const payload = JSON.parse(publishParameters[2]);
+        payload.error = encryptor.decryptMessageContent(Buffer.from(payload.error));
 
         expect(payload).toEqual({
             error: {
@@ -385,7 +402,7 @@ describe('AMQP', () => {
         expect(publishParameters[1]).toEqual('5559edd38968ec0736000003:step_1:1432205514864:error');
 
         const payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
+        payload.error = encryptor.decryptMessageContent(Buffer.from(payload.error));
 
         expect(payload).toEqual({
             error: {
@@ -417,7 +434,7 @@ describe('AMQP', () => {
             }
         };
 
-        await amqp.sendRebound(new Error('Rebound error'), message, props);
+        await amqp.sendRebound(new Error('Rebound error'), MESSAGE, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish).toHaveBeenCalledTimes(1);
@@ -444,7 +461,7 @@ describe('AMQP', () => {
             }
         ]);
 
-        const payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        const payload = encryptor.decryptMessageContent(publishParameters[2]);
         expect(payload).toEqual({ content: 'Message content' });
     });
 
@@ -466,7 +483,7 @@ describe('AMQP', () => {
             }
         };
 
-        const clonedMessage = _.cloneDeep(message);
+        const clonedMessage = _.cloneDeep(MESSAGE);
         clonedMessage.properties.headers.reboundIteration = 2;
 
         await amqp.sendRebound(new Error('Rebound error'), clonedMessage, props);
@@ -496,7 +513,7 @@ describe('AMQP', () => {
             }
         ]);
 
-        const payload = encryptor.decryptMessageContent(publishParameters[2].toString());
+        const payload = encryptor.decryptMessageContent(publishParameters[2]);
         expect(payload).toEqual({ content: 'Message content' });
     });
 
@@ -518,7 +535,7 @@ describe('AMQP', () => {
             }
         };
 
-        const clonedMessage = _.cloneDeep(message);
+        const clonedMessage = _.cloneDeep(MESSAGE);
         clonedMessage.properties.headers.reboundIteration = 100;
 
         await amqp.sendRebound(new Error('Rebound error'), clonedMessage, props);
@@ -530,13 +547,13 @@ describe('AMQP', () => {
         expect(publishParameters).toEqual([
             settings.PUBLISH_MESSAGES_TO,
             settings.ERROR_ROUTING_KEY,
-            jasmine.any(Object),
+            jasmine.any(Buffer),
             props
         ]);
 
-        const payload = JSON.parse(publishParameters[2].toString());
-        payload.error = encryptor.decryptMessageContent(payload.error);
-        payload.errorInput = encryptor.decryptMessageContent(payload.errorInput);
+        const payload = JSON.parse(publishParameters[2]);
+        payload.error = encryptor.decryptMessageContent(Buffer.from(payload.error));
+        payload.errorInput = encryptor.decryptMessageContent(Buffer.from(payload.errorInput));
 
         expect(payload.error.message).toEqual('Rebound limit exceeded');
         expect(payload.errorInput).toEqual({ content: 'Message content' });
@@ -546,21 +563,21 @@ describe('AMQP', () => {
         const amqp = new Amqp();
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['ack']);
 
-        amqp.ack(message);
+        amqp.ack(MESSAGE);
 
         expect(amqp.subscribeChannel.ack).toHaveBeenCalled();
         expect(amqp.subscribeChannel.ack).toHaveBeenCalledTimes(1);
-        expect(amqp.subscribeChannel.ack.calls.argsFor(0)[0]).toEqual(message);
+        expect(amqp.subscribeChannel.ack.calls.argsFor(0)[0]).toEqual(MESSAGE);
     });
 
     it('Should reject message when ack is called with false', () => {
         const amqp = new Amqp(settings);
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['reject']);
-        amqp.reject(message);
+        amqp.reject(MESSAGE);
 
         expect(amqp.subscribeChannel.reject).toHaveBeenCalled();
         expect(amqp.subscribeChannel.reject).toHaveBeenCalledTimes(1);
-        expect(amqp.subscribeChannel.reject.calls.argsFor(0)[0]).toEqual(message);
+        expect(amqp.subscribeChannel.reject.calls.argsFor(0)[0]).toEqual(MESSAGE);
         expect(amqp.subscribeChannel.reject.calls.argsFor(0)[1]).toEqual(false);
     });
 
@@ -569,7 +586,7 @@ describe('AMQP', () => {
         const clientFunction = jasmine.createSpy('clientFunction');
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['consume', 'prefetch']);
         await amqp.subscribeChannel.consume.and.callFake((queueName, callback) => {
-            callback(message);
+            callback(MESSAGE);
         });
 
         await amqp.listenQueue('testQueue', clientFunction);
@@ -584,9 +601,9 @@ describe('AMQP', () => {
                 content: 'Message content'
             }
         );
-        expect(clientFunction.calls.argsFor(0)[1]).toEqual(message);
+        expect(clientFunction.calls.argsFor(0)[1]).toEqual(MESSAGE);
         expect(clientFunction.calls.argsFor(0)[1].content).toEqual(encryptor.encryptMessageContent({ content: 'Message content' }));
-        expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(message.content, message.properties.headers);
+        expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(MESSAGE.content, MESSAGE.properties.headers);
     });
 
     it('Should disconnect from all channels and connection', async () => {

@@ -24,7 +24,7 @@ class AmqpHelper extends EventEmitter {
         env.ELASTICIO_TIMEOUT = 3000;
     }
 
-    publishMessage (message, { parentMessageId, traceId } = {}, headers = {}) {
+    async publishMessage (message, { parentMessageId, traceId } = {}, headers = {}) {
         return this.subscriptionChannel.publish(
             env.ELASTICIO_LISTEN_MESSAGES_ON,
             env.ELASTICIO_DATA_ROUTING_KEY,

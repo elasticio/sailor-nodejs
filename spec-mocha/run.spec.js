@@ -1,8 +1,8 @@
 const nock = require('nock');
 const expect = require('chai').expect;
 const sinonjs = require('sinon');
-const heapdump = require('heapdump');
 const helpers = require('./integration_helpers');
+const HUGE_JSON = require('../spec-jasmine/fixtures/huge_json.json');
 const env = process.env;
 
 describe('Integration Test', () => {
@@ -131,12 +131,10 @@ describe('Integration Test', () => {
         });
 
         it('should run trigger successfully on a huge message', (done) => {
-            const MESSAGE_SIZE_IN_MB = 1;
-            const buildMessage = (size) => Buffer.alloc(size * 1024 * 1024, 'a');
             const inputMessage = {
                 headers: {},
                 body: {
-                    message: buildMessage(MESSAGE_SIZE_IN_MB)
+                    message: HUGE_JSON
                 }
             };
 
@@ -149,8 +147,6 @@ describe('Integration Test', () => {
                 .reply(200, customers);
 
             amqpHelper.on('data', ({ properties, body }, queueName) => {
-                heapdump.writeSnapshot('on_amqp_message.heapsnapshot');
-
                 expect(queueName).to.eql(amqpHelper.nextStepQueue);
 
                 delete properties.headers.start;
@@ -210,9 +206,7 @@ describe('Integration Test', () => {
 
             run = requireRun();
 
-            heapdump.writeSnapshot('before_publish_message.heapsnapshot');
             amqpHelper.publishMessage(inputMessage, { parentMessageId, traceId });
-            heapdump.writeSnapshot('after_publish_message.heapsnapshot');
         });
 
         it('should augment passthrough property with data', done => {
