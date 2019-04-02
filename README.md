@@ -49,6 +49,12 @@ Here is a list of components build on Node.js:
 [daviddm-image]: https://david-dm.org/elasticio/sailor-nodejs.svg?theme=shields.io
 [daviddm-url]: https://david-dm.org/elasticio/sailor-nodejs
 
+## Sailor logging
+
+Sailor uses [bunyan](https://github.com/trentm/node-bunyan) logging framework. You can change the logging settings with environment varaible:
+ * `LOG_LEVEL` - set it to one of `error`,`warn`,`info`,`debug` or `trace`. See [this code](https://github.com/elasticio/sailor-nodejs/blob/master/lib/logging.js#L11) for more details.
+
+
 ## Flow control
 
 When working in the multi-tenant integration environment it's important to obey the API and
