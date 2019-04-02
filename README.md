@@ -104,6 +104,13 @@ on the component level)
 
  * ELASTICIO_DATA_RATE_LIMIT - a number of maximum `data` messages per second that could be emitted
  by the component
+ 
+ * ELASTICIO_SNAPSHOT_RATE_LIMIT - a number of maximum `snapshot` messages per second that could be emitted
+ by the component
+ 
+ * ELASTICIO_PROCESS_AMQP_DRAIN, (boolean) - true value means that 'emit' method in component would return
+ promise which will resolve to true value when amqplib inner buffer would be empty. Preventing OutOfMemoryError
+ on buffer overflow.
 
 ## Sailor hooks
 
