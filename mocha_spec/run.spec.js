@@ -143,6 +143,87 @@ describe('Integration Test', () => {
             });
         });
 
+        it('should run trigger with data from maester successfully', (done) => {
+            process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+            process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+
+            helpers.mockApiTaskStepResponse();
+
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .reply(200, customers);
+
+            amqpHelper.on('data', ({ properties, body }, queueName) => {
+
+                expect(queueName).to.eql(amqpHelper.nextStepQueue);
+
+                delete properties.headers.start;
+                delete properties.headers.end;
+                delete properties.headers.cid;
+
+                expect(properties.headers).to.deep.equal({
+                    'execId': env.ELASTICIO_EXEC_ID,
+                    'taskId': env.ELASTICIO_FLOW_ID,
+                    'userId': env.ELASTICIO_USER_ID,
+                    'stepId': env.ELASTICIO_STEP_ID,
+                    'compId': env.ELASTICIO_COMP_ID,
+                    'function': env.ELASTICIO_FUNCTION,
+                    'x-eio-meta-trace-id': traceId,
+                    'parentMessageId': parentMessageId,
+                    messageId
+                });
+
+                expect(properties).to.deep.equal({
+                    contentType: 'application/json',
+                    contentEncoding: 'utf8',
+                    headers: {
+                        'execId': env.ELASTICIO_EXEC_ID,
+                        'taskId': env.ELASTICIO_FLOW_ID,
+                        'userId': env.ELASTICIO_USER_ID,
+                        'stepId': env.ELASTICIO_STEP_ID,
+                        'compId': env.ELASTICIO_COMP_ID,
+                        'function': env.ELASTICIO_FUNCTION,
+                        'x-eio-meta-trace-id': traceId,
+                        'parentMessageId': parentMessageId,
+                        messageId
+                    },
+                    deliveryMode: undefined,
+                    priority: undefined,
+                    correlationId: undefined,
+                    replyTo: undefined,
+                    expiration: undefined,
+                    messageId: undefined,
+                    timestamp: undefined,
+                    type: undefined,
+                    userId: undefined,
+                    appId: undefined,
+                    clusterId: undefined
+                });
+                expect(body).to.deep.equal({
+                    originalMsg: '',
+                    customers: customers,
+                    subscription: {
+                        id: 'subscription_12345',
+                        cfg: {
+                            apiKey: 'secret'
+                        }
+                    }
+                });
+                done();
+            });
+
+            run = requireRun();
+
+            amqpHelper.publishMessage('', {
+                parentMessageId,
+                traceId
+            }, { maesterId: '47d3e978-8099-11e9-bc42-526af7764f64' });
+        });
+
         it('should augment passthrough property with data', done => {
             process.env.ELASTICIO_STEP_ID = 'step_2';
             process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
