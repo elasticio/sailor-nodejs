@@ -357,24 +357,77 @@ describe('Executor', () => {
     });
 
     describe('executor logger', () => {
+        function TestStream() {
+            this.lastRecord = '';
+        }
+
+        TestStream.prototype.write = function write(record) {
+            this.lastRecord = record;
+        };
+
+        let taskExec;
+        let testStream;
+
+        beforeEach(() => {
+            testStream = new TestStream();
+
+            taskExec = new TaskExec({
+                loggerOptions: {
+                    streams: [
+                        {
+                            type: 'raw',
+                            stream: testStream
+                        }
+                    ]
+                }
+            });
+        });
+
+        it('should check if level is enabled', () => {
+            expect(taskExec.logger.info()).toBeTruthy();
+        });
+
+        it('should implicitly convert first argument to string', () => {
+            taskExec.logger.info(undefined);
+            expect(testStream.lastRecord.msg).toEqual('undefined');
+
+            taskExec.logger.info(null);
+            expect(testStream.lastRecord.msg).toEqual('null');
+
+            taskExec.logger.info({});
+            expect(testStream.lastRecord.msg).toEqual('[object Object]');
+        });
+
+        it('should format log message', () => {
+            taskExec.logger.info('hello %s', 'world');
+
+            expect(testStream.lastRecord.msg).toEqual('hello world');
+        });
+
         it('should log extra fields', () => {
+            const testStream = new TestStream();
+
             const taskExec = new TaskExec({
-                loggerFields: {
+                loggerOptions: {
+                    streams: [
+                        {
+                            type: 'raw',
+                            stream: testStream
+                        }
+                    ],
+
                     threadId: 'threadId',
                     messageId: 'messageId',
                     parentMessageId: 'parentMessageId'
                 }
             });
 
-            expect(taskExec.logger.fields.threadId).toEqual('threadId');
-            expect(taskExec.logger.fields.messageId).toEqual('messageId');
-            expect(taskExec.logger.fields.parentMessageId).toEqual('parentMessageId');
+            taskExec.logger.info('info');
 
-            spyOn(taskExec.logger, 'info').andCallThrough();
-
-            taskExec.logger.info('test');
-
-            expect(taskExec.logger.info).toHaveBeenCalledWith('test');
+            expect(testStream.lastRecord.threadId).toEqual('threadId');
+            expect(testStream.lastRecord.messageId).toEqual('messageId');
+            expect(testStream.lastRecord.parentMessageId).toEqual('parentMessageId');
+            expect(testStream.lastRecord.msg).toEqual('info');
         });
     });
 });
