@@ -355,4 +355,26 @@ describe('Executor', () => {
             });
         });
     });
+
+    describe('executor logger', () => {
+        it('should log extra fields', () => {
+            const taskExec = new TaskExec({
+                loggerFields: {
+                    threadId: 'threadId',
+                    messageId: 'messageId',
+                    parentMessageId: 'parentMessageId'
+                }
+            });
+
+            expect(taskExec.logger.fields.threadId).toEqual('threadId');
+            expect(taskExec.logger.fields.messageId).toEqual('messageId');
+            expect(taskExec.logger.fields.parentMessageId).toEqual('parentMessageId');
+
+            spyOn(taskExec.logger, 'info').andCallThrough();
+
+            taskExec.logger.info('test');
+
+            expect(taskExec.logger.info).toHaveBeenCalledWith('test');
+        });
+    });
 });
