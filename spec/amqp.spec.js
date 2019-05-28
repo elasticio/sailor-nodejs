@@ -65,7 +65,7 @@ describe('AMQP', () => {
         spyOn(encryptor, 'decryptMessageContent').andCallThrough();
     });
 
-    it('Should send message to outgoing channel when process data', () => {
+    it('Should send message to outgoing channel when process data', async () => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
@@ -79,7 +79,7 @@ describe('AMQP', () => {
             }
         };
 
-        amqp.sendData({
+        await amqp.sendData({
             headers: {
                 'some-other-header': 'headerValue'
             },
@@ -164,7 +164,7 @@ describe('AMQP', () => {
         }, done);
     });
 
-    it('Should sendHttpReply to outgoing channel using routing key from headers when process data', () => {
+    it('Should sendHttpReply to outgoing channel using routing key from headers when process data', async () => {
 
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
@@ -187,7 +187,7 @@ describe('AMQP', () => {
                 reply_to: 'my-special-routing-key'
             }
         };
-        amqp.sendHttpReply(msg, props);
+        await amqp.sendHttpReply(msg, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish.callCount).toEqual(1);
@@ -232,7 +232,7 @@ describe('AMQP', () => {
 
     });
 
-    it('Should send message to outgoing channel using routing key from headers when process data', () => {
+    it('Should send message to outgoing channel using routing key from headers when process data', async () => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
 
@@ -255,7 +255,7 @@ describe('AMQP', () => {
             }
         };
 
-        amqp.sendData(msg, props);
+        await amqp.sendData(msg, props);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish.callCount).toEqual(1);
@@ -672,7 +672,7 @@ describe('AMQP', () => {
             //eslint-disable-next-line max-len
             expect(clientFunction.calls[0].args[1].content).toEqual(encryptor.encryptMessageContent({ content: 'Message content' }));
 
-            expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(message.content, message.properties.headers);
+            expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(message.content);
         });
     });
 
