@@ -6,6 +6,7 @@ const co = require('co');
 const sinonjs = require('sinon');
 const logging = require('../lib/logging.js');
 const helpers = require('./integration_helpers');
+const encryptor = require('../lib/encryptor.js');
 
 const env = process.env;
 
@@ -143,44 +144,51 @@ describe('Integration Test', () => {
             });
         });
 
-        it('should run trigger with data from maester successfully', (done) => {
-            process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
-            process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+        describe('when maester should be used', () => {
+            beforeEach(() => helpers.prepareEnv(true));
 
-            helpers.mockApiTaskStepResponse();
+            it('should run trigger successfully', (done) => {
+                const maesterId = '47d3e978-8099-11e9-bc42-526af7764f64';
 
-            nock('https://api.acme.com')
-                .post('/subscribe')
-                .reply(200, {
-                    id: 'subscription_12345'
-                })
-                .get('/customers')
-                .reply(200, customers);
+                helpers.mockApiTaskStepResponse();
 
-            amqpHelper.on('data', ({ properties, body }, queueName) => {
+                nock('https://api.acme.com')
+                    .post('/subscribe')
+                    .reply(200, {
+                        id: 'subscription_12345'
+                    })
+                    .get('/customers')
+                    .reply(200, customers);
 
-                expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                nock(process.env.ELASTICIO_MAESTER_BASEPATH)
+                    .get(`/objects/${maesterId}`)
+                    .reply(200, encryptor.encryptMessageContent(inputMessage))
+                    .put(/^\/objects\/[0-9a-z-]+$/, encryptor.encryptMessageContent({
+                        id: messageId,
+                        body: {
+                            originalMsg: inputMessage,
+                            customers,
+                            subscription: {
+                                id: 'subscription_12345',
+                                cfg: {
+                                    apiKey: 'secret'
+                                }
+                            }
+                        },
+                        headers: {}
+                    }))
+                    .reply(200);
 
-                delete properties.headers.start;
-                delete properties.headers.end;
-                delete properties.headers.cid;
+                amqpHelper.on('data', ({ properties, body }, queueName) => {
+                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                    expect(properties.headers.maesterId).to.be.string;
 
-                expect(properties.headers).to.deep.equal({
-                    'execId': env.ELASTICIO_EXEC_ID,
-                    'taskId': env.ELASTICIO_FLOW_ID,
-                    'userId': env.ELASTICIO_USER_ID,
-                    'stepId': env.ELASTICIO_STEP_ID,
-                    'compId': env.ELASTICIO_COMP_ID,
-                    'function': env.ELASTICIO_FUNCTION,
-                    'x-eio-meta-trace-id': traceId,
-                    'parentMessageId': parentMessageId,
-                    messageId
-                });
+                    delete properties.headers.start;
+                    delete properties.headers.end;
+                    delete properties.headers.cid;
+                    delete properties.headers.maesterId;
 
-                expect(properties).to.deep.equal({
-                    contentType: 'application/json',
-                    contentEncoding: 'utf8',
-                    headers: {
+                    expect(properties.headers).to.deep.equal({
                         'execId': env.ELASTICIO_EXEC_ID,
                         'taskId': env.ELASTICIO_FLOW_ID,
                         'userId': env.ELASTICIO_USER_ID,
@@ -190,38 +198,45 @@ describe('Integration Test', () => {
                         'x-eio-meta-trace-id': traceId,
                         'parentMessageId': parentMessageId,
                         messageId
-                    },
-                    deliveryMode: undefined,
-                    priority: undefined,
-                    correlationId: undefined,
-                    replyTo: undefined,
-                    expiration: undefined,
-                    messageId: undefined,
-                    timestamp: undefined,
-                    type: undefined,
-                    userId: undefined,
-                    appId: undefined,
-                    clusterId: undefined
+                    });
+
+                    expect(properties).to.deep.equal({
+                        contentType: 'application/json',
+                        contentEncoding: 'utf8',
+                        headers: {
+                            'execId': env.ELASTICIO_EXEC_ID,
+                            'taskId': env.ELASTICIO_FLOW_ID,
+                            'userId': env.ELASTICIO_USER_ID,
+                            'stepId': env.ELASTICIO_STEP_ID,
+                            'compId': env.ELASTICIO_COMP_ID,
+                            'function': env.ELASTICIO_FUNCTION,
+                            'x-eio-meta-trace-id': traceId,
+                            'parentMessageId': parentMessageId,
+                            messageId
+                        },
+                        deliveryMode: undefined,
+                        priority: undefined,
+                        correlationId: undefined,
+                        replyTo: undefined,
+                        expiration: undefined,
+                        messageId: undefined,
+                        timestamp: undefined,
+                        type: undefined,
+                        userId: undefined,
+                        appId: undefined,
+                        clusterId: undefined
+                    });
+                    expect(body).to.be.null;
+                    done();
                 });
-                expect(body).to.deep.equal({
-                    originalMsg: '',
-                    customers: customers,
-                    subscription: {
-                        id: 'subscription_12345',
-                        cfg: {
-                            apiKey: 'secret'
-                        }
-                    }
-                });
-                done();
+
+                run = requireRun();
+
+                amqpHelper.publishMessage('', {
+                    parentMessageId,
+                    traceId
+                }, { maesterId });
             });
-
-            run = requireRun();
-
-            amqpHelper.publishMessage('', {
-                parentMessageId,
-                traceId
-            }, { maesterId: '47d3e978-8099-11e9-bc42-526af7764f64' });
         });
 
         it('should augment passthrough property with data', done => {

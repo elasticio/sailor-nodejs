@@ -131,11 +131,12 @@ class AmqpHelper extends EventEmitter {
 
         this.publishChannel.ack(message);
 
-        const emittedMessage = JSON.parse(message.content.toString());
+        const content = message.content.toString();
+        const emittedMessage = content ? JSON.parse(content) : content;
 
         const data = {
             properties: message.properties,
-            body: emittedMessage.body,
+            body: emittedMessage ? emittedMessage.body : null,
             emittedMessage
         };
         this.dataMessages.push(data);
@@ -159,7 +160,7 @@ function amqp() {
     return handle;
 }
 
-function prepareEnv() {
+function prepareEnv(isMaester) {
     env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672';
     env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '10';
     env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
@@ -178,7 +179,9 @@ function prepareEnv() {
 
     env.DEBUG = 'sailor:debug';
 
-
+    env.ELASTICIO_MAESTER_IS_STORE = isMaester || '';
+    env.ELASTICIO_MAESTER_BASEPATH = isMaester ? 'http://ma.es.ter' : '';
+    env.ELASTICIO_MAESTER_JWT = isMaester ? 'jwt' : '';
 }
 
 function mockApiTaskStepResponse(response) {
