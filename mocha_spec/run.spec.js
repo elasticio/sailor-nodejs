@@ -146,7 +146,7 @@ describe('Integration Test', () => {
         });
 
         it('should get maester message', (done) => {
-            process.env.ELASTICIO_MAESTER_IS_STORE = true;
+            process.env.ELASTICIO_MAESTER_OUT = true;
 
             helpers.mockApiTaskStepResponse();
 
