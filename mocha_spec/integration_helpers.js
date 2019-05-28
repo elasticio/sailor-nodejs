@@ -179,9 +179,9 @@ function prepareEnv(isMaester) {
 
     env.DEBUG = 'sailor:debug';
 
-    env.ELASTICIO_MAESTER_IS_STORE = isMaester || '';
-    env.ELASTICIO_MAESTER_BASEPATH = isMaester ? 'http://ma.es.ter' : '';
-    env.ELASTICIO_MAESTER_JWT = isMaester ? 'jwt' : '';
+    env.ELASTICIO_MAESTER_IS_STORE = '';
+    env.ELASTICIO_MAESTER_BASEPATH = 'http://ma.es.ter';
+    env.ELASTICIO_MAESTER_JWT = 'jwt';
 }
 
 function mockApiTaskStepResponse(response) {

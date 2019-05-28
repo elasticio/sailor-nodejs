@@ -60,6 +60,7 @@ describe('Integration Test', () => {
         const parentMessageId = 'parent_message_1234567890';
         const traceId = helpers.PREFIX + '_trace_id_123456';
         const messageId = 'f45be600-f770-11e6-b42d-b187bfbf19fd';
+        const maesterId = '47d3e978-8099-11e9-bc42-526af7764f64';
 
         let amqpHelper = helpers.amqp();
         beforeEach(() => amqpHelper.prepare());
@@ -144,99 +145,90 @@ describe('Integration Test', () => {
             });
         });
 
-        describe('when maester should be used', () => {
-            beforeEach(() => helpers.prepareEnv(true));
+        it('should get maester message', (done) => {
+            process.env.ELASTICIO_MAESTER_IS_STORE = true;
 
-            it('should run trigger successfully', (done) => {
-                const maesterId = '47d3e978-8099-11e9-bc42-526af7764f64';
+            helpers.mockApiTaskStepResponse();
 
-                helpers.mockApiTaskStepResponse();
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .reply(200, customers);
 
-                nock('https://api.acme.com')
-                    .post('/subscribe')
-                    .reply(200, {
-                        id: 'subscription_12345'
-                    })
-                    .get('/customers')
-                    .reply(200, customers);
-
-                nock(process.env.ELASTICIO_MAESTER_BASEPATH)
-                    .get(`/objects/${maesterId}`)
-                    .reply(200, encryptor.encryptMessageContent(inputMessage))
-                    .put(/^\/objects\/[0-9a-z-]+$/, encryptor.encryptMessageContent({
-                        id: messageId,
-                        body: {
-                            originalMsg: inputMessage,
-                            customers,
-                            subscription: {
-                                id: 'subscription_12345',
-                                cfg: {
-                                    apiKey: 'secret'
-                                }
+            const maesterCalls = nock(process.env.ELASTICIO_MAESTER_BASEPATH)
+                .get(`/objects/${maesterId}`)
+                .reply(200, encryptor.encryptMessageContent(inputMessage))
+                .put(/^\/objects\/[0-9a-z-]+$/, encryptor.encryptMessageContent({
+                    id: messageId,
+                    body: {
+                        originalMsg: inputMessage,
+                        customers,
+                        subscription: {
+                            id: 'subscription_12345',
+                            cfg: {
+                                apiKey: 'secret'
                             }
-                        },
-                        headers: {}
-                    }))
-                    .reply(200);
+                        }
+                    },
+                    headers: {}
+                }))
+                .reply(200);
 
-                amqpHelper.on('data', ({ properties, body }, queueName) => {
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
-                    expect(properties.headers.maesterId).to.be.string;
-
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.maesterId;
-
-                    expect(properties.headers).to.deep.equal({
-                        'execId': env.ELASTICIO_EXEC_ID,
-                        'taskId': env.ELASTICIO_FLOW_ID,
-                        'userId': env.ELASTICIO_USER_ID,
-                        'stepId': env.ELASTICIO_STEP_ID,
-                        'compId': env.ELASTICIO_COMP_ID,
-                        'function': env.ELASTICIO_FUNCTION,
-                        'x-eio-meta-trace-id': traceId,
-                        'parentMessageId': parentMessageId,
-                        messageId
-                    });
-
-                    expect(properties).to.deep.equal({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        headers: {
-                            'execId': env.ELASTICIO_EXEC_ID,
-                            'taskId': env.ELASTICIO_FLOW_ID,
-                            'userId': env.ELASTICIO_USER_ID,
-                            'stepId': env.ELASTICIO_STEP_ID,
-                            'compId': env.ELASTICIO_COMP_ID,
-                            'function': env.ELASTICIO_FUNCTION,
-                            'x-eio-meta-trace-id': traceId,
-                            'parentMessageId': parentMessageId,
-                            messageId
-                        },
-                        deliveryMode: undefined,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
-                    });
-                    expect(body).to.be.null;
-                    done();
-                });
-
-                run = requireRun();
-
-                amqpHelper.publishMessage('', {
-                    parentMessageId,
-                    traceId
-                }, { maesterId });
+            amqpHelper.on('data', ({ properties, body }) => {
+                expect(properties.headers.maesterId).to.be.a('string');
+                expect(body).to.be.null;
+                expect(maesterCalls.isDone()).to.be.true;
+                done();
             });
+
+            run = requireRun();
+
+            amqpHelper.publishMessage('', {
+                parentMessageId,
+                traceId
+            }, { maesterId });
+        });
+
+        it('should get maester message, but publish directly', (done) => {
+            helpers.mockApiTaskStepResponse();
+
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .reply(200, customers);
+
+            const maesterCalls = nock(process.env.ELASTICIO_MAESTER_BASEPATH)
+                .get(`/objects/${maesterId}`)
+                .reply(200, encryptor.encryptMessageContent(inputMessage));
+
+            amqpHelper.on('data', ({ properties, body }) => {
+                expect(properties.headers.maesterId).to.not.exist;
+                expect(body).to.deep.equal({
+                    originalMsg: inputMessage,
+                    customers,
+                    subscription: {
+                        id: 'subscription_12345',
+                        cfg: {
+                            apiKey: 'secret'
+                        }
+                    }
+                });
+                expect(maesterCalls.isDone()).to.be.true;
+                done();
+            });
+
+            run = requireRun();
+
+            amqpHelper.publishMessage('', {
+                parentMessageId,
+                traceId
+            }, { maesterId });
         });
 
         it('should augment passthrough property with data', done => {
