@@ -60,7 +60,7 @@ describe('Integration Test', () => {
         const parentMessageId = 'parent_message_1234567890';
         const traceId = helpers.PREFIX + '_trace_id_123456';
         const messageId = 'f45be600-f770-11e6-b42d-b187bfbf19fd';
-        const maesterId = '47d3e978-8099-11e9-bc42-526af7764f64';
+        const objectId = '47d3e978-8099-11e9-bc42-526af7764f64';
 
         let amqpHelper = helpers.amqp();
         beforeEach(() => amqpHelper.prepare());
@@ -145,8 +145,8 @@ describe('Integration Test', () => {
             });
         });
 
-        it('should get maester message', (done) => {
-            process.env.ELASTICIO_MAESTER_OUT = true;
+        it('should get object storage message', (done) => {
+            process.env.ELASTICIO_OBJECT_STORAGE_OUT = true;
 
             helpers.mockApiTaskStepResponse();
 
@@ -158,8 +158,8 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            const maesterCalls = nock(process.env.ELASTICIO_MAESTER_BASEPATH)
-                .get(`/objects/${maesterId}`)
+            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_BASEPATH)
+                .get(`/objects/${objectId}`)
                 .reply(200, encryptor.encryptMessageContent(inputMessage))
                 .put(/^\/objects\/[0-9a-z-]+$/, encryptor.encryptMessageContent({
                     id: messageId,
@@ -178,9 +178,9 @@ describe('Integration Test', () => {
                 .reply(200);
 
             amqpHelper.on('data', ({ properties, body }) => {
-                expect(properties.headers.maesterId).to.be.a('string');
+                expect(properties.headers.objectId).to.be.a('string');
                 expect(body).to.be.null;
-                expect(maesterCalls.isDone()).to.be.true;
+                expect(objectStorageCalls.isDone()).to.be.true;
                 done();
             });
 
@@ -189,10 +189,10 @@ describe('Integration Test', () => {
             amqpHelper.publishMessage('', {
                 parentMessageId,
                 traceId
-            }, { maesterId });
+            }, { objectId });
         });
 
-        it('should get maester message, but publish directly', (done) => {
+        it('should get object storage message, but publish directly', (done) => {
             helpers.mockApiTaskStepResponse();
 
             nock('https://api.acme.com')
@@ -203,12 +203,12 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            const maesterCalls = nock(process.env.ELASTICIO_MAESTER_BASEPATH)
-                .get(`/objects/${maesterId}`)
+            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_BASEPATH)
+                .get(`/objects/${objectId}`)
                 .reply(200, encryptor.encryptMessageContent(inputMessage));
 
             amqpHelper.on('data', ({ properties, body }) => {
-                expect(properties.headers.maesterId).to.not.exist;
+                expect(properties.headers.objectId).to.not.exist;
                 expect(body).to.deep.equal({
                     originalMsg: inputMessage,
                     customers,
@@ -219,7 +219,7 @@ describe('Integration Test', () => {
                         }
                     }
                 });
-                expect(maesterCalls.isDone()).to.be.true;
+                expect(objectStorageCalls.isDone()).to.be.true;
                 done();
             });
 
@@ -228,7 +228,7 @@ describe('Integration Test', () => {
             amqpHelper.publishMessage('', {
                 parentMessageId,
                 traceId
-            }, { maesterId });
+            }, { objectId });
         });
 
         it('should augment passthrough property with data', done => {

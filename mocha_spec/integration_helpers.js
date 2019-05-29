@@ -160,7 +160,7 @@ function amqp() {
     return handle;
 }
 
-function prepareEnv(isMaester) {
+function prepareEnv() {
     env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672';
     env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '10';
     env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
@@ -179,9 +179,9 @@ function prepareEnv(isMaester) {
 
     env.DEBUG = 'sailor:debug';
 
-    env.ELASTICIO_MAESTER_BASEPATH = 'http://ma.es.ter';
-    env.ELASTICIO_MAESTER_OUT = '';
-    env.ELASTICIO_MAESTER_JWT = 'jwt';
+    env.ELASTICIO_OBJECT_STORAGE_BASEPATH = 'http://ma.es.ter';
+    env.ELASTICIO_OBJECT_STORAGE_OUT = '';
+    env.ELASTICIO_OBJECT_STORAGE_TOKEN = 'jwt';
 }
 
 function mockApiTaskStepResponse(response) {
