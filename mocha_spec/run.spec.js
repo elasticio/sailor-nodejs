@@ -158,7 +158,7 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_BASEPATH)
+            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .get(`/objects/${objectId}`)
                 .reply(200, encryptor.encryptMessageContent(inputMessage))
                 .put(/^\/objects\/[0-9a-z-]+$/, encryptor.encryptMessageContent({
@@ -203,7 +203,7 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_BASEPATH)
+            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .get(`/objects/${objectId}`)
                 .reply(200, encryptor.encryptMessageContent(inputMessage));
 
