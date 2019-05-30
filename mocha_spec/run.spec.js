@@ -145,7 +145,7 @@ describe('Integration Test', () => {
             });
         });
 
-        it('should get object storage message', (done) => {
+        it('should get object storage message', async () => {
             process.env.ELASTICIO_OBJECT_STORAGE_OUT = true;
 
             helpers.mockApiTaskStepResponse();
@@ -158,10 +158,14 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+            const objectStorageGet = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .get(`/objects/${objectId}`)
-                .reply(200, encryptor.encryptMessageContent(inputMessage))
-                .put(/^\/objects\/[0-9a-z-]+$/, encryptor.encryptMessageContent({
+                .reply(200, await helpers.encryptForObjectStorage(inputMessage), {
+                    'content-type': 'application/octet-stream'
+                });
+            const objectStoragePut = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+                .matchHeader('content-type', 'application/octet-stream')
+                .put(/^\/objects\/[0-9a-z-]+$/, await helpers.encryptForObjectStorage({
                     id: messageId,
                     body: {
                         originalMsg: inputMessage,
@@ -177,10 +181,12 @@ describe('Integration Test', () => {
                 }))
                 .reply(200);
 
+            let done;
             amqpHelper.on('data', ({ properties, body }) => {
                 expect(properties.headers.objectId).to.be.a('string');
                 expect(body).to.be.null;
-                expect(objectStorageCalls.isDone()).to.be.true;
+                expect(objectStorageGet.isDone()).to.be.true;
+                expect(objectStoragePut.isDone()).to.be.true;
                 done();
             });
 
@@ -190,9 +196,11 @@ describe('Integration Test', () => {
                 parentMessageId,
                 traceId
             }, { objectId });
+
+            return new Promise((resolve) => { done = resolve; });
         });
 
-        it('should get object storage message, but publish directly', (done) => {
+        it('should get object storage message, but publish directly', async () => {
             helpers.mockApiTaskStepResponse();
 
             nock('https://api.acme.com')
@@ -205,8 +213,11 @@ describe('Integration Test', () => {
 
             const objectStorageCalls = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .get(`/objects/${objectId}`)
-                .reply(200, encryptor.encryptMessageContent(inputMessage));
+                .reply(200, await helpers.encryptForObjectStorage(inputMessage), {
+                    'content-type': 'application/octet-stream'
+                });
 
+            let done;
             amqpHelper.on('data', ({ properties, body }) => {
                 expect(properties.headers.objectId).to.not.exist;
                 expect(body).to.deep.equal({
@@ -229,6 +240,8 @@ describe('Integration Test', () => {
                 parentMessageId,
                 traceId
             }, { objectId });
+
+            return new Promise((resolve) => { done = resolve; });
         });
 
         it('should augment passthrough property with data', done => {

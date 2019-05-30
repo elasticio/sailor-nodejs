@@ -5,6 +5,8 @@ const amqplib = require('amqplib');
 const { EventEmitter } = require('events');
 const PREFIX = 'sailor_nodejs_integration_test';
 const nock = require('nock');
+const getStream = require('get-stream');
+const encryptor = require('../lib/encryptor.js');
 
 const env = process.env;
 
@@ -200,6 +202,11 @@ function mockApiTaskStepResponse(response) {
         .reply(200, Object.assign(defaultResponse, response));
 }
 
+async function encryptForObjectStorage(input) {
+    const stream = encryptor.encryptMessageContentStream(input);
+    return await getStream.buffer(stream);
+}
+
 exports.PREFIX = PREFIX;
 
 exports.amqp = function amqp() {
@@ -208,4 +215,4 @@ exports.amqp = function amqp() {
 
 exports.prepareEnv = prepareEnv;
 exports.mockApiTaskStepResponse = mockApiTaskStepResponse;
-
+exports.encryptForObjectStorage = encryptForObjectStorage;
