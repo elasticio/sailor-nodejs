@@ -6,7 +6,6 @@ const co = require('co');
 const sinonjs = require('sinon');
 const logging = require('../lib/logging.js');
 const helpers = require('./integration_helpers');
-const encryptor = require('../lib/encryptor.js');
 
 const env = process.env;
 
