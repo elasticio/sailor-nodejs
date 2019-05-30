@@ -160,11 +160,13 @@ describe('Integration Test', () => {
 
             const objectStorageGet = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .get(`/objects/${objectId}`)
+                .matchHeader('authorization', /Bearer/)
                 .reply(200, await helpers.encryptForObjectStorage(inputMessage), {
                     'content-type': 'application/octet-stream'
                 });
             const objectStoragePut = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .matchHeader('content-type', 'application/octet-stream')
+                .matchHeader('authorization', /Bearer/)
                 .put(/^\/objects\/[0-9a-z-]+$/, await helpers.encryptForObjectStorage({
                     id: messageId,
                     body: {
