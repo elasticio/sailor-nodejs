@@ -145,7 +145,7 @@ describe('Integration Test', () => {
         });
 
         it('should get object storage message', async () => {
-            process.env.ELASTICIO_OBJECT_STORAGE_OUT = true;
+            process.env.ELASTICIO_OBJECT_STORAGE_ENABLED = true;
 
             helpers.mockApiTaskStepResponse();
 

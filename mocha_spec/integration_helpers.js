@@ -182,7 +182,7 @@ function prepareEnv() {
     env.DEBUG = 'sailor:debug';
 
     env.ELASTICIO_OBJECT_STORAGE_URI = 'http://ma.es.ter';
-    env.ELASTICIO_OBJECT_STORAGE_OUT = '';
+    env.ELASTICIO_OBJECT_STORAGE_ENABLED = '';
     env.ELASTICIO_OBJECT_STORAGE_TOKEN = 'jwt';
 }
 
