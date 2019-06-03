@@ -201,6 +201,143 @@ describe('Integration Test', () => {
             return new Promise((resolve) => { done = resolve; });
         });
 
+        it('should get object storage message if error repeat succeed', async () => {
+            process.env.ELASTICIO_OBJECT_STORAGE_ENABLED = true;
+
+            helpers.mockApiTaskStepResponse();
+
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .reply(200, customers);
+
+            const log = sinon.stub(logging, 'warn');
+            const objectStorageGet = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+                .get(`/objects/${objectId}`)
+                .matchHeader('authorization', /Bearer/)
+                .reply(200, await helpers.encryptForObjectStorage(inputMessage), {
+                    'content-type': 'application/octet-stream'
+                });
+            const putData = await helpers.encryptForObjectStorage({
+                id: messageId,
+                body: {
+                    originalMsg: inputMessage,
+                    customers,
+                    subscription: {
+                        id: 'subscription_12345',
+                        cfg: {
+                            apiKey: 'secret'
+                        }
+                    }
+                },
+                headers: {}
+            });
+            const objectStoragePut = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+                .matchHeader('content-type', 'application/octet-stream')
+                .matchHeader('authorization', /Bearer/)
+                .put(/^\/objects\/[0-9a-z-]+$/, putData)
+                .replyWithError({ code: 'ECONNREFUSED' })
+                .put(/^\/objects\/[0-9a-z-]+$/, putData)
+                .reply(400)
+                .put(/^\/objects\/[0-9a-z-]+$/, putData)
+                .reply(200);
+
+            let done;
+            amqpHelper.on('data', ({ properties, body }) => {
+                expect(properties.headers.objectId).to.be.a('string');
+                expect(body).to.be.null;
+                expect(objectStorageGet.isDone()).to.be.true;
+                expect(objectStoragePut.isDone()).to.be.true;
+                expect(log.getCall(1).args[1].toString()).to.include('400');
+                done();
+            });
+
+            run = requireRun();
+
+            amqpHelper.publishMessage('', {
+                parentMessageId,
+                traceId
+            }, { objectId });
+
+            return new Promise((resolve) => { done = resolve; });
+        });
+
+        it('should get object storage message, but publish directly on 3 errors', async () => {
+            process.env.ELASTICIO_OBJECT_STORAGE_ENABLED = true;
+
+            helpers.mockApiTaskStepResponse();
+
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .reply(200, customers);
+
+            const log = sinon.stub(logging, 'error');
+            const objectStorageGet = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+                .get(`/objects/${objectId}`)
+                .matchHeader('authorization', /Bearer/)
+                .reply(200, await helpers.encryptForObjectStorage(inputMessage), {
+                    'content-type': 'application/octet-stream'
+                });
+            const putData = await helpers.encryptForObjectStorage({
+                id: messageId,
+                body: {
+                    originalMsg: inputMessage,
+                    customers,
+                    subscription: {
+                        id: 'subscription_12345',
+                        cfg: {
+                            apiKey: 'secret'
+                        }
+                    }
+                },
+                headers: {}
+            });
+            const objectStoragePut = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+                .matchHeader('content-type', 'application/octet-stream')
+                .matchHeader('authorization', /Bearer/)
+                .put(/^\/objects\/[0-9a-z-]+$/, putData)
+                .replyWithError({ code: 'ECONNREFUSED' })
+                .put(/^\/objects\/[0-9a-z-]+$/, putData)
+                .reply(400)
+                .put(/^\/objects\/[0-9a-z-]+$/, putData)
+                .reply(503);
+
+            let done;
+            amqpHelper.on('data', ({ properties, body }) => {
+                expect(properties.headers.objectId).to.not.exist;
+                expect(body).to.deep.equal({
+                    originalMsg: inputMessage,
+                    customers,
+                    subscription: {
+                        id: 'subscription_12345',
+                        cfg: {
+                            apiKey: 'secret'
+                        }
+                    }
+                });
+                expect(objectStorageGet.isDone()).to.be.true;
+                expect(objectStoragePut.isDone()).to.be.true;
+                expect(log.getCall(0).args[1].toString()).to.include('503');
+                done();
+            });
+
+            run = requireRun();
+
+            amqpHelper.publishMessage('', {
+                parentMessageId,
+                traceId
+            }, { objectId });
+
+            return new Promise((resolve) => { done = resolve; });
+        });
+
         it('should get object storage message, but publish directly', async () => {
             helpers.mockApiTaskStepResponse();
 

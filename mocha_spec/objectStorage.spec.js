@@ -1,6 +1,8 @@
 const nock = require('nock');
+const sinonjs = require('sinon');
 const expect = require('chai').expect;
 const getStream = require('get-stream');
+const logging = require('../lib/logging.js');
 
 describe('ObjectStorage', () => {
 
@@ -31,7 +33,16 @@ describe('ObjectStorage', () => {
     const encryptor = require('../lib/encryptor.js');
     const settings = require('../lib/settings.js').readFrom(envVars);
 
+    let sinon;
+    beforeEach(() => {
+        sinon = sinonjs.sandbox.create();
+    });
+    afterEach(() => {
+        sinon.restore();
+    });
+
     it('should fail after 3 retries', async () => {
+        const log = sinon.stub(logging, 'warn');
         const objectStorage = new ObjectStorage(settings);
 
         const objectStorageCalls = nock(settings.OBJECT_STORAGE_URI)
@@ -52,6 +63,8 @@ describe('ObjectStorage', () => {
 
         expect(objectStorageCalls.isDone()).to.be.true;
         expect(err.code).to.be.equal('ENOTFOUND');
+        expect(log.getCall(1).args[1].toString()).to.include('404');
+        expect(log.callCount).to.be.equal(3);
     });
 
     it('should retry get request 3 times on errors', async () => {
@@ -93,6 +106,7 @@ describe('ObjectStorage', () => {
     });
 
     it('should retry put request on 409 error with different objectId', async () => {
+        const log = sinon.stub(logging, 'warn');
         const objectStorage = new ObjectStorage(settings);
         const data = { test: 'test' };
         const put = await getStream.buffer(encryptor.encryptMessageContentStream(data));
@@ -116,5 +130,7 @@ describe('ObjectStorage', () => {
         expect(objectStorageCalls.isDone()).to.be.true;
         expect(urls[0]).to.be.equal(urls[1]);
         expect(urls[1]).to.not.equal(urls[2]);
+        expect(log.getCall(1).args[0]).to.include('UUID');
+        expect(log.callCount).to.be.equal(2);
     });
 });
