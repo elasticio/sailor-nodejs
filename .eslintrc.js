@@ -145,6 +145,7 @@ module.exports = {
             }
         ],
         'mocha/no-skipped-tests': ERROR,
-        'mocha/no-exclusive-tests': ERROR
+        'mocha/no-exclusive-tests': ERROR,
+        'new-parens': ERROR
     }
 };

@@ -5,6 +5,8 @@ const amqplib = require('amqplib');
 const { EventEmitter } = require('events');
 const PREFIX = 'sailor_nodejs_integration_test';
 const nock = require('nock');
+const getStream = require('get-stream');
+const encryptor = require('../lib/encryptor.js');
 
 const env = process.env;
 
@@ -131,11 +133,12 @@ class AmqpHelper extends EventEmitter {
 
         this.publishChannel.ack(message);
 
-        const emittedMessage = JSON.parse(message.content.toString());
+        const content = message.content.toString();
+        const emittedMessage = content ? JSON.parse(content) : content;
 
         const data = {
             properties: message.properties,
-            body: emittedMessage.body,
+            body: emittedMessage ? emittedMessage.body : null,
             emittedMessage
         };
         this.dataMessages.push(data);
@@ -178,7 +181,9 @@ function prepareEnv() {
 
     env.DEBUG = 'sailor:debug';
 
-
+    env.ELASTICIO_OBJECT_STORAGE_URI = 'http://ma.es.ter';
+    env.ELASTICIO_OBJECT_STORAGE_ENABLED = '';
+    env.ELASTICIO_OBJECT_STORAGE_TOKEN = 'jwt';
 }
 
 function mockApiTaskStepResponse(response) {
@@ -197,6 +202,11 @@ function mockApiTaskStepResponse(response) {
         .reply(200, Object.assign(defaultResponse, response));
 }
 
+async function encryptForObjectStorage(input) {
+    const stream = encryptor.encryptMessageContentStream(input);
+    return await getStream.buffer(stream);
+}
+
 exports.PREFIX = PREFIX;
 
 exports.amqp = function amqp() {
@@ -205,4 +215,4 @@ exports.amqp = function amqp() {
 
 exports.prepareEnv = prepareEnv;
 exports.mockApiTaskStepResponse = mockApiTaskStepResponse;
-
+exports.encryptForObjectStorage = encryptForObjectStorage;
