@@ -497,6 +497,50 @@ describe('AMQP', () => {
         expect(publishParameters[3]).toEqual(props);
     });
 
+    it('Should send objectId instead of message when process error', () => {
+
+        const amqp = new Amqp(settings);
+        const objectId = 'aef703e0-7ebf-456f-a7b9-20b647ab43cd';
+        amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish']);
+
+
+        const props = {
+            contentType: 'application/json',
+            contentEncoding: 'utf8',
+            mandatory: true,
+            headers: {
+                objectId,
+                taskId: 'task1234567890',
+                stepId: 'step_456'
+            }
+        };
+
+        amqp.sendError(new Error('Test error'), props, message.content);
+
+        expect(amqp.publishChannel.publish).toHaveBeenCalled();
+        expect(amqp.publishChannel.publish.callCount).toEqual(1);
+
+        const publishParameters = amqp.publishChannel.publish.calls[0].args;
+        expect(publishParameters).toEqual([
+            settings.PUBLISH_MESSAGES_TO,
+            settings.ERROR_ROUTING_KEY,
+            jasmine.any(Object),
+            props
+        ]);
+
+        const payload = JSON.parse(publishParameters[2].toString());
+        payload.error = encryptor.decryptMessageContent(payload.error);
+
+        expect(payload).toEqual({
+            error: {
+                name: 'Error',
+                message: 'Test error',
+                stack: jasmine.any(String)
+            },
+            objectId
+        });
+    });
+
     it('Should send message to rebounds when rebound happened', () => {
 
         const amqp = new Amqp(settings);
