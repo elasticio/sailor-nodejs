@@ -33,6 +33,10 @@
     "http_reply_action": {
       "main": "./actions/http_reply_action.js",
       "title": "Http Reply Action"
+    },
+    "error_action": {
+      "main": "./actions/error_action.js",
+      "title": "Error Action"
     }
   }
 }

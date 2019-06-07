@@ -508,8 +508,8 @@ describe('AMQP', () => {
             contentType: 'application/json',
             contentEncoding: 'utf8',
             mandatory: true,
+            [Symbol.for('objectId')]: objectId,
             headers: {
-                objectId,
                 taskId: 'task1234567890',
                 stepId: 'step_456'
             }

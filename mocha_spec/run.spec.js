@@ -201,6 +201,37 @@ describe('Integration Test', () => {
             return new Promise((resolve) => { done = resolve; });
         });
 
+        it('should send objectId on error instead of original message', async () => {
+
+            process.env.ELASTICIO_OBJECT_STORAGE_ENABLED = true;
+            env.ELASTICIO_FUNCTION = 'error_action';
+
+            helpers.mockApiTaskStepResponse();
+
+            const objectStorageGet = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
+                .get(`/objects/${objectId}`)
+                .matchHeader('authorization', /Bearer/)
+                .reply(200, await helpers.encryptForObjectStorage(inputMessage), {
+                    'content-type': 'application/octet-stream'
+                });
+
+            let done;
+            amqpHelper.on('data', ({ emittedMessage }) => {
+                expect(emittedMessage.objectId).to.equal(objectId);
+                expect(objectStorageGet.isDone()).to.be.true;
+                done();
+            });
+
+            run = requireRun();
+
+            amqpHelper.publishMessage('', {
+                parentMessageId,
+                traceId
+            }, { objectId });
+
+            return new Promise((resolve) => { done = resolve; });
+        });
+
         it('should get object storage message if error repeat succeed', async () => {
             process.env.ELASTICIO_OBJECT_STORAGE_ENABLED = true;
 
