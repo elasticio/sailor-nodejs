@@ -312,7 +312,7 @@ describe('AMQP', () => {
             }
         };
 
-        amqp.sendError(new Error('Test error'), props, message.content);
+        amqp.sendError(new Error('Test error'), props, message);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish.callCount).toEqual(1);
@@ -371,7 +371,7 @@ describe('AMQP', () => {
         };
 
         async function test() {
-            await amqp.sendError(new Error('Test error'), props, message.content);
+            await amqp.sendError(new Error('Test error'), props, message);
         }
 
         test().then(() => {
@@ -508,14 +508,16 @@ describe('AMQP', () => {
             contentType: 'application/json',
             contentEncoding: 'utf8',
             mandatory: true,
-            [Symbol.for('objectId')]: objectId,
             headers: {
                 taskId: 'task1234567890',
                 stepId: 'step_456'
             }
         };
 
-        amqp.sendError(new Error('Test error'), props, message.content);
+        const msgWithObjectId = _.cloneDeep(message);
+        msgWithObjectId.properties.headers.objectId = objectId;
+
+        amqp.sendError(new Error('Test error'), props, msgWithObjectId);
 
         expect(amqp.publishChannel.publish).toHaveBeenCalled();
         expect(amqp.publishChannel.publish.callCount).toEqual(1);
