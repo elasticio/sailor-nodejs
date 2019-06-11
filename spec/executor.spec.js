@@ -424,6 +424,7 @@ describe('Executor', () => {
 
             taskExec.logger.info('info');
 
+            expect(testStream.lastRecord.name).toEqual('component');
             expect(testStream.lastRecord.threadId).toEqual('threadId');
             expect(testStream.lastRecord.messageId).toEqual('messageId');
             expect(testStream.lastRecord.parentMessageId).toEqual('parentMessageId');
