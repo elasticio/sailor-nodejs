@@ -8,6 +8,7 @@ const nock = require('nock');
 const getStream = require('get-stream');
 const { Readable } = require('stream');
 const { Message } = require('@elastic.io/object-storage-client');
+const encryptor = require('../lib/encryptor');
 
 const env = process.env;
 
@@ -135,7 +136,7 @@ class AmqpHelper extends EventEmitter {
         this.publishChannel.ack(message);
 
         const content = message.content.toString();
-        const emittedMessage = content ? JSON.parse(content) : content;
+        const emittedMessage = content ? encryptor.decryptMessageContent(message.content) : content;
 
         const data = {
             properties: message.properties,
