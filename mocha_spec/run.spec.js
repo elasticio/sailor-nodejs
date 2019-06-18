@@ -214,7 +214,6 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            const log = sinon.stub(logging, 'warn');
             const objectStorageGet = nock(process.env.ELASTICIO_OBJECT_STORAGE_URI)
                 .get(`/objects/${objectId}`)
                 .matchHeader('authorization', /Bearer/)
@@ -251,7 +250,6 @@ describe('Integration Test', () => {
                 expect(body).to.be.null;
                 expect(objectStorageGet.isDone()).to.be.true;
                 expect(objectStoragePut.isDone()).to.be.true;
-                expect(log.getCall(1).args[1].toString()).to.include('400');
                 done();
             });
 
