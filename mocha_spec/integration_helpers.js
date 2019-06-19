@@ -6,7 +6,9 @@ const { EventEmitter } = require('events');
 const PREFIX = 'sailor_nodejs_integration_test';
 const nock = require('nock');
 const getStream = require('get-stream');
-const encryptor = require('../lib/encryptor.js');
+const { Readable } = require('stream');
+const { Message } = require('@elastic.io/object-storage-client');
+const encryptor = require('../lib/encryptor');
 
 const env = process.env;
 
@@ -134,7 +136,7 @@ class AmqpHelper extends EventEmitter {
         this.publishChannel.ack(message);
 
         const content = message.content.toString();
-        const emittedMessage = content ? JSON.parse(content) : content;
+        const emittedMessage = content ? encryptor.decryptMessageContent(message.content) : content;
 
         const data = {
             properties: message.properties,
@@ -184,6 +186,9 @@ function prepareEnv() {
     env.ELASTICIO_OBJECT_STORAGE_URI = 'http://ma.es.ter';
     env.ELASTICIO_OBJECT_STORAGE_ENABLED = '';
     env.ELASTICIO_OBJECT_STORAGE_TOKEN = 'jwt';
+
+    env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+    env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
 }
 
 function mockApiTaskStepResponse(response) {
@@ -203,7 +208,14 @@ function mockApiTaskStepResponse(response) {
 }
 
 async function encryptForObjectStorage(input) {
-    const stream = encryptor.encryptMessageContentStream(input);
+    const dataStream = new Readable();
+    dataStream.push(JSON.stringify(input));
+    dataStream.push(null);
+    const message = new Message({
+        key: env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
+        iv: env.ELASTICIO_MESSAGE_CRYPTO_IV
+    });
+    const stream = message.packStream(dataStream);
     return await getStream.buffer(stream);
 }
 
