@@ -1,16 +1,26 @@
-'use strict';
-
-const co = require('co');
-const amqplib = require('amqplib');
 const { EventEmitter } = require('events');
-const PREFIX = 'sailor_nodejs_integration_test';
+
+const _ = require('lodash');
+const amqplib = require('amqplib');
+
 const nock = require('nock');
 
-const env = process.env;
+const encryptor = require('../lib/encryptor.js');
+const cipher = require('../lib/cipher.js');
+
+
+const PREFIX = 'sailor_nodejs_integration_test';
+//const env = process.env;
 
 class AmqpHelper extends EventEmitter {
-    constructor() {
+    constructor(config) {
         super();
+        this._config = config;
+
+        this._cryptoSettings = {
+            password: config.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
+            cryptoIV: config.ELASTICIO_MESSAGE_CRYPTO_IV
+        };
 
         this.httpReplyQueueName = PREFIX + 'request_reply_queue';
         this.httpReplyQueueRoutingKey = PREFIX + 'request_reply_routing_key';
@@ -21,118 +31,119 @@ class AmqpHelper extends EventEmitter {
         this.errorMessages = [];
     }
 
-    prepareEnv() {
-        env.ELASTICIO_LISTEN_MESSAGES_ON = PREFIX + ':messages';
-        env.ELASTICIO_PUBLISH_MESSAGES_TO = PREFIX + ':exchange';
-        env.ELASTICIO_DATA_ROUTING_KEY = PREFIX + ':routing_key:message';
-        env.ELASTICIO_ERROR_ROUTING_KEY = PREFIX + ':routing_key:error';
-        env.ELASTICIO_REBOUND_ROUTING_KEY = PREFIX + ':routing_key:rebound';
-        env.ELASTICIO_SNAPSHOT_ROUTING_KEY = PREFIX + ':routing_key:snapshot';
-
-        env.ELASTICIO_TIMEOUT = 3000;
-    }
-
     publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
         return this.subscriptionChannel.publish(
-            env.ELASTICIO_LISTEN_MESSAGES_ON,
-            env.ELASTICIO_DATA_ROUTING_KEY,
-            new Buffer(JSON.stringify(message)), {
-                headers: Object.assign({
-                    execId: env.ELASTICIO_EXEC_ID,
-                    taskId: env.ELASTICIO_FLOW_ID,
-                    workspaceId: env.ELASTICIO_WORKSPACE_ID,
-                    userId: env.ELASTICIO_USER_ID,
-                    threadId,
-                    messageId: parentMessageId
-                }, headers)
-            });
+            this._config.ELASTICIO_LISTEN_MESSAGES_ON,
+            this._config.ELASTICIO_DATA_ROUTING_KEY,
+            Buffer.from(encryptor.encryptMessageContent(this._cryptoSettings, message)),
+            {
+                headers: Object.assign(
+                    {
+                        execId: this._config.ELASTICIO_EXEC_ID,
+                        taskId: this._config.ELASTICIO_FLOW_ID,
+                        workspaceId: this._config.ELASTICIO_WORKSPACE_ID,
+                        userId: this._config.ELASTICIO_USER_ID,
+                        threadId,
+                        messageId: parentMessageId
+                    },
+                    headers
+                )
+            }
+        );
     }
 
-    *prepareQueues() {
-        const amqp = yield amqplib.connect(env.ELASTICIO_AMQP_URI);
-        const subscriptionChannel = yield amqp.createChannel();
-        const publishChannel = yield amqp.createChannel();
+    async _prepareQueues() {
+        this._amqpConn = await amqplib.connect(this._config.ELASTICIO_AMQP_URI);
+        const subscriptionChannel = await this._amqpConn.createChannel();
+        const publishChannel = await this._amqpConn.createChannel();
 
-        yield subscriptionChannel.assertQueue(env.ELASTICIO_LISTEN_MESSAGES_ON);
-        yield publishChannel.assertQueue(this.nextStepQueue);
-        yield publishChannel.assertQueue(this.nextStepErrorQueue);
+        await subscriptionChannel.assertQueue(this._config.ELASTICIO_LISTEN_MESSAGES_ON);
+        await publishChannel.assertQueue(this.nextStepQueue);
+        await publishChannel.assertQueue(this.nextStepErrorQueue);
 
         const exchangeOptions = {
             durable: true,
             autoDelete: false
         };
 
-        yield subscriptionChannel.assertExchange(env.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', exchangeOptions);
-        yield publishChannel.assertExchange(env.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
+        await subscriptionChannel.assertExchange(this._config.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', exchangeOptions);
+        await publishChannel.assertExchange(this._config.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
 
-        yield subscriptionChannel.bindQueue(
-            env.ELASTICIO_LISTEN_MESSAGES_ON,
-            env.ELASTICIO_LISTEN_MESSAGES_ON,
-            env.ELASTICIO_DATA_ROUTING_KEY);
+        await subscriptionChannel.bindQueue(
+            this._config.ELASTICIO_LISTEN_MESSAGES_ON,
+            this._config.ELASTICIO_LISTEN_MESSAGES_ON,
+            this._config.ELASTICIO_DATA_ROUTING_KEY);
 
-        yield publishChannel.bindQueue(
+        await publishChannel.bindQueue(
             this.nextStepQueue,
-            env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            env.ELASTICIO_DATA_ROUTING_KEY);
+            this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
+            this._config.ELASTICIO_DATA_ROUTING_KEY);
 
-        yield publishChannel.bindQueue(
+        await publishChannel.bindQueue(
             this.nextStepErrorQueue,
-            env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            env.ELASTICIO_ERROR_ROUTING_KEY);
+            this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
+            this._config.ELASTICIO_ERROR_ROUTING_KEY);
 
-        yield publishChannel.assertQueue(this.httpReplyQueueName);
-        yield publishChannel.bindQueue(
+        await publishChannel.assertQueue(this.httpReplyQueueName);
+        await publishChannel.bindQueue(
             this.httpReplyQueueName,
-            env.ELASTICIO_PUBLISH_MESSAGES_TO,
+            this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
             this.httpReplyQueueRoutingKey);
 
-        yield publishChannel.purgeQueue(this.nextStepQueue);
-        yield publishChannel.purgeQueue(this.nextStepErrorQueue);
-        yield publishChannel.purgeQueue(env.ELASTICIO_LISTEN_MESSAGES_ON);
+        await publishChannel.purgeQueue(this.nextStepQueue);
+        await publishChannel.purgeQueue(this.nextStepErrorQueue);
+        await publishChannel.purgeQueue(this._config.ELASTICIO_LISTEN_MESSAGES_ON);
 
         this.subscriptionChannel = subscriptionChannel;
         this.publishChannel = publishChannel;
     }
 
-    cleanUp() {
+    async cleanUp() {
         this.removeAllListeners();
-        return Promise.all([
+        await Promise.all([
             this.publishChannel.cancel('sailor_nodejs_1'),
             this.publishChannel.cancel('sailor_nodejs_2'),
             this.publishChannel.cancel('sailor_nodejs_3')
         ]);
+        if (this._amqpConn) {
+            await this._amqpConn.close();
+            this._amqpConn = null;
+        }
     }
 
-    prepare() {
-        const that = this;
-        return co(function * gen() {
-            that.prepareEnv();
-            yield that.prepareQueues();
+    async prepare() {
+        await this._prepareQueues();
 
-            yield that.publishChannel.consume(
-                that.nextStepQueue,
-                that.consumer.bind(that, that.nextStepQueue),
-                { consumerTag: 'sailor_nodejs_1' }
-            );
+        await this.publishChannel.consume(
+            this.nextStepQueue,
+            this._consumer.bind(this, this.nextStepQueue),
+            { consumerTag: 'sailor_nodejs_1' }
+        );
 
-            yield that.publishChannel.consume(
-                that.nextStepErrorQueue,
-                that.consumer.bind(that, that.nextStepErrorQueue),
-                { consumerTag: 'sailor_nodejs_2' }
-            );
+        await this.publishChannel.consume(
+            this.nextStepErrorQueue,
+            this._consumer.bind(this, this.nextStepErrorQueue),
+            { consumerTag: 'sailor_nodejs_2' }
+        );
 
-            yield that.publishChannel.consume(
-                that.httpReplyQueueName,
-                that.consumer.bind(that, that.httpReplyQueueName),
-                { consumerTag: 'sailor_nodejs_3' }
-            );
-        });
+        await this.publishChannel.consume(
+            this.httpReplyQueueName,
+            this._consumer.bind(this, this.httpReplyQueueName),
+            { consumerTag: 'sailor_nodejs_3' }
+        );
     }
 
-    consumer(queue, message) {
+    _consumer(queue, message) {
         this.publishChannel.ack(message);
-
-        const emittedMessage = JSON.parse(message.content.toString());
+        let emittedMessage;
+        if (queue === this.nextStepErrorQueue) {
+            // Notice errors are encoded in slighlty other way then commond data messages
+            emittedMessage = {
+                error: cipher.decrypt(this._cryptoSettings, JSON.parse(message.content.toString()).error)
+            };
+        } else {
+            emittedMessage = encryptor.decryptMessageContent(this._cryptoSettings, message.content.toString());
+        }
 
         const data = {
             properties: message.properties,
@@ -142,45 +153,70 @@ class AmqpHelper extends EventEmitter {
 
         this.dataMessages.push(data);
         this.emit('data', data, queue);
-
-        // publishChannel.cancel('sailor_nodejs');
-        // done();
     }
 }
 
-function amqp() {
-    const handle = {
-        //eslint-disable-next-line no-empty-function
-        getMessages() {
-        }
-    };
-    return handle;
-}
-
 function prepareEnv() {
-    env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672';
-    env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '10';
-    env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
-    env.ELASTICIO_STEP_ID = 'step_1';
-    env.ELASTICIO_EXEC_ID = 'some-exec-id';
+    // FIXME copy&pasted from mocha_spec/unit.sailor.js
+    const config = {
+        /************************ SAILOR ITSELF CONFIGURATION ***********************************/
 
-    env.ELASTICIO_WORKSPACE_ID = '5559edd38968ec073600683';
-    env.ELASTICIO_CONTAINER_ID = 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948';
+        AMQP_URI: 'amqp://guest:guest@localhost:5672',
+        API_URI: 'http://apihost.com',
+        API_USERNAME: 'test@test.com',
+        API_KEY: '5559edd',
+        API_REQUEST_RETRY_DELAY: 100,
+        API_REQUEST_RETRY_ATTEMPTS: 3,
 
-    env.ELASTICIO_USER_ID = '5559edd38968ec0736000002';
-    env.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
+        FLOW_ID: '5559edd38968ec0736000003',
+        STEP_ID: 'step_1',
+        EXEC_ID: 'some-exec-id',
+        WORKSPACE_ID: '5559edd38968ec073600683',
+        CONTAINER_ID: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
 
-    env.ELASTICIO_COMPONENT_PATH = '/mocha_spec/integration_component';
+        USER_ID: '5559edd38968ec0736000002',
+        COMP_ID: '5559edd38968ec0736000456',
+        FUNCTION: 'list',
 
-    env.ELASTICIO_API_URI = 'https://apidotelasticidotio';
-    env.ELASTICIO_API_USERNAME = 'test@test.com';
-    env.ELASTICIO_API_KEY = '5559edd';
-    env.ELASTICIO_FLOW_WEBHOOK_URI = 'https://in.elastic.io/hooks/' + env.ELASTICIO_FLOW_ID;
+        TIMEOUT: 3000,
 
-    env.DEBUG = 'sailor:debug';
+        /************************ COMMUNICATION LAYER SETTINGS ***********************************/
+        MESSAGE_CRYPTO_PASSWORD: 'testCryptoPassword',
+        MESSAGE_CRYPTO_IV: 'iv=any16_symbols',
+
+        LISTEN_MESSAGES_ON: '5559edd38968ec0736000003:step_1:1432205514864:messages',
+        PUBLISH_MESSAGES_TO: 'userexchange:5527f0ea43238e5d5f000001',
+        DATA_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:message',
+        ERROR_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:error',
+        REBOUND_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:rebound',
+        SNAPSHOT_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:snapshot',
+
+        DATA_RATE_LIMIT: 1000,
+        ERROR_RATE_LIMIT: 1000,
+        SNAPSHOT_RATE_LIMIT: 1000,
+        RATE_INTERVAL: 1000,
+
+        REBOUND_INITIAL_EXPIRATION: 15000,
+        REBOUND_LIMIT: 5,
+
+        RABBITMQ_PREFETCH_SAILOR: 1,
+
+        /******************************* MINOR SHIT ********************************/
+        COMP_NAME: 'does_NOT_MATTER',
+        EXEC_TYPE: 'flow-step',
+        FLOW_VERSION: '12345',
+        TENANT_ID: 'tenant_id',
+        CONTRACT_ID: 'contract_id',
+        TASK_USER_EMAIL: 'fuck@you',// FIXME
+        EXECUTION_RESULT_ID: '987654321',
+        COMPONENT_PATH: '/mocha_spec/integration_component'
+    };
+    Object.assign(process.env, _.fromPairs(Object.entries(config).map(([k,v]) => ['ELASTICIO_' + k, v])));
+
+    return process.env;
 }
 
-function mockApiTaskStepResponse(response) {
+function mockApiTaskStepResponse(config, response) {
     const defaultResponse = {
         config: {
             apiKey: 'secret'
@@ -190,16 +226,16 @@ function mockApiTaskStepResponse(response) {
         }
     };
 
-    nock(env.ELASTICIO_API_URI)
+    nock(config.ELASTICIO_API_URI)
         .matchHeader('Connection', 'Keep-Alive')
-        .get(`/v1/tasks/${env.ELASTICIO_FLOW_ID}/steps/${env.ELASTICIO_STEP_ID}`)
+        .get(`/v1/tasks/${config.ELASTICIO_FLOW_ID}/steps/${config.ELASTICIO_STEP_ID}`)
         .reply(200, Object.assign(defaultResponse, response));
 }
 
 exports.PREFIX = PREFIX;
 
-exports.amqp = function amqp() {
-    return new AmqpHelper();
+exports.amqp = function amqp(config) {
+    return new AmqpHelper(config);
 };
 
 exports.prepareEnv = prepareEnv;

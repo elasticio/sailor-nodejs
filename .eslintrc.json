@@ -1,0 +1,46 @@
+{
+    "root": true,
+    "parserOptions": {
+        "ecmaVersion": 2018,
+        "sourceType": "script",
+        "ecmaFeatures": {
+            "impliedStrict": true
+        }
+    },
+    "plugins": [
+        "eslint-plugin-mocha"
+    ],
+    "extends": [
+        "standard"
+    ],
+    "rules": {
+        "mocha/no-exclusive-tests": "error",
+        "mocha/no-skipped-tests": "error",
+        "node/no-deprecated-api": "warn",
+        "semi": [
+            "error",
+            "always"
+        ],
+        "indent": [
+            "error",
+            4
+        ],
+        "max-len": [
+            "warn",
+            120,
+            4,
+            {
+                "ignoreUrls": true,
+                "ignoreTemplateLiterals": true
+            }
+        ],
+        "space-before-function-paren": [
+            "warn",
+            {
+                "anonymous": "always",
+                "named": "never",
+                "asyncArrow": "always"
+            }
+        ]
+    }
+}
