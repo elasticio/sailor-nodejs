@@ -5,12 +5,11 @@ const amqplib = require('amqplib');
 
 const nock = require('nock');
 
-const encryptor = require('../lib/encryptor.js');
-const cipher = require('../lib/cipher.js');
+const encryptor = require('../../lib/encryptor.js');
+const cipher = require('../../lib/cipher.js');
 
 
 const PREFIX = 'sailor_nodejs_integration_test';
-//const env = process.env;
 
 class AmqpHelper extends EventEmitter {
     constructor(config) {
@@ -32,9 +31,10 @@ class AmqpHelper extends EventEmitter {
     }
 
     publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
+        const currentStepRoutingKey = `${this._config.ELASTICIO_WORKSPACE_ID}.${this._config.ELASTICIO_FLOW_ID}/ordinary.${this._config.ELASTICIO_STEP_ID}.input`;
         return this.subscriptionChannel.publish(
-            this._config.ELASTICIO_LISTEN_MESSAGES_ON,
-            this._config.ELASTICIO_DATA_ROUTING_KEY,
+            this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
+            currentStepRoutingKey,
             Buffer.from(encryptor.encryptMessageContent(this._cryptoSettings, message)),
             {
                 headers: Object.assign(
@@ -60,19 +60,26 @@ class AmqpHelper extends EventEmitter {
         await subscriptionChannel.assertQueue(this._config.ELASTICIO_LISTEN_MESSAGES_ON);
         await publishChannel.assertQueue(this.nextStepQueue);
         await publishChannel.assertQueue(this.nextStepErrorQueue);
+        await publishChannel.assertQueue(this.httpReplyQueueName);
+
+        await publishChannel.purgeQueue(this.nextStepQueue);
+        await publishChannel.purgeQueue(this.nextStepErrorQueue);
+        await publishChannel.purgeQueue(this.httpReplyQueueName);
+        await publishChannel.purgeQueue(this._config.ELASTICIO_LISTEN_MESSAGES_ON);
 
         const exchangeOptions = {
             durable: true,
             autoDelete: false
         };
 
-        await subscriptionChannel.assertExchange(this._config.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', exchangeOptions);
         await publishChannel.assertExchange(this._config.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
 
+        const currentStepRoutingKey = `${this._config.ELASTICIO_WORKSPACE_ID}.${this._config.ELASTICIO_FLOW_ID}/ordinary.${this._config.ELASTICIO_STEP_ID}.input`;
         await subscriptionChannel.bindQueue(
             this._config.ELASTICIO_LISTEN_MESSAGES_ON,
-            this._config.ELASTICIO_LISTEN_MESSAGES_ON,
-            this._config.ELASTICIO_DATA_ROUTING_KEY);
+            this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
+            currentStepRoutingKey
+        );
 
         await publishChannel.bindQueue(
             this.nextStepQueue,
@@ -84,15 +91,10 @@ class AmqpHelper extends EventEmitter {
             this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
             this._config.ELASTICIO_ERROR_ROUTING_KEY);
 
-        await publishChannel.assertQueue(this.httpReplyQueueName);
         await publishChannel.bindQueue(
             this.httpReplyQueueName,
             this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
             this.httpReplyQueueRoutingKey);
-
-        await publishChannel.purgeQueue(this.nextStepQueue);
-        await publishChannel.purgeQueue(this.nextStepErrorQueue);
-        await publishChannel.purgeQueue(this._config.ELASTICIO_LISTEN_MESSAGES_ON);
 
         this.subscriptionChannel = subscriptionChannel;
         this.publishChannel = publishChannel;
@@ -134,6 +136,7 @@ class AmqpHelper extends EventEmitter {
     }
 
     _consumer(queue, message) {
+        console.log('god message', queue, message);
         this.publishChannel.ack(message);
         let emittedMessage;
         if (queue === this.nextStepErrorQueue) {
@@ -156,7 +159,10 @@ class AmqpHelper extends EventEmitter {
     }
 }
 
-function prepareEnv() {
+function prepareEnv(currentStep) {
+    const WORKSPACE_ID = String(Math.ceil(Math.random() * 10000000));
+    const FLOW_ID = String(Math.ceil(Math.random() * 10000000));
+    const STEP_ID = currentStep;
     // FIXME copy&pasted from mocha_spec/unit.sailor.js
     const config = {
         /************************ SAILOR ITSELF CONFIGURATION ***********************************/
@@ -168,10 +174,10 @@ function prepareEnv() {
         API_REQUEST_RETRY_DELAY: 100,
         API_REQUEST_RETRY_ATTEMPTS: 3,
 
-        FLOW_ID: '5559edd38968ec0736000003',
-        STEP_ID: 'step_1',
+        FLOW_ID,
+        STEP_ID,
         EXEC_ID: 'some-exec-id',
-        WORKSPACE_ID: '5559edd38968ec073600683',
+        WORKSPACE_ID,
         CONTAINER_ID: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
 
         USER_ID: '5559edd38968ec0736000002',
@@ -184,12 +190,12 @@ function prepareEnv() {
         MESSAGE_CRYPTO_PASSWORD: 'testCryptoPassword',
         MESSAGE_CRYPTO_IV: 'iv=any16_symbols',
 
-        LISTEN_MESSAGES_ON: '5559edd38968ec0736000003:step_1:1432205514864:messages',
-        PUBLISH_MESSAGES_TO: 'userexchange:5527f0ea43238e5d5f000001',
-        DATA_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:message',
-        ERROR_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:error',
-        REBOUND_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:rebound',
-        SNAPSHOT_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:snapshot',
+        LISTEN_MESSAGES_ON: `${WORKSPACE_ID}:${FLOW_ID}/ordinary:${STEP_ID}:messages`,
+        PUBLISH_MESSAGES_TO: `${WORKSPACE_ID}_org`,
+        DATA_ROUTING_KEY: `${WORKSPACE_ID}.${FLOW_ID}/ordinary.${STEP_ID}.message`,
+        ERROR_ROUTING_KEY: `${WORKSPACE_ID}.${FLOW_ID}/ordinary.${STEP_ID}.error`,
+        REBOUND_ROUTING_KEY: `${WORKSPACE_ID}.${FLOW_ID}/ordinary.${STEP_ID}.rebound`,
+        SNAPSHOT_ROUTING_KEY: `${WORKSPACE_ID}.${FLOW_ID}/ordinary.${STEP_ID}.snapshot`,
 
         DATA_RATE_LIMIT: 1000,
         ERROR_RATE_LIMIT: 1000,
@@ -209,11 +215,10 @@ function prepareEnv() {
         CONTRACT_ID: 'contract_id',
         TASK_USER_EMAIL: 'fuck@you',// FIXME
         EXECUTION_RESULT_ID: '987654321',
-        COMPONENT_PATH: '/mocha_spec/integration_component'
+        COMPONENT_PATH: '/mocha_spec/integration/integration_component',
+        //LOG_LEVEL: 'trace'
     };
-    Object.assign(process.env, _.fromPairs(Object.entries(config).map(([k,v]) => ['ELASTICIO_' + k, v])));
-
-    return process.env;
+    return _.fromPairs(Object.entries(config).map(([k,v]) => ['ELASTICIO_' + k, v]));
 }
 
 function mockApiTaskStepResponse(config, response) {
@@ -223,9 +228,14 @@ function mockApiTaskStepResponse(config, response) {
         },
         snapshot: {
             lastModifiedDate: 123456789
-        }
+        },
+        tenant_id: config.ELASTICIO_TENANT_ID,
+        workspace_id: config.ELASTICIO_WORKSPACE_ID,
+        comp_id: config.ELASTICIO_COMP_ID,
+        comp_name: config.ELASTICIO_COMP_NAME,
+        function: config.ELASTICIO_FUNCTION,
+        flow_version: config.ELASTICIO_FLOW_VERSION,
     };
-
     nock(config.ELASTICIO_API_URI)
         .matchHeader('Connection', 'Keep-Alive')
         .get(`/v1/tasks/${config.ELASTICIO_FLOW_ID}/steps/${config.ELASTICIO_STEP_ID}`)

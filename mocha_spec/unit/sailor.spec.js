@@ -139,7 +139,7 @@ describe('Sailor', () => {
 
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {
@@ -159,7 +159,7 @@ describe('Sailor', () => {
 
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {
@@ -196,14 +196,14 @@ describe('Sailor', () => {
             describe(`when step data retreived`, () => {
                 beforeEach(() => {
                     sandbox.stub(sailor.componentReader, 'init').resolves();
-                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').resolves(stepData);
+                    sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').resolves(stepData);
                 });
 
                 it('should init component', async () => {
                     await sailor.prepare();
                     expect(sailor.stepData).to.deep.equal(stepData);
                     expect(sailor.snapshot).to.deep.equal(stepData.snapshot);
-                    expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce
+                    expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce
                         .and.calledWith(config.FLOW_ID, config.STEP_ID);
                     expect(sailor.componentReader.init).to.have.been.calledOnce
                         .and.calledWith(config.COMPONENT_PATH);
@@ -215,7 +215,7 @@ describe('Sailor', () => {
             let error;
             beforeEach(() => {
                 error = new Error('failed');
-                sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').rejects(error);
+                sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').rejects(error);
             });
 
             it('should fail', async () => {
@@ -236,7 +236,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'data_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -246,7 +246,7 @@ describe('Sailor', () => {
             await sailor.prepare();
             await sailor.processMessage(payload, message);
 
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce
                 .and.calledWith(config.FLOW_ID, config.STEP_ID);
 
             expect(amqpCommunicationLayer.sendData).to.have.been.calledOnce.and.calledWith(
@@ -284,7 +284,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'end_after_data_twice';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -295,7 +295,7 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.sendData).to.have.been.calledOnce;
 
             expect(amqpCommunicationLayer.reject).not.to.have.been.called;
@@ -307,7 +307,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'passthrough';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return { is_passthrough: true };
@@ -328,7 +328,7 @@ describe('Sailor', () => {
             await sailor.prepare();
             await sailor.processMessage(psPayload, message);
 
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.sendData).to.have.been.calledOnce.and.calledWith(
                 {
                     body: {
@@ -378,7 +378,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'use_flow_variables';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {
@@ -400,7 +400,7 @@ describe('Sailor', () => {
             await sailor.prepare();
             await sailor.processMessage(psPayload, message);
 
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.sendData).to.have.been.calledOnce.and.calledWith(
                 {
                     body: {
@@ -441,7 +441,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'keys_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
             const account = '1234567890';
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {
@@ -451,7 +451,7 @@ describe('Sailor', () => {
                 };
             });
 
-            sandbox.stub(sailor.apiClient.accounts, 'update').callsFake(async (accountId, keys) => {
+            sandbox.stub(sailor._apiClient.accounts, 'update').callsFake(async (accountId, keys) => {
                 expect(accountId).to.equal(account);
                 expect(keys).to.deep.equal({ keys: { oauth: { access_token: 'newAccessToken' } } });
             });
@@ -459,8 +459,8 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
-            expect(sailor.apiClient.accounts.update).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.accounts.update).to.have.been.calledOnce;
 
             expect(amqpCommunicationLayer.ack).to.have.been.calledOnce.and.calledWith(message);
         });
@@ -469,7 +469,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'keys_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
             const account = '1234567890';
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {
@@ -479,7 +479,7 @@ describe('Sailor', () => {
                 };
             });
             const error = new Error('Update keys error');
-            sandbox.stub(sailor.apiClient.accounts, 'update').callsFake(async (accountId, keys) => {
+            sandbox.stub(sailor._apiClient.accounts, 'update').callsFake(async (accountId, keys) => {
                 expect(accountId).to.equal(account);
                 expect(keys).to.deep.equal({ keys: { oauth: { access_token: 'newAccessToken' } } });
                 throw error;
@@ -490,8 +490,8 @@ describe('Sailor', () => {
             await sailor.processMessage(payload, message);
             // It will not throw an error because component
             // process method is not `async`
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
-            expect(sailor.apiClient.accounts.update).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.accounts.update).to.have.been.calledOnce;
 
             expect(amqpCommunicationLayer.sendError).to.have.been.calledOnce
                 .and.calledWith(sinon.match(arg => arg.message === error.message));
@@ -502,7 +502,7 @@ describe('Sailor', () => {
             config.FUNCTION = 'rebound_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
 
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -512,7 +512,7 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
 
             expect(amqpCommunicationLayer.sendRebound).to.have.been.calledOnce
                 .and.calledWith(sinon.match(arg => arg.message === 'Rebound reason'));
@@ -523,7 +523,7 @@ describe('Sailor', () => {
             sandbox.useFakeTimers();
             config.FUNCTION = 'update';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -535,7 +535,7 @@ describe('Sailor', () => {
                 snapshot: { blabla: 'blablabla' }
             };
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
 
             const expectedSnapshot = { blabla: 'blablabla' };
             expect(amqpCommunicationLayer.sendSnapshot).to.have.been.calledOnce.and.calledWith(
@@ -572,7 +572,7 @@ describe('Sailor', () => {
             sandbox.useFakeTimers();
             config.FUNCTION = 'update';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {
@@ -589,7 +589,7 @@ describe('Sailor', () => {
                 updateSnapshot: { updated: 'value' }
             };
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.to.have.been.calledOnce;
 
             const expectedSnapshot = { someId: 'someData', updated: 'value' };
 
@@ -628,7 +628,7 @@ describe('Sailor', () => {
         it('should send error if error happened', async () => {
             config.FUNCTION = 'error_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -637,7 +637,7 @@ describe('Sailor', () => {
             sandbox.stub(amqpCommunicationLayer, 'reject');
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.sendError).to.have.been.calledOnce
                 .and.calledWith(
                     sinon.match(arg => {
@@ -655,7 +655,7 @@ describe('Sailor', () => {
         it('should send error and reject only once()', async () => {
             config.FUNCTION = 'end_after_error_twice';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -665,7 +665,7 @@ describe('Sailor', () => {
             sandbox.stub(amqpCommunicationLayer, 'sendError');
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.sendError).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.ack).not.to.have.been.called;
             expect(amqpCommunicationLayer.reject).to.have.been.calledOnce.and.calledWith(message);
@@ -674,7 +674,7 @@ describe('Sailor', () => {
         it('should reject message if trigger is missing', async () => {
             config.FUNCTION = 'missing_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -685,7 +685,7 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
 
             expect(amqpCommunicationLayer.sendError).to.have.been.calledOnce
                 .and.calledWith(
@@ -708,7 +708,7 @@ describe('Sailor', () => {
 
             config.FUNCTION = 'error_trigger';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -718,7 +718,7 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message2);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(amqpCommunicationLayer.reject).to.have.been.calledOnce;
         });
 
@@ -730,7 +730,7 @@ describe('Sailor', () => {
             // then end message is emitted anyway.
             config.FUNCTION = 'datas_and_errors';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -747,7 +747,7 @@ describe('Sailor', () => {
                 process.nextTick(() => clock.tick(2000));
             });
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce;
 
             expect(amqpCommunicationLayer.sendData).to.have.been.calledThrice;
             expect(amqpCommunicationLayer.sendError).to.have.been.calledTwice;
@@ -758,7 +758,7 @@ describe('Sailor', () => {
             sandbox.useFakeTimers();
             config.FUNCTION = 'http_reply';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -770,7 +770,7 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce
                 .and.calledWith(config.FLOW_ID, config.STEP_ID);
 
             expect(amqpCommunicationLayer.sendHttpReply).to.have.been.calledOnce.and.calledWith(
@@ -840,7 +840,7 @@ describe('Sailor', () => {
             sandbox.useFakeTimers();
             config.FUNCTION = 'http_reply';
             const sailor = new Sailor(amqpCommunicationLayer, config, logger);
-            sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
+            sandbox.stub(sailor._apiClient.tasks, 'retrieveStep').callsFake(async (taskId, stepId) => {
                 expect(taskId).to.equal(config.FLOW_ID);
                 expect(stepId).to.equal(config.STEP_ID);
                 return {};
@@ -855,7 +855,7 @@ describe('Sailor', () => {
 
             await sailor.prepare();
             await sailor.processMessage(payload, message);
-            expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce
+            expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce
                 .and.calledWith(config.FLOW_ID, config.STEP_ID);
 
             expect(amqpCommunicationLayer.sendHttpReply).to.have.been.calledOnce

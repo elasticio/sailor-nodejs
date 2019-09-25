@@ -29,6 +29,7 @@ function shutdown(cfg, startupData) {
 }
 
 function initTrigger(cfg) {
+    console.log('real init call', cfg);
     const options = {
         uri: 'https://api.acme.com/subscribe',
         json: true,
@@ -45,11 +46,12 @@ function initTrigger(cfg) {
 }
 
 function processTrigger(msg) {
+    console.log('real process call', subscription);
     const options = {
         uri: 'https://api.acme.com/customers',
         json: true
     };
-
+    
     rp.get(options).then((data) => {
         this.emit('data', {
             id: 'f45be600-f770-11e6-b42d-b187bfbf19fd',
