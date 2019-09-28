@@ -239,11 +239,13 @@ function mockApiTaskStepResponse(config, response) {
             lastModifiedDate: 123456789
         },
         tenant_id: config.ELASTICIO_TENANT_ID,
+        contract_id: config.ELASTICIO_CONTRACT_ID,
         workspace_id: config.ELASTICIO_WORKSPACE_ID,
         comp_id: config.ELASTICIO_COMP_ID,
         comp_name: config.ELASTICIO_COMP_NAME,
         function: config.ELASTICIO_FUNCTION,
-        flow_version: config.ELASTICIO_FLOW_VERSION
+        flow_version: config.ELASTICIO_FLOW_VERSION,
+        flow_type: 'ordinary'
     };
     nock(config.ELASTICIO_API_URI)
         .matchHeader('Connection', 'Keep-Alive')
