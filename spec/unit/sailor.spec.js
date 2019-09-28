@@ -10,63 +10,26 @@ const AmqpCommunicationLayer = require('../../lib/amqp.js').AmqpCommunicationLay
 const AmqpConnWrapper = require('../../lib/AmqpConnWrapper.js');
 const Sailor = require('../../lib/sailor.js');
 const encryptor = require('../../lib/encryptor.js');
+const { SingleSailorConfig } = require('../../lib/settings.js');
+
+const { prepareEnv } = require('../config.js');
 
 describe('Sailor', () => {
-
     let config;
     let amqpCommunicationLayer;
     let logger;
     let sandbox;
     let message;
+    let oldEnv;
 
     const payload = { param1: 'Value1' };
-
     beforeEach(() => {
         sandbox = sinon.createSandbox();
+        oldEnv = process.env;
+        process.env = prepareEnv('step_1');
+        config = SingleSailorConfig.fromEnv();
+        config.COMPONENT_PATH = '/spec/component';
 
-        config = {
-            /************************ SAILOR ITSELF CONFIGURATION ***********************************/
-            API_URI: 'http://apihost.com',
-            API_USERNAME: 'test@test.com',
-            API_KEY: '5559edd',
-            API_REQUEST_RETRY_DELAY: 100,
-            API_REQUEST_RETRY_ATTEMPTS: 3,
-
-            FLOW_ID: '5559edd38968ec0736000003',
-            STEP_ID: 'step_1',
-            EXEC_ID: 'some-exec-id',
-            WORKSPACE_ID: '5559edd38968ec073600683',
-            CONTAINER_ID: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-
-            USER_ID: '5559edd38968ec0736000002',
-            COMP_ID: '5559edd38968ec0736000456',
-            FUNCTION: 'list',
-
-            COMPONENT_PATH: '/spec/component',
-
-            TIMEOUT: 3000,
-
-            /************************ COMMUNICATION LAYER SETTINGS ***********************************/
-            MESSAGE_CRYPTO_PASSWORD: 'testCryptoPassword',
-            MESSAGE_CRYPTO_IV: 'iv=any16_symbols',
-
-            LISTEN_MESSAGES_ON: '5559edd38968ec0736000003:step_1:1432205514864:messages',
-            PUBLISH_MESSAGES_TO: 'userexchange:5527f0ea43238e5d5f000001',
-            DATA_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:message',
-            ERROR_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:error',
-            REBOUND_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:rebound',
-            SNAPSHOT_ROUTING_KEY: '5559edd38968ec0736000003:step_1:1432205514864:snapshot',
-
-            DATA_RATE_LIMIT: 1000,
-            ERROR_RATE_LIMIT: 1000,
-            SNAPSHOT_RATE_LIMIT: 1000,
-            RATE_INTERVAL: 1000,
-
-            REBOUND_INITIAL_EXPIRATION: 15000,
-            REBOUND_LIMIT: 5,
-
-            RABBITMQ_PREFETCH_SAILOR: 1
-        };
         const cryptoSettings = {
             password: config.MESSAGE_CRYPTO_PASSWORD,
             cryptoIV: config.MESSAGE_CRYPTO_IV
@@ -82,10 +45,10 @@ describe('Sailor', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 headers: {
-                    taskId: '5559edd38968ec0736000003',
-                    execId: 'some-exec-id',
-                    userId: '5559edd38968ec0736000002',
-                    workspaceId: '5559edd38968ec073600683',
+                    taskId: config.FLOW_ID,
+                    execId: config.EXEC_ID,
+                    userId: config.USER_ID,
+                    workspaceId: config.WORKSPACE_ID,
                     threadId: uuid.v4()
                 },
                 deliveryMode: undefined,
@@ -101,7 +64,7 @@ describe('Sailor', () => {
                 mandatory: true,
                 clusterId: ''
             },
-            content: Buffer.from(encryptor.encryptMessageContent(cryptoSettings,payload))
+            content: Buffer.from(encryptor.encryptMessageContent(cryptoSettings, payload))
         };
 
         const amqpConn = new AmqpConnWrapper();
@@ -130,6 +93,7 @@ describe('Sailor', () => {
         amqpCommunicationLayer = new AmqpCommunicationLayer(amqpConn, config, logger);
     });
     afterEach(() => {
+        process.env = oldEnv;
         sandbox.restore();
     });
 
@@ -250,7 +214,7 @@ describe('Sailor', () => {
                 .and.calledWith(config.FLOW_ID, config.STEP_ID);
 
             expect(amqpCommunicationLayer.sendData).to.have.been.calledOnce.and.calledWith(
-                { items: [1,2,3,4,5,6] },
+                { items: [1, 2, 3, 4, 5, 6] },
                 sinon.match((arg) => {
                     expect(arg.headers.messageId).to.be.a.uuid('v4');
                     delete arg.headers.messageId;
@@ -260,12 +224,12 @@ describe('Sailor', () => {
                         mandatory: true,
                         headers: {
                             execId: 'some-exec-id',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
-                            workspaceId: '5559edd38968ec073600683',
+                            taskId: config.FLOW_ID,
+                            userId: config.USER_ID,
+                            workspaceId: config.WORKSPACE_ID,
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                             stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
+                            compId: config.COMP_ID,
                             threadId: message.properties.headers.threadId,
                             function: 'data_trigger',
                             start: 0,
@@ -354,12 +318,12 @@ describe('Sailor', () => {
                         mandatory: true,
                         headers: {
                             execId: 'some-exec-id',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
+                            taskId: config.FLOW_ID,
+                            userId: config.USER_ID,
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                            workspaceId: '5559edd38968ec073600683',
+                            workspaceId: config.WORKSPACE_ID,
                             stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
+                            compId: config.COMP_ID,
                             function: 'passthrough',
                             start: 0,
                             cid: 1,
@@ -417,12 +381,12 @@ describe('Sailor', () => {
                         mandatory: true,
                         headers: {
                             execId: 'some-exec-id',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
+                            taskId: config.FLOW_ID,
+                            userId: config.USER_ID,
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                            workspaceId: '5559edd38968ec073600683',
+                            workspaceId: config.WORKSPACE_ID,
                             stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
+                            compId: config.COMP_ID,
                             function: 'use_flow_variables',
                             start: 0,
                             cid: 1,
@@ -548,13 +512,13 @@ describe('Sailor', () => {
                         contentEncoding: 'utf8',
                         mandatory: true,
                         headers: {
-                            taskId: '5559edd38968ec0736000003',
+                            taskId: config.FLOW_ID,
                             execId: 'some-exec-id',
-                            userId: '5559edd38968ec0736000002',
+                            userId: config.USER_ID,
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                            workspaceId: '5559edd38968ec073600683',
+                            workspaceId: config.WORKSPACE_ID,
                             stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
+                            compId: config.COMP_ID,
                             function: 'update',
                             start: 0,
                             cid: 1,
@@ -604,13 +568,13 @@ describe('Sailor', () => {
                             contentEncoding: 'utf8',
                             mandatory: true,
                             headers: {
-                                taskId: '5559edd38968ec0736000003',
+                                taskId: config.FLOW_ID,
                                 execId: 'some-exec-id',
-                                userId: '5559edd38968ec0736000002',
+                                userId: config.USER_ID,
                                 containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                                workspaceId: '5559edd38968ec073600683',
+                                workspaceId: config.WORKSPACE_ID,
                                 stepId: 'step_1',
-                                compId: '5559edd38968ec0736000456',
+                                compId: config.COMP_ID,
                                 function: 'update',
                                 start: 0,
                                 cid: 1,
@@ -649,7 +613,6 @@ describe('Sailor', () => {
                     message.content
                 );
             expect(amqpCommunicationLayer.reject).to.have.been.calledOnce.and.calledWith(message);
-
         });
 
         it('should send error and reject only once()', async () => {
@@ -790,12 +753,12 @@ describe('Sailor', () => {
                         mandatory: true,
                         headers: {
                             execId: 'some-exec-id',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
+                            taskId: config.FLOW_ID,
+                            userId: config.USER_ID,
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                            workspaceId: '5559edd38968ec073600683',
+                            workspaceId: config.WORKSPACE_ID,
                             stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
+                            compId: config.COMP_ID,
                             function: 'http_reply',
                             start: 0,
                             cid: 1,
@@ -817,12 +780,12 @@ describe('Sailor', () => {
                         mandatory: true,
                         headers: {
                             execId: 'some-exec-id',
-                            taskId: '5559edd38968ec0736000003',
-                            userId: '5559edd38968ec0736000002',
+                            taskId: config.FLOW_ID,
+                            userId: config.USER_ID,
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                            workspaceId: '5559edd38968ec073600683',
+                            workspaceId: config.WORKSPACE_ID,
                             stepId: 'step_1',
-                            compId: '5559edd38968ec0736000456',
+                            compId: config.COMP_ID,
                             function: 'http_reply',
                             threadId: message.properties.headers.threadId,
                             start: 0,
@@ -852,7 +815,6 @@ describe('Sailor', () => {
             sandbox.stub(amqpCommunicationLayer, 'sendError');
             sandbox.stub(amqpCommunicationLayer, 'sendData');
 
-
             await sailor.prepare();
             await sailor.processMessage(payload, message);
             expect(sailor._apiClient.tasks.retrieveStep).to.have.been.calledOnce
@@ -877,12 +839,12 @@ describe('Sailor', () => {
                             mandatory: true,
                             headers: {
                                 execId: 'some-exec-id',
-                                taskId: '5559edd38968ec0736000003',
-                                userId: '5559edd38968ec0736000002',
+                                taskId: config.FLOW_ID,
+                                userId: config.USER_ID,
                                 containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                                workspaceId: '5559edd38968ec073600683',
+                                workspaceId: config.WORKSPACE_ID,
                                 stepId: 'step_1',
-                                compId: '5559edd38968ec0736000456',
+                                compId: config.COMP_ID,
                                 function: 'http_reply',
                                 threadId: message.properties.headers.threadId,
                                 start: 0,
@@ -1058,5 +1020,4 @@ describe('Sailor', () => {
             });
         });
     });
-
 });

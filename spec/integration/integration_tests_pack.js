@@ -3,6 +3,7 @@ const chai = require('chai');
 const sinon = require('sinon');
 
 chai.use(require('sinon-chai'));
+chai.use(require('chai-uuid'));
 const { expect } = chai;
 
 const helpers = require('./integration_helpers');
@@ -51,8 +52,8 @@ module.exports = (injectSailor, singleMode = true) => {
 
         await amqpHelper.cleanUp();
         nock.cleanAll();
-        sandbox.restore();
         await app.stop();
+        sandbox.restore();
     });
 
     describe('when sailor is being invoked for message processing', () => {
@@ -78,7 +79,7 @@ module.exports = (injectSailor, singleMode = true) => {
                     if (singleMode) {
                         expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
                     } else {
-                        //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
+                        // FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                         expect(properties.headers.containerId).to.be.uuid('v4');
                     }
                     delete properties.headers.containerId;
@@ -135,12 +136,11 @@ module.exports = (injectSailor, singleMode = true) => {
             });
             await promise;
         });
-        // FIXME bad test. On timeout it emit's end
-        // that bothers closed amqp connection and that makes to explode everything around
-        it.skip('should augment passthrough property with data', async () => { // eslint-disable-line
+        it('should augment passthrough property with data', async () => {
             config = helpers.prepareEnv('step_2');
             config.ELASTICIO_STEP_ID = 'step_2';
             config.ELASTICIO_FUNCTION = 'emit_data';
+            config.ELASTICIO_TIMEOUT = 500;
             Object.assign(process.env, config);
 
             amqpHelper = helpers.amqp(config);
@@ -185,12 +185,18 @@ module.exports = (injectSailor, singleMode = true) => {
                     delete properties.headers.start;
                     delete properties.headers.end;
                     delete properties.headers.cid;
+                    if (singleMode) {
+                        expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
+                    } else {
+                        // FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
+                        expect(properties.headers.containerId).to.be.uuid('v4');
+                    }
+                    delete properties.headers.containerId;
 
                     expect(properties.headers).to.deep.equal({
                         taskId: config.ELASTICIO_FLOW_ID,
                         execId: config.ELASTICIO_EXEC_ID,
                         workspaceId: config.ELASTICIO_WORKSPACE_ID,
-                        containerId: config.ELASTICIO_CONTAINER_ID,
                         userId: config.ELASTICIO_USER_ID,
                         threadId,
                         stepId: config.ELASTICIO_STEP_ID,
@@ -262,7 +268,6 @@ module.exports = (injectSailor, singleMode = true) => {
             const start = Date.now();
             const promise = new Promise(resolve => {
                 amqpHelper.on('data', ({ properties, emittedMessage }, queueName) => {
-
                     expect(queueName).to.eql(amqpHelper.nextStepQueue);
 
                     expect(emittedMessage.passthrough).to.deep.eql({
@@ -283,14 +288,13 @@ module.exports = (injectSailor, singleMode = true) => {
                         }
                     });
 
-
                     delete properties.headers.start;
                     delete properties.headers.end;
                     delete properties.headers.cid;
                     if (singleMode) {
                         expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
                     } else {
-                        //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
+                        // FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                         expect(properties.headers.containerId).to.be.uuid('v4');
                     }
                     delete properties.headers.containerId;
@@ -748,7 +752,7 @@ module.exports = (injectSailor, singleMode = true) => {
                         if (singleMode) {
                             expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
                         } else {
-                            //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
+                            // FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                             expect(properties.headers.containerId).to.be.uuid('v4');
                         }
                         delete properties.headers.containerId;
@@ -809,7 +813,7 @@ module.exports = (injectSailor, singleMode = true) => {
                         if (singleMode) {
                             expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
                         } else {
-                            //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
+                            // FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                             expect(properties.headers.containerId).to.be.uuid('v4');
                         }
                         delete properties.headers.containerId;
@@ -898,7 +902,6 @@ module.exports = (injectSailor, singleMode = true) => {
                     expect(requestFromShutdownNock.isDone()).to.be.ok;
                     expect(hooksDataDeleteNock.isDone()).to.be.ok;
                     resolve();
-
                 }, 50)));
 
                 await app.start();

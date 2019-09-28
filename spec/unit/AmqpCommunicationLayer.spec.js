@@ -19,7 +19,6 @@ async function waitsFor(cb, timeout) {
     throw new Error('timeout waiting condition');
 }
 
-
 describe('AMQP', () => {
     let config;
     let cryptoSettings;
@@ -88,7 +87,7 @@ describe('AMQP', () => {
             content: encryptor.encryptMessageContent(cryptoSettings, { content: 'Message content' })
         };
         sandbox.spy(encryptor, 'decryptMessageContent');
-        amqpConn = new AmqpConnWrapper(),
+        amqpConn = new AmqpConnWrapper();
         publishChannel = {
             publish: sandbox.stub().returns(true),
             waitForConfirms: sandbox.stub().resolves([null]),
@@ -615,7 +614,6 @@ describe('AMQP', () => {
                 props
             );
     });
-
 
     it('Should ack message when confirmed', () => {
         const amqp = new AmqpCommunicationLayer(amqpConn, config, logger);

@@ -1,7 +1,5 @@
-exports.process = processTrigger;
-
-function processTrigger(msg, cfg) {
+exports.process = function processTrigger() {
     return Promise.resolve({
         body: 'I am a simple promise'
     });
-}
+};

@@ -1,7 +1,4 @@
-exports.process = processTrigger;
-
-function processTrigger(msg, cfg) {
-    var that = this;
-    that.emit('data', msg);
-    that.emit('end');
-}
+exports.process = function processTrigger(msg) {
+    this.emit('data', msg);
+    this.emit('end');
+};

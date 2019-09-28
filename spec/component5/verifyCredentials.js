@@ -1,5 +1,3 @@
-module.exports = verify;
-
-function verify(credentials) {
+module.exports = function verify() {
     return Promise.reject(new Error('Your API key is invalid'));
-}
+};

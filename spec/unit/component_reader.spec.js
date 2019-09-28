@@ -1,12 +1,12 @@
 const { expect } = require('chai');
 const ComponentReader = require('../../lib/component_reader.js').ComponentReader;
-const { ComponentLogger } = require('../../lib/logging.js');
+const { SingleAppLogger } = require('../../lib/logging.js');
 
 describe('Component reader', () => {
     let logger;
     let reader;
     beforeEach(() => {
-        logger = new ComponentLogger({ get: () => undefined }, {});
+        logger = new SingleAppLogger({ get: () => undefined });
         reader = new ComponentReader(logger);
     });
     it('Should find component located on the path', async () => {
@@ -46,7 +46,7 @@ describe('Component reader', () => {
             caughtError = e;
         }
         expect(caughtError.message).match(
-            //eslint-disable-next-line no-useless-escape
+            // eslint-disable-next-line no-useless-escape
             /Failed to load file \'.\/triggers\/missing_trigger.js\': Cannot find module.+missing_trigger\.js/
         );
         expect(caughtError.code).to.equal('MODULE_NOT_FOUND');
@@ -63,8 +63,8 @@ describe('Component reader', () => {
         }
 
         expect(caughtError.message).to.equal(
-            'Failed to load file \'./triggers/trigger_with_wrong_dependency.js\': '
-            + 'Cannot find module \'../not-found-dependency\''
+            'Failed to load file \'./triggers/trigger_with_wrong_dependency.js\': ' +
+                'Cannot find module \'../not-found-dependency\''
         );
         expect(caughtError.code).to.equal('MODULE_NOT_FOUND');
     });
@@ -80,8 +80,8 @@ describe('Component reader', () => {
         }
 
         expect(caughtError.message).to.equal(
-            "Trigger or action 'syntax_error_trigger' is found, but can not be loaded. "
-            + "Please check if the file './triggers/syntax_error_trigger.js' is correct."
+            "Trigger or action 'syntax_error_trigger' is found, but can not be loaded. " +
+                "Please check if the file './triggers/syntax_error_trigger.js' is correct."
         );
     });
 

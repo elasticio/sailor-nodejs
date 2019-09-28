@@ -1,36 +1,29 @@
-const co = require('co');
-const Q = require('q');
-const request = require('request');
+const request = require('request-promise-native');
 
-exports.process = processTrigger;
+exports.process = async function processTrigger() {
+    const tokenOptions = {
+        uri: 'https://login.acme/oauth2/v2.0/token',
+        json: true,
+        body: {
+            client_id: 'admin',
+            client_secret: 'secret'
+        }
+    };
 
-function processTrigger(msg, cfg) {
+    const newToken = await request.post(tokenOptions);
 
-    return co(function* gen() {
-        const tokenOptions = {
-            uri: 'https://login.acme/oauth2/v2.0/token',
-            json: true,
-            body: {
-                client_id: 'admin',
-                client_secret: 'secret'
-            }
-        };
+    this.emit('updateKeys', {
+        oauth: newToken
+    });
 
-        const [, newToken] = yield Q.ninvoke(request, 'post', tokenOptions);
+    const options = {
+        uri: 'https://login.acme/oauth2/v2.0/contacts',
+        json: true
+    };
 
-        this.emit('updateKeys', {
-            oauth: newToken
-        });
+    const body = await request.get(options);
 
-        const options = {
-            uri: 'https://login.acme/oauth2/v2.0/contacts',
-            json: true
-        };
-
-        const [, body] = yield Q.ninvoke(request, 'get', options);
-
-        return {
-            body
-        };
-    }.bind(this));
-}
+    return {
+        body
+    };
+};

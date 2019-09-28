@@ -1,22 +1,14 @@
-'use strict';
+const request = require('request-promise-native');
 
-const co = require('co');
-const Q = require('q');
-const request = require('request');
+exports.process = async function processTrigger() {
+    const options = {
+        uri: 'http://promise_target_url:80/foo/bar',
+        json: true
+    };
 
-exports.process = processTrigger;
+    const body = await request.get(options);
 
-function processTrigger(msg, cfg) {
-    return co(function* gen() {
-        const options = {
-            uri: 'http://promise_target_url:80/foo/bar',
-            json: true
-        };
-
-        const [response, body] = yield Q.ninvoke(request, 'get', options);
-
-        return {
-            body
-        };
-    });
-}
+    return {
+        body
+    };
+};

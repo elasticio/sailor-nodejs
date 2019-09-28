@@ -1,7 +1,5 @@
-module.exports = verify;
-
-function verify(credentials, cb) {
+module.exports = function verify(credentials, cb) {
     cb(null, {
         verified: true
     });
-}
+};

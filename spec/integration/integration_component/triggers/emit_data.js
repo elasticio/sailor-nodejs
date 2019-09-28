@@ -1,4 +1,4 @@
-function process() {
+exports.process = function process() {
     this.emit('data', {
         id: 'f45be600-f770-11e6-b42d-b187bfbf19fd',
         headers: {
@@ -9,7 +9,4 @@ function process() {
             hai: 'there'
         }
     });
-}
-
-exports.process = process;
-
+};

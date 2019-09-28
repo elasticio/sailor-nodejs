@@ -1,6 +1,6 @@
-.env
 .idea
 .circleci
-mocha_spec
+node_modules
+.nyc_output
 spec
 .*.swp

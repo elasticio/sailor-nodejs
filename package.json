@@ -4,36 +4,32 @@
   "version": "2.6.0-dev.3",
   "main": "run.js",
   "scripts": {
-    "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
+    "lint": "./node_modules/.bin/eslint lib spec run.js runService.js",
     "pretest": "npm run lint",
-    "test": "npm run test:jasmine && npm run test:mocha",
-    "test:jasmine": "true || NODE_ENV=test JASMINE_CONFIG_PATH=./spec/jasmine.json jasmine",
-    "test:mocha": "NODE_ENV=test mocha mocha_spec/**/*.spec.js mocha_spec/*.spec.js",
-    "postpublish": "./postpublish.js"
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "NODE_ENV=test mocha spec/unit/**/*.spec.js",
+    "test:integration": "NODE_ENV=test mocha spec/integration/**/*.spec.js",
+    "postpublish": "./postpublish.js",
+    "coverage": "nyc --clean npm run test"
   },
   "engines": {
     "node": ">=10.15.0"
   },
   "dependencies": {
-    "amqplib": "0.5.1",
-    "bunyan": "1.8.10",
+    "amqplib": "0.5.5",
+    "bunyan": "1.8.12",
     "debug": "3.1.0",
     "elasticio-rest-node": "1.2.3",
     "event-to-promise": "0.8.0",
-    "lodash": "4.17.4",
-    "p-throttle": "2.1.0",
-    "requestretry": "3.1.0",
-    "self-addressed": "0.3.0",
-    "uuid": "3.0.1"
+    "lodash": "4.17.15",
+    "p-throttle": "3.1.0",
+    "requestretry": "4.0.0",
+    "uuid": "3.3.3"
   },
   "devDependencies": {
-    "co": "4.6.0",
-    "q": "1.5.1",
-    "body-parser": "1.16.1",
     "chai": "4.2.0",
-    "chai-uuid": "^1.0.6",
+    "chai-uuid": "1.0.6",
     "code-quality-js": "2.0.2",
-    "del": "2.2.2",
     "eslint": "5.9.0",
     "eslint-config-standard": "12.0.0",
     "eslint-plugin-import": "2.14.0",
@@ -41,15 +37,13 @@
     "eslint-plugin-node": "8.0.0",
     "eslint-plugin-promise": "4.0.1",
     "eslint-plugin-standard": "4.0.0",
-    "express": "4.14.1",
-    "jasmine": "^3.4.0",
     "mocha": "6.2.0",
     "nock": "10.0.6",
-    "nsp": "2.8.1",
     "request": "2.88.0",
-    "request-promise-native": "1.0.5",
+    "request-promise-native": "1.0.7",
     "sinon": "7.4.2",
-    "sinon-chai": "3.3.0"
+    "sinon-chai": "3.3.0",
+    "nyc": "14.1.1"
   },
   "repository": "elasticio/sailor-nodejs",
   "license": "Apache-2.0"

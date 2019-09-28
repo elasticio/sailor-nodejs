@@ -5,7 +5,7 @@ chai.use(require('sinon-chai'));
 const nock = require('nock');
 
 const TaskExec = require('../../lib/executor.js').TaskExec;
-const { ComponentLogger } = require('../../lib/logging.js');
+const { MessageLevelLogger } = require('../../lib/logging.js');
 
 async function waitsFor(cb, timeout) {
     const start = Date.now();
@@ -26,7 +26,11 @@ describe('Executor', () => {
     const cfg = {};
 
     beforeEach(() => {
-        logger = new ComponentLogger({ get: () => 'info' });
+        logger = new MessageLevelLogger({}, {
+            threadId: 'threadId',
+            messageId: 'messageId',
+            parentMessageId: 'parentMessageId'
+        });
         sandbox = sinon.createSandbox();
     });
     afterEach(() => {
@@ -60,7 +64,7 @@ describe('Executor', () => {
     it('Should execute passthrough trigger and emit all events - data, end', async () => {
         const taskexec = new TaskExec({ }, logger);
 
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         sandbox.spy(taskexec, 'emit');
 
@@ -77,7 +81,7 @@ describe('Executor', () => {
 
     it('Should reject if module is missing', async () => {
         const taskexec = new TaskExec({}, logger);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         sandbox.spy(taskexec, 'emit');
 
@@ -92,7 +96,7 @@ describe('Executor', () => {
 
     it('Should execute rebound_trigger and emit all events - rebound, end', async () => {
         const taskexec = new TaskExec({ }, logger);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         sandbox.spy(taskexec, 'emit');
 
@@ -110,7 +114,7 @@ describe('Executor', () => {
 
     it('Should execute complex trigger, and emit all 6 events', async () => {
         const taskexec = new TaskExec({ }, logger);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         sandbox.spy(taskexec, 'emit');
 
@@ -131,7 +135,7 @@ describe('Executor', () => {
     it('Should execute a Promise trigger and emit all events - data, end', async () => {
         const taskexec = new TaskExec({ }, logger);
 
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         sandbox.spy(taskexec, 'emit');
 
@@ -147,7 +151,7 @@ describe('Executor', () => {
     });
     it('Should execute test_trigger and emit all events - 3 data events, 3 errors, 3 rebounds, 1 end', async () => {
         const taskexec = new TaskExec({ }, logger);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         sandbox.spy(taskexec, 'emit');
 
@@ -174,7 +178,7 @@ describe('Executor', () => {
         it('Should execute a Promise.resolve() trigger and emit end', async () => {
             const taskexec = new TaskExec({ }, logger);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             sandbox.spy(taskexec, 'emit');
 
@@ -190,7 +194,6 @@ describe('Executor', () => {
     });
 
     describe('Request Promise', () => {
-
         beforeEach(() => {
             nock('http://promise_target_url:80')
                 .get('/foo/bar')
@@ -202,7 +205,7 @@ describe('Executor', () => {
         it('Should execute a Promise trigger and emit all events - data, end', async () => {
             const taskexec = new TaskExec({ }, logger);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             sandbox.spy(taskexec, 'emit');
 
@@ -219,7 +222,6 @@ describe('Executor', () => {
     });
 
     describe('Request Generators', () => {
-
         it('Should execute a Promise trigger and emit all events - data, end', async () => {
             nock('http://promise_target_url:80')
                 .get('/foo/bar')
@@ -227,10 +229,9 @@ describe('Executor', () => {
                     message: 'Life is good with generators'
                 });
 
-
             const taskexec = new TaskExec({ }, logger);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             sandbox.spy(taskexec, 'emit');
 
@@ -266,10 +267,9 @@ describe('Executor', () => {
                     ]
                 });
 
-
             const taskexec = new TaskExec({ }, logger);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             sandbox.spy(taskexec, 'emit');
 
@@ -300,7 +300,7 @@ describe('Executor', () => {
         it('should work', async () => {
             const taskexec = new TaskExec({ }, logger);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             sandbox.spy(taskexec, 'emit');
 
@@ -329,14 +329,21 @@ describe('Executor', () => {
 
         beforeEach(() => {
             testStream = new TestStream();
-            const logger = new ComponentLogger({ get: () => 'info' }, {
-                streams: [
-                    {
-                        type: 'raw',
-                        stream: testStream
-                    }
-                ]
-            });
+            const logger = new MessageLevelLogger(
+                {},
+                {
+                    threadId: 'threadId',
+                    messageId: 'messageId',
+                    parentMessageId: 'parentMessageId',
+                    streams: [
+                        {
+                            type: 'raw',
+                            stream: testStream
+                        }
+                    ]
+                },
+                true
+            );
 
             taskExec = new TaskExec({ }, logger);
         });
@@ -364,18 +371,22 @@ describe('Executor', () => {
 
         it('should log extra fields', () => {
             const testStream = new TestStream();
-            const logger = new ComponentLogger({ get: () => 'info' }, {
-                streams: [
-                    {
-                        type: 'raw',
-                        stream: testStream
-                    }
-                ],
-                threadId: 'threadId',
-                messageId: 'messageId',
-                parentMessageId: 'parentMessageId'
+            const logger = new MessageLevelLogger(
+                {},
+                {
+                    streams: [
+                        {
+                            type: 'raw',
+                            stream: testStream
+                        }
+                    ],
+                    threadId: 'threadId',
+                    messageId: 'messageId',
+                    parentMessageId: 'parentMessageId'
 
-            });
+                },
+                true
+            );
 
             taskExec = new TaskExec({ }, logger);
 
@@ -388,5 +399,4 @@ describe('Executor', () => {
             expect(testStream.lastRecord.msg).to.equal('info');
         });
     });
-
 });

@@ -67,5 +67,3 @@ exports.init = initTrigger;
 exports.startup = startup;
 exports.shutdown = shutdown;
 exports.process = processTrigger;
-
-

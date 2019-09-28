@@ -1,5 +1,3 @@
-module.exports = verify;
-
-function verify(credentials) {
+module.exports = function verify() {
     return Promise.resolve();
-}
+};
