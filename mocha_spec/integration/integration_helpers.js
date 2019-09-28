@@ -31,7 +31,12 @@ class AmqpHelper extends EventEmitter {
     }
 
     publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
-        const currentStepRoutingKey = `${this._config.ELASTICIO_WORKSPACE_ID}.${this._config.ELASTICIO_FLOW_ID}/ordinary.${this._config.ELASTICIO_STEP_ID}.input`;
+        const currentStepRoutingKey = [
+            this._config.ELASTICIO_WORKSPACE_ID,
+            `${this._config.ELASTICIO_FLOW_ID}/ordinary`,
+            this._config.ELASTICIO_STEP_ID,
+            'input'
+        ].join('.');
         return this.subscriptionChannel.publish(
             this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
             currentStepRoutingKey,
@@ -74,7 +79,12 @@ class AmqpHelper extends EventEmitter {
 
         await publishChannel.assertExchange(this._config.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
 
-        const currentStepRoutingKey = `${this._config.ELASTICIO_WORKSPACE_ID}.${this._config.ELASTICIO_FLOW_ID}/ordinary.${this._config.ELASTICIO_STEP_ID}.input`;
+        const currentStepRoutingKey = [
+            this._config.ELASTICIO_WORKSPACE_ID,
+            `${this._config.ELASTICIO_FLOW_ID}/ordinary`,
+            this._config.ELASTICIO_STEP_ID,
+            'input'
+        ].join('.');
         await subscriptionChannel.bindQueue(
             this._config.ELASTICIO_LISTEN_MESSAGES_ON,
             this._config.ELASTICIO_PUBLISH_MESSAGES_TO,
@@ -136,7 +146,6 @@ class AmqpHelper extends EventEmitter {
     }
 
     _consumer(queue, message) {
-        console.log('god message', queue, message);
         this.publishChannel.ack(message);
         let emittedMessage;
         if (queue === this.nextStepErrorQueue) {
@@ -213,9 +222,9 @@ function prepareEnv(currentStep) {
         FLOW_VERSION: '12345',
         TENANT_ID: 'tenant_id',
         CONTRACT_ID: 'contract_id',
-        TASK_USER_EMAIL: 'fuck@you',// FIXME
+        TASK_USER_EMAIL: 'user@email',// FIXME
         EXECUTION_RESULT_ID: '987654321',
-        COMPONENT_PATH: '/mocha_spec/integration/integration_component',
+        COMPONENT_PATH: '/mocha_spec/integration/integration_component'
         //LOG_LEVEL: 'trace'
     };
     return _.fromPairs(Object.entries(config).map(([k,v]) => ['ELASTICIO_' + k, v]));
@@ -234,7 +243,7 @@ function mockApiTaskStepResponse(config, response) {
         comp_id: config.ELASTICIO_COMP_ID,
         comp_name: config.ELASTICIO_COMP_NAME,
         function: config.ELASTICIO_FUNCTION,
-        flow_version: config.ELASTICIO_FLOW_VERSION,
+        flow_version: config.ELASTICIO_FLOW_VERSION
     };
     nock(config.ELASTICIO_API_URI)
         .matchHeader('Connection', 'Keep-Alive')

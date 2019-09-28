@@ -3,3 +3,4 @@
 .circleci
 mocha_spec
 spec
+.*.swp

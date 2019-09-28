@@ -5,10 +5,8 @@ const sinon = require('sinon');
 chai.use(require('sinon-chai'));
 const { expect } = chai;
 
-const uuid = require('uuid');
-
 const helpers = require('./integration_helpers');
-module.exports = (injectSailor, singleMode=true) => {
+module.exports = (injectSailor, singleMode = true) => {
     const customers = [
         {
             name: 'Homer Simpson'
@@ -79,7 +77,7 @@ module.exports = (injectSailor, singleMode=true) => {
                     delete properties.headers.cid;
                     if (singleMode) {
                         expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
-                    } else { 
+                    } else {
                         //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                         expect(properties.headers.containerId).to.be.uuid('v4');
                     }
@@ -139,7 +137,7 @@ module.exports = (injectSailor, singleMode=true) => {
         });
         // FIXME bad test. On timeout it emit's end
         // that bothers closed amqp connection and that makes to explode everything around
-        it.skip('should augment passthrough property with data', async () => {
+        it.skip('should augment passthrough property with data', async () => { // eslint-disable-line
             config = helpers.prepareEnv('step_2');
             config.ELASTICIO_STEP_ID = 'step_2';
             config.ELASTICIO_FUNCTION = 'emit_data';
@@ -291,7 +289,7 @@ module.exports = (injectSailor, singleMode=true) => {
                     delete properties.headers.cid;
                     if (singleMode) {
                         expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
-                    } else { 
+                    } else {
                         //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                         expect(properties.headers.containerId).to.be.uuid('v4');
                     }
@@ -749,7 +747,7 @@ module.exports = (injectSailor, singleMode=true) => {
 
                         if (singleMode) {
                             expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
-                        } else { 
+                        } else {
                             //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                             expect(properties.headers.containerId).to.be.uuid('v4');
                         }
@@ -801,7 +799,7 @@ module.exports = (injectSailor, singleMode=true) => {
                 helpers.mockApiTaskStepResponse(config);
                 amqpHelper = helpers.amqp(config);
                 await amqpHelper.prepare();
-                
+
                 const promise = new Promise(resolve =>
                     amqpHelper.on('data', ({ properties, emittedMessage }, queueName) => {
                         expect(queueName).to.eql(amqpHelper.nextStepErrorQueue);
@@ -810,7 +808,7 @@ module.exports = (injectSailor, singleMode=true) => {
 
                         if (singleMode) {
                             expect(properties.headers.containerId).to.equal(config.ELASTICIO_CONTAINER_ID);
-                        } else { 
+                        } else {
                             //FIXME in sigle mode this should be config.ELASTICIO_CONTAINER_ID
                             expect(properties.headers.containerId).to.be.uuid('v4');
                         }
@@ -835,7 +833,6 @@ module.exports = (injectSailor, singleMode=true) => {
                         resolve();
                     })
                 );
-                console.log('test body start');
                 await app.start();
                 if (!singleMode) {
                     // FIXME this is different for multicluster and single
