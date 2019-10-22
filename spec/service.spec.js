@@ -251,7 +251,7 @@ describe('Service', () => {
                     function checkResult(result) {
                         expect(result.status).toEqual('success');
                         expect(result.data).toEqual({
-                            verified: true,
+                            verified: true
                         });
                     }
                 });
