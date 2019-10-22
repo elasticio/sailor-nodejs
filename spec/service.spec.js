@@ -219,10 +219,9 @@ describe('Service', () => {
                         .done(done, done);
 
                     function checkResult(result) {
-                        expect(result.status).toEqual('success');
+                        expect(result.status).toEqual('error');
                         expect(result.data).toEqual({
-                            verified: false,
-                            reason: 'Your API key is invalid'
+                            message: 'Your API key is invalid'
                         });
                     }
                 });
@@ -235,14 +234,42 @@ describe('Service', () => {
                         .done(done, done);
 
                     function checkResult(result) {
-                        expect(result.status).toEqual('success');
+                        expect(result.status).toEqual('error');
                         expect(result.data).toEqual({
-                            verified: false,
-                            reason: 'Ouch. This occurred during verification.'
+                            message: 'Ouch. This occurred during verification.'
                         });
                     }
                 });
 
+                it('should verify successfully for an async verifyCredentials', done => {
+
+                    //eslint-disable-next-line max-len
+                    service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }))
+                        .then(checkResult)
+                        .done(done, done);
+
+                    function checkResult(result) {
+                        expect(result.status).toEqual('success');
+                        expect(result.data).toEqual({
+                            verified: true,
+                        });
+                    }
+                });
+
+                it('should fail verification successfully for an async verifyCredentials', done => {
+
+                    //eslint-disable-next-line max-len
+                    service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }))
+                        .then(checkResult)
+                        .done(done, done);
+
+                    function checkResult(result) {
+                        expect(result.status).toEqual('error');
+                        expect(result.data).toEqual({
+                            message: 'Verification failed :('
+                        });
+                    }
+                });
             });
 
             describe('getMetaModel', () => {
