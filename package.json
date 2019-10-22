@@ -40,7 +40,7 @@
     "gulp": "3.9.1",
     "gulp-istanbul": "1.1.1",
     "gulp-jasmine": "0.2.0",
-    "jasmine-node": "^1.15.0",
+    "jasmine-node": "1.15.0",
     "mocha": "6.2.0",
     "nock": "10.0.6",
     "nsp": "2.8.1",
