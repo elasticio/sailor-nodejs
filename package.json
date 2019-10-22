@@ -7,7 +7,7 @@
     "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
     "pretest": "npm run lint",
     "test": "npm run test:jasmine && npm run test:mocha",
-    "test:jasmine": " jasmine-node spec",
+    "test:jasmine": "NODE_ENV=test jasmine-node spec",
     "test:mocha": "NODE_ENV=test mocha mocha_spec/**/*.js",
     "postpublish": "./postpublish.js"
   },
