@@ -219,9 +219,10 @@ describe('Service', () => {
                         .done(done, done);
 
                     function checkResult(result) {
-                        expect(result.status).toEqual('error');
+                        expect(result.status).toEqual('success');
                         expect(result.data).toEqual({
-                            message: 'Your API key is invalid'
+                            verified: false,
+                            reason: 'Your API key is invalid'
                         });
                     }
                 });
@@ -234,9 +235,10 @@ describe('Service', () => {
                         .done(done, done);
 
                     function checkResult(result) {
-                        expect(result.status).toEqual('error');
+                        expect(result.status).toEqual('success');
                         expect(result.data).toEqual({
-                            message: 'Ouch. This occurred during verification.'
+                            verified: false,
+                            reason: 'Ouch. This occurred during verification.'
                         });
                     }
                 });
@@ -251,7 +253,7 @@ describe('Service', () => {
                     function checkResult(result) {
                         expect(result.status).toEqual('success');
                         expect(result.data).toEqual({
-                            verified: true
+                            verified: true,
                         });
                     }
                 });
@@ -264,9 +266,10 @@ describe('Service', () => {
                         .done(done, done);
 
                     function checkResult(result) {
-                        expect(result.status).toEqual('error');
+                        expect(result.status).toEqual('success');
                         expect(result.data).toEqual({
-                            message: 'Verification failed :('
+                            verified: false,
+                            reason: 'Verification failed :('
                         });
                     }
                 });
