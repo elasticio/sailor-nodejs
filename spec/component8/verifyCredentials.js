@@ -7,12 +7,9 @@ function sleep(ms) {
 async function verify(credentials, cb) {
     try {
         await sleep(100);
-        const q = true;
-        if (q) {throw new Error('Verification failed :(');}
-        return cb(null, { verified: true });
+        throw new Error('Verification failed :(');
     } catch (e) {
         // should do this
         return cb(e, { verified: false });
     }
-
 }

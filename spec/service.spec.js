@@ -159,7 +159,7 @@ describe('Service', () => {
         const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }))
         expect(result.status).to.be.equal('success');
         expect(result.data).to.be.deep.equal({
-            verified: true,
+          verified: true,
         });
     });
 
@@ -168,9 +168,18 @@ describe('Service', () => {
         const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }))
         expect(result.status).to.be.equal('error');
         expect(result.data).to.be.deep.equl({
-            message: 'Verification failed :('
+          message: 'Verification failed :('
         });
     });
+
+    it('should fail verification successfully for async with a return (no cb)', async () => {
+      //eslint-disable-next-line max-len
+      const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }))
+      expect(result.status).to.be.equal('success');
+      expect(result.data).to.be.deep.equal({
+        verified: false,
+      });
+  });
 
       describe('getMetaModel', () => {
         it('should return callback based model successfully', async () => {
