@@ -243,7 +243,7 @@ describe('Service', () => {
                     }
                 });
 
-                it('should verify successfully for an async verifyCredentials', done => {
+                it('should verify successfully for an async verifyCredentials (with cb)', done => {
 
                     //eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }))
@@ -258,7 +258,7 @@ describe('Service', () => {
                     }
                 });
 
-                it('should fail verification successfully for an async verifyCredentials', done => {
+                it('should fail verification successfully for an async verifyCredentials (with cb)', done => {
 
                     //eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }))
@@ -270,6 +270,21 @@ describe('Service', () => {
                         expect(result.data).toEqual({
                             verified: false,
                             reason: 'Verification failed :('
+                        });
+                    }
+                });
+
+                it('should fail verification successfully for async with a return (no cb)', done => {
+
+                    //eslint-disable-next-line max-len
+                    service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }))
+                        .then(checkResult)
+                        .done(done, done);
+
+                    function checkResult(result) {
+                        expect(result.status).toEqual('success');
+                        expect(result.data).toEqual({
+                            verified: false
                         });
                     }
                 });
