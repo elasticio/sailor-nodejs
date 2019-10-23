@@ -6,5 +6,5 @@ function sleep(ms) {
 
 async function verify(credentials, cb) {
     await sleep(100);
-    cb(null, {verified: false});
+    cb(null, { verified: false });
 }
