@@ -6,6 +6,6 @@ function sleep(ms) {
 
 async function verify(credentials, cb) {
     await sleep(100);
-    cb(new Error('This is an error'), { verified: true });
-    return null;
+    cb(null, { verified: true });
+    return;
 }

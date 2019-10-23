@@ -274,7 +274,7 @@ describe('Service', () => {
                     }
                 });
 
-                it('should fail verification successfully for async with a return (no cb)', done => {
+                it('should succeed failed verification with callback and return', done => {
 
                     //eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }))
@@ -284,7 +284,23 @@ describe('Service', () => {
                     function checkResult(result) {
                         expect(result.status).toEqual('success');
                         expect(result.data).toEqual({
-                            verified: false
+                            verified: false,
+                            reason: 'This is an error'
+                        });
+                    }
+                });
+
+                it('should succeed correct verification with callback and return', done => {
+
+                    //eslint-disable-next-line max-len
+                    service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component10' }))
+                        .then(checkResult)
+                        .done(done, done);
+
+                    function checkResult(result) {
+                        expect(result.status).toEqual('success');
+                        expect(result.data).toEqual({
+                            verified: true
                         });
                     }
                 });
