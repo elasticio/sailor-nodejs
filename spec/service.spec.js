@@ -161,25 +161,34 @@ describe('Service', () => {
         expect(result.data).to.be.deep.equal({
           verified: true,
         });
-    });
+      });
 
-    it('should fail verification successfully for an async verifyCredentials', async () => {
+      it('should fail verification successfully for an async verifyCredentials', async () => {
         //eslint-disable-next-line max-len
         const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }))
         expect(result.status).to.be.equal('error');
         expect(result.data).to.be.deep.equl({
           message: 'Verification failed :('
         });
-    });
-
-    it('should fail verification successfully for async with a return (no cb)', async () => {
-      //eslint-disable-next-line max-len
-      const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }))
-      expect(result.status).to.be.equal('success');
-      expect(result.data).to.be.deep.equal({
-        verified: false,
       });
-  });
+
+      it('should fail verification successfully for async with a return (no cb)', async () => {
+        //eslint-disable-next-line max-len
+        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }))
+        expect(result.status).to.be.equal('success');
+        expect(result.data).to.be.deep.equal({
+          verified: false,
+        });
+      });
+
+      it('should succeed correct verification with callback and return', async () => {
+        //eslint-disable-next-line max-len
+        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component10' }))
+        expect(result.status).to.be.equal('success');
+        expect(result.data).to.be.deep.equal({
+          verified: true,
+        });
+      });
 
       describe('getMetaModel', () => {
         it('should return callback based model successfully', async () => {
