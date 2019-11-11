@@ -12,4 +12,6 @@ service.processService(serviceMethod, process.env)
         process.exit(0);
     });
 
-process.on('uncaughtException', logger.criticalErrorAndExit);
+process.on('uncaughtException', (err) => {
+    logger.criticalErrorAndExit(err);
+});

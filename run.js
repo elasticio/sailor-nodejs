@@ -50,7 +50,9 @@ process.on('SIGINT', function onSigint() {
     disconnectAndExit();
 });
 
-process.on('uncaughtException', logger.criticalErrorAndExit);
+process.on('uncaughtException', (err) => {
+    logger.criticalErrorAndExit(err);
+});
 
 function disconnect() {
     return co(function* putIn() {
