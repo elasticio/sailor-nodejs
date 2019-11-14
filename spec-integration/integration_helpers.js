@@ -170,7 +170,7 @@ function prepareEnv() {
     env.ELASTICIO_USER_ID = '5559edd38968ec0736000002';
     env.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
 
-    env.ELASTICIO_COMPONENT_PATH = '/mocha_spec/integration_component';
+    env.ELASTICIO_COMPONENT_PATH = '/spec-integration/integration_component';
 
     env.ELASTICIO_API_URI = 'https://apidotelasticidotio';
     env.ELASTICIO_API_USERNAME = 'test@test.com';
