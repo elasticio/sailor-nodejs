@@ -55,7 +55,6 @@ describe('Component reader', () => {
       () => {
         expect(error.message).to.be.equal('Trigger or action "some-missing-component" is not found in component.json!');
       });
-
   });
 
   it('Should return appropriate error if trigger file is missing', () => {
