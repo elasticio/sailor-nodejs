@@ -10,6 +10,7 @@ function processTrigger(msg, cfg) {
         that.emit('data', { content: 'Data 2' });
         that.emit('error', new Error('Error 2'));
         that.emit('data', { content: 'Data 3' });
+        that.emit('end');
         //throw new Error('Error 4');
     }, 1000);
 }

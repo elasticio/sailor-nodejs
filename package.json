@@ -31,10 +31,12 @@
   },
   "devDependencies": {
     "body-parser": "1.16.1",
-    "chai": "4.2.0",
+    "chai": "^4.2.0",
     "code-quality-js": "2.0.2",
     "del": "2.2.2",
-    "eslint": "4.19.1",
+    "eslint": "^6.6.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-mocha": "4.12.1",
     "express": "4.14.1",
     "gulp": "3.9.1",
@@ -45,7 +47,8 @@
     "nock": "10.0.6",
     "nsp": "2.8.1",
     "request": "2.88.0",
-    "sinon": "7.4.2"
+    "sinon": "7.4.2",
+    "sinon-chai": "^3.3.0"
   },
   "repository": "elasticio/sailor-nodejs",
   "license": "Apache-2.0"
