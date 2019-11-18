@@ -6,7 +6,7 @@
   "scripts": {
     "test": "mocha spec/*.js",
     "integration-test": "mocha spec-integration/**/*.js",
-    "coverage": "nyc --reporter=text --reporter=html mocha spec/*.js --timeout=3000",
+    "coverage": "nyc mocha spec/*.js --timeout=3000 && nyc report --reporter=text-lcov | coveralls",
     "postpublish": "./postpublish.js"
   },
   "engines": {
@@ -29,12 +29,14 @@
   },
   "devDependencies": {
     "chai": "4.2.0",
+    "coveralls": "3.0.7",
     "dotenv": "8.2.0",
     "eslint": "6.6.0",
     "eslint-config-airbnb-base": "14.0.0",
     "eslint-plugin-import": "2.18.2",
     "eslint-plugin-mocha": "6.2.1",
     "mocha": "6.2.0",
+    "mocha-lcov-reporter": "1.3.0",
     "nock": "10.0.6",
     "nyc": "14.1.1",
     "request": "2.88.0",
