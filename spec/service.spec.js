@@ -151,37 +151,48 @@ describe('Service', () => {
             reason: 'Ouch. This occurred during verification.',
           });
         });
-      });
 
-      it('should verify successfully for an async verifyCredentials', async () => {
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }));
-        expect(result.status).to.be.equal('success');
-        expect(result.data).to.be.deep.equal({
-          verified: true,
+        it('should verify successfully for an async verifyCredentials', async () => {
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }));
+          expect(result.status).to.be.equal('success');
+          expect(result.data).to.be.deep.equal({
+            verified: true,
+          });
         });
-      });
 
-      it('should fail verification successfully for an async verifyCredentials', async () => {
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }));
-        expect(result.status).to.be.equal('error');
-        expect(result.data).to.be.deep.equl({
-          message: 'Verification failed :(',
+        it('should fail verification successfully for an async verifyCredentials', async () => {
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }));
+          expect(result.status).to.be.equal('success');
+          expect(result.data).to.be.deep.equal({
+            reason: 'Verification failed :(',
+            verified: false,
+          });
         });
-      });
 
-      it('should fail verification successfully for async with a return (no cb)', async () => {
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }));
-        expect(result.status).to.be.equal('success');
-        expect(result.data).to.be.deep.equal({
-          verified: false,
+        it('should fail verification successfully for async with a return (no cb)', async () => {
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }));
+          expect(result.status).to.be.equal('success');
+          expect(result.data).to.be.deep.equal({
+            reason: 'This is an error',
+            verified: false,
+          });
         });
-      });
 
-      it('should succeed correct verification with callback and return', async () => {
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component10' }));
-        expect(result.status).to.be.equal('success');
-        expect(result.data).to.be.deep.equal({
-          verified: true,
+        it('should succeed correct verification with callback and return', async () => {
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component10' }));
+          expect(result.status).to.be.equal('success');
+          expect(result.data).to.be.deep.equal({
+            verified: true,
+          });
+        });
+
+        it('should emit from verifyCredentials', async () => {
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component11' }));
+          expect(result.status).to.be.equal('success');
+          expect(result.data).to.be.deep.equal({
+            reason: 'Error emitted!!',
+            verified: false,
+          });
         });
       });
 
