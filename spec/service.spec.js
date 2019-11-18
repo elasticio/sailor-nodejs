@@ -91,7 +91,6 @@ describe('Service', () => {
       });
 
       it('should throw an error when ELASTICIO_GET_MODEL_METHOD is not found', async () => {
-        // eslint-disable-next-line max-len
         const result = await service.processService('selectModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update', ELASTICIO_GET_MODEL_METHOD: 'unknown' }));
         expect(result.status).to.be.equal('error');
         expect(result.data.message).to.be.equal('Method "unknown" is not found in "update" action or trigger');
@@ -155,8 +154,7 @@ describe('Service', () => {
       });
 
       it('should verify successfully for an async verifyCredentials', async () => {
-        //eslint-disable-next-line max-len
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }))
+        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component7' }));
         expect(result.status).to.be.equal('success');
         expect(result.data).to.be.deep.equal({
           verified: true,
@@ -164,17 +162,15 @@ describe('Service', () => {
       });
 
       it('should fail verification successfully for an async verifyCredentials', async () => {
-        //eslint-disable-next-line max-len
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }))
+        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component8' }));
         expect(result.status).to.be.equal('error');
         expect(result.data).to.be.deep.equl({
-          message: 'Verification failed :('
+          message: 'Verification failed :(',
         });
       });
 
       it('should fail verification successfully for async with a return (no cb)', async () => {
-        //eslint-disable-next-line max-len
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }))
+        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component9' }));
         expect(result.status).to.be.equal('success');
         expect(result.data).to.be.deep.equal({
           verified: false,
@@ -182,8 +178,7 @@ describe('Service', () => {
       });
 
       it('should succeed correct verification with callback and return', async () => {
-        //eslint-disable-next-line max-len
-        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component10' }))
+        const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component10' }));
         expect(result.status).to.be.equal('success');
         expect(result.data).to.be.deep.equal({
           verified: true,
@@ -363,7 +358,6 @@ describe('Service', () => {
       });
 
       it('verifyCredentials', async () => {
-        // eslint-disable-next-line max-len
         service.processService('verifyCredentials', makeEnv({ ELASTICIO_POST_RESULT_URL: 'http://test.com/111/222' }))
           .catch((err) => {
             expect(err.message).to.be.equal('Failed to POST data to http://test.com/111/222 (404, Page not found)');
