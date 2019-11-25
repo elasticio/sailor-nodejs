@@ -1,4 +1,4 @@
-
+/* eslint-disable no-unused-expressions, no-param-reassign */
 const nock = require('nock');
 const { expect } = require('chai');
 const co = require('co');
@@ -8,6 +8,15 @@ const helpers = require('./integration_helpers');
 require('dotenv').config();
 
 const { env } = process;
+
+function requireRun() {
+  // @todo it would be great to use something like this https://github.com/jveski/shelltest
+  const path = '../run.js';
+  const resolved = require.resolve(path);
+  delete require.cache[resolved];
+  // eslint-disable-next-line global-require
+  return require('../run.js');
+}
 
 describe('Integration Test', () => {
   const customers = [
@@ -55,7 +64,7 @@ describe('Integration Test', () => {
 
   describe('when sailor is being invoked for message processing', () => {
     const parentMessageId = 'parent_message_1234567890';
-    const threadId = `${helpers.PREFIX }_thread_id_123456`;
+    const threadId = `${helpers.PREFIX}_thread_id_123456`;
     const messageId = 'f45be600-f770-11e6-b42d-b187bfbf19fd';
 
     const amqpHelper = helpers.amqp();
@@ -307,7 +316,7 @@ describe('Integration Test', () => {
           clusterId: undefined,
         });
 
-        counter++;
+        counter += 1;
         // We need 10 messages
         if (counter > 10) {
           const duration = Date.now() - start;
@@ -730,7 +739,7 @@ describe('Integration Test', () => {
 
     describe('when sailor could not init the module', () => {
       it('should publish init errors to RabbitMQ', (done) => {
-        const logCriticalErrorStub = sinon.stub(logging, 'criticalErrorAndExit');
+        sinon.stub(logging, 'criticalErrorAndExit');
 
         env.ELASTICIO_FUNCTION = 'fails_to_init';
 
@@ -793,9 +802,7 @@ describe('Integration Test', () => {
 
         helpers.mockApiTaskStepResponse();
 
-        hooksDataDeleteNock.on('replied', () => setTimeout(checkResult, 50));
-
-        function checkResult() {
+        hooksDataDeleteNock.on('replied', () => setTimeout(() => {
           expect(hooksDataGetNock.isDone()).to.be.ok;
 
           expect(requestFromShutdownHook).to.deep.equal({
@@ -809,7 +816,7 @@ describe('Integration Test', () => {
           expect(hooksDataDeleteNock.isDone()).to.be.ok;
 
           done();
-        }
+        }, 50));
 
         run = requireRun();
       });
@@ -826,11 +833,3 @@ describe('Integration Test', () => {
     });
   });
 });
-
-function requireRun() {
-  // @todo it would be great to use something like this https://github.com/jveski/shelltest
-  const path = '../run.js';
-  const resolved = require.resolve(path);
-  delete require.cache[resolved];
-  return require(path);
-}

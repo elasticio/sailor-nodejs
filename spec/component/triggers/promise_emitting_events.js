@@ -5,32 +5,31 @@ const request = require('request');
 exports.process = processTrigger;
 
 function processTrigger(msg, cfg) {
+  return co(function* gen() {
+    const tokenOptions = {
+      uri: 'https://login.acme/oauth2/v2.0/token',
+      json: true,
+      body: {
+        client_id: 'admin',
+        client_secret: 'secret',
+      },
+    };
 
-    return co(function* gen() {
-        const tokenOptions = {
-            uri: 'https://login.acme/oauth2/v2.0/token',
-            json: true,
-            body: {
-                client_id: 'admin',
-                client_secret: 'secret'
-            }
-        };
+    const [, newToken] = yield Q.ninvoke(request, 'post', tokenOptions);
 
-        const [, newToken] = yield Q.ninvoke(request, 'post', tokenOptions);
+    this.emit('updateKeys', {
+      oauth: newToken,
+    });
 
-        this.emit('updateKeys', {
-            oauth: newToken
-        });
+    const options = {
+      uri: 'https://login.acme/oauth2/v2.0/contacts',
+      json: true,
+    };
 
-        const options = {
-            uri: 'https://login.acme/oauth2/v2.0/contacts',
-            json: true
-        };
+    const [, body] = yield Q.ninvoke(request, 'get', options);
 
-        const [, body] = yield Q.ninvoke(request, 'get', options);
-
-        return {
-            body
-        };
-    }.bind(this));
+    return {
+      body,
+    };
+  }.bind(this));
 }

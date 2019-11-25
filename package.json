@@ -4,6 +4,8 @@
   "version": "2.5.1",
   "main": "run.js",
   "scripts": {
+    "lint": "eslint spec spec-integration --fix",
+    "pretest": "npm run lint",
     "test": "mocha spec/*.js",
     "integration-test": "mocha spec-integration/**/*.js",
     "coverage": "nyc mocha spec/*.js --timeout=3000 && nyc report --reporter=text-lcov | coveralls",

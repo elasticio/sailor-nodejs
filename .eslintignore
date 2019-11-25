@@ -1,1 +1,3 @@
 syntax_error_trigger.js
+spec/component*/*
+spec-integration/integration_component/*

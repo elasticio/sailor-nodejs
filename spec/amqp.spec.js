@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-expressions */
+/* eslint-disable max-len, no-unused-expressions */
 const chai = require('chai');
 const sinon = require('sinon');
 const sinonChai = require('sinon-chai');
@@ -147,7 +147,7 @@ describe('AMQP', () => {
     // One request every 500 ms
     const throttle = pThrottle(() => Promise.resolve(), 1, 500);
     const start = Date.now();
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i += 1) {
       // eslint-disable-next-line no-await-in-loop
       await amqp.sendData({
         headers: {

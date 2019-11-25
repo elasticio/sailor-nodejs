@@ -107,35 +107,35 @@ describe('Service', () => {
 
       describe('verifyCredentials', () => {
         it('should verify successfully when verifyCredentials.js is not available', async () => {
-          const result = await service.processService('verifyCredentials', makeEnv({}))
+          const result = await service.processService('verifyCredentials', makeEnv({}));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({ verified: true });
         });
 
         it('should verify successfully when callback verified', async () => {
           // eslint-disable-next-line max-len
-          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component2' }))
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component2' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({ verified: true });
         });
 
         it('should NOT verify successfully when callback did not verify', async () => {
           // eslint-disable-next-line max-len
-          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component3' }))
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component3' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({ verified: false });
         });
 
         it('should verify successfully when promise resolves', async () => {
           // eslint-disable-next-line max-len
-          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component4' }))
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component4' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({ verified: true });
         });
 
         it('should NOT verify successfully when promise rejects', async () => {
           // eslint-disable-next-line max-len
-          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component5' }))
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component5' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
             verified: false,
@@ -145,7 +145,7 @@ describe('Service', () => {
 
         it('should NOT verify successfully when error thrown synchronously', async () => {
           // eslint-disable-next-line max-len
-          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component6' }))
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component6' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
             verified: false,
@@ -156,7 +156,7 @@ describe('Service', () => {
 
       describe('getMetaModel', () => {
         it('should return callback based model successfully', async () => {
-          const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update' }))
+          const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
             in: {
@@ -171,7 +171,7 @@ describe('Service', () => {
           });
         });
         it('should return promise based model successfully', async () => {
-          const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update1' }))
+          const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update1' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
             in: {
@@ -186,7 +186,7 @@ describe('Service', () => {
           });
         });
         it('should return error when promise rejects', async () => {
-          const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update2' }))
+          const result = await service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update2' }));
           expect(result.status).to.be.equal('error');
           expect(result.data).to.be.deep.equal({
             message: 'Today no metamodels. Sorry!',
@@ -197,7 +197,7 @@ describe('Service', () => {
       describe('selectModel', () => {
         it('selectModel', async () => {
           // eslint-disable-next-line max-len
-          const result = await service.processService('selectModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update', ELASTICIO_GET_MODEL_METHOD: 'getModel' }))
+          const result = await service.processService('selectModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update', ELASTICIO_GET_MODEL_METHOD: 'getModel' }));
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
             de: 'Germany',
@@ -221,7 +221,7 @@ describe('Service', () => {
             .put('/v1/accounts/1234567890', { keys: { oauth: { access_token: 'newAccessToken' } } })
             .reply(200, 'Success');
 
-          const result = await service.processService('selectModel', env)
+          const result = await service.processService('selectModel', env);
           expect(nockScope.isDone()).to.be.equal(true);
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
@@ -245,7 +245,7 @@ describe('Service', () => {
             .put('/v1/accounts/1234567890', { keys: { oauth: { access_token: 'newAccessToken' } } })
             .reply(400, 'Success');
 
-          const result = await service.processService('selectModel', env)
+          const result = await service.processService('selectModel', env);
           expect(nockScope.isDone()).to.be.equal(true);
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
@@ -264,7 +264,7 @@ describe('Service', () => {
             ELASTICIO_API_KEY: '5559edd',
           });
 
-          const result = await service.processService('selectModel', env)
+          const result = await service.processService('selectModel', env);
           expect(result.status).to.be.equal('success');
           expect(result.data).to.be.deep.equal({
             de: 'de_DE',
@@ -289,7 +289,7 @@ describe('Service', () => {
               b: 'y',
             });
 
-          const result = await service.processService('selectModel', env)
+          const result = await service.processService('selectModel', env);
 
 
           expect(nockScope.isDone()).to.be.equal(true);
@@ -310,8 +310,7 @@ describe('Service', () => {
             ELASTICIO_API_KEY: '5559edd',
           });
 
-          const result = await service.processService('selectModel', env)
-
+          const result = await service.processService('selectModel', env);
 
 
           expect(result.status).to.be.equal('error');
@@ -332,7 +331,7 @@ describe('Service', () => {
         service.processService('verifyCredentials', makeEnv({ ELASTICIO_POST_RESULT_URL: 'http://test.com/111/222' }))
           .catch((err) => {
             expect(err.message).to.be.equal('Failed to POST data to http://test.com/111/222 (404, Page not found)');
-          })
+          });
       });
     });
   });

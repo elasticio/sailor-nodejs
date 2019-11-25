@@ -3,6 +3,7 @@ const amqplib = require('amqplib');
 const { EventEmitter } = require('events');
 
 const PREFIX = 'sailor_nodejs_integration_test';
+// eslint-disable-next-line import/no-extraneous-dependencies
 const nock = require('nock');
 
 const { env } = process;
@@ -20,6 +21,7 @@ class AmqpHelper extends EventEmitter {
     this.errorMessages = [];
   }
 
+  // eslint-disable-next-line class-methods-use-this
   prepareEnv() {
     env.ELASTICIO_LISTEN_MESSAGES_ON = `${PREFIX}:messages`;
     env.ELASTICIO_PUBLISH_MESSAGES_TO = `${PREFIX}:exchange`;
@@ -35,7 +37,7 @@ class AmqpHelper extends EventEmitter {
     return this.subscriptionChannel.publish(
       env.ELASTICIO_LISTEN_MESSAGES_ON,
       env.ELASTICIO_DATA_ROUTING_KEY,
-      new Buffer(JSON.stringify(message)), {
+      Buffer.from(JSON.stringify(message)), {
         headers: {
           execId: env.ELASTICIO_EXEC_ID,
           taskId: env.ELASTICIO_FLOW_ID,
@@ -151,15 +153,6 @@ class AmqpHelper extends EventEmitter {
     // publishChannel.cancel('sailor_nodejs');
     // done();
   }
-}
-
-function amqp() {
-  const handle = {
-    // eslint-disable-next-line no-empty-function
-    getMessages() {
-    },
-  };
-  return handle;
 }
 
 function prepareEnv() {

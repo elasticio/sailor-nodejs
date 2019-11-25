@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-expressions */
+/* eslint-disable global-require, no-unused-expressions */
 const nock = require('nock');
 const sinon = require('sinon');
 const chai = require('chai');
@@ -354,9 +354,9 @@ describe('Executor', () => {
     });
 
     it('should log extra fields', () => {
-      const testStream = new TestStream();
+      testStream = new TestStream();
 
-      const taskExec = new TaskExec({
+      taskExec = new TaskExec({
         loggerOptions: {
           streams: [
             {

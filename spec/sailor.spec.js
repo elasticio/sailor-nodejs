@@ -73,6 +73,7 @@ const message = {
 
 describe('Sailor', () => {
   beforeEach(() => {
+    // eslint-disable-next-line global-require
     settings = require('../lib/settings').readFrom(envVars);
   });
 
@@ -147,7 +148,8 @@ describe('Sailor', () => {
             .then(() => {
               expect(sailor.stepData).to.be.deep.equal(stepData);
               expect(sailor.snapshot).to.be.deep.equal(stepData.snapshot);
-              expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledWith(settings.FLOW_ID, settings.STEP_ID);
+              expect(sailor.apiClient.tasks.retrieveStep).to.have.been
+                .calledWith(settings.FLOW_ID, settings.STEP_ID);
               expect(sailor.componentReader.init).to.have.been.calledWith(settings.COMPONENT_PATH);
             });
         });

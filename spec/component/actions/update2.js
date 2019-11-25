@@ -4,5 +4,5 @@ const request = require('request');
 exports.getMetaModel = getMetaModel;
 
 function getMetaModel(cfg) {
-    return Promise.reject(new Error('Today no metamodels. Sorry!'));
+  return Promise.reject(new Error('Today no metamodels. Sorry!'));
 }

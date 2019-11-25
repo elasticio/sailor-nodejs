@@ -14,6 +14,7 @@ describe('Executor', () => {
         var2: 'val2',
       };
       const taskexec = new TaskExec({ variables: vars });
+      // eslint-disable-next-line no-underscore-dangle
       expect(taskexec._variables).to.deep.equal(vars);
     });
   });
