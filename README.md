@@ -31,8 +31,8 @@ After the registration and opening of the account you must **[upload your SSH Ke
 ### Getting Started
 
 After registration and uploading of your SSH Key you can proceed to deploy it into our system. At this stage we suggest you to:
-*   [Create a team](https://support.elastic.io/support/solutions/articles/14000048250-how-to-create-and-manage-a-team) to work on your new component. This is not required but will be automatically created using random naming by our system so we suggest you name your team accordingly.
-*   [Create a repository](https://support.elastic.io/support/solutions/articles/14000038797-create-and-manage-your-repositories) inside the team to deploy your new component code.
+*   [Create a team](https://docs.elastic.io/guides/teams-and-repos.html#creating-a-developer-team) to work on your new component. This is not required but will be automatically created using random naming by our system so we suggest you name your team accordingly.
+*   [Create a repository](https://docs.elastic.io/guides/teams-and-repos.html#create-a-component-repository) inside the team to deploy your new component code.
 
 ### Examples of Node.js components
 
@@ -51,9 +51,57 @@ Here is a list of components build on Node.js:
 
 ## Sailor logging
 
-Sailor uses [bunyan](https://github.com/trentm/node-bunyan) logging framework. You can change the logging settings with environment varaible:
- * `LOG_LEVEL` - set it to one of `error`,`warn`,`info`,`debug` or `trace`. See [this code](https://github.com/elasticio/sailor-nodejs/blob/master/lib/logging.js#L11) for more details.
+Sailor uses [bunyan](https://github.com/trentm/node-bunyan) logging framework. 
+ 
+Supported log levels are:
 
+- `FATAL`
+- `ERROR`
+- `WARN`
+- `INFO`
+- `DEBUG`
+- `TRACE`
+
+Default log level is `INFO`. You can change default log level with environment variable `LOG_LEVEL`.
+
+Sailor logger adds the following extra context to log messages:
+
+- `ELASTICIO_API_USERNAME`
+- `ELASTICIO_COMP_ID`
+- `ELASTICIO_COMP_NAME`
+- `ELASTICIO_CONTAINER_ID`
+- `ELASTICIO_CONTRACT_ID`
+- `ELASTICIO_EXEC_ID`
+- `ELASTICIO_EXEC_TYPE`
+- `ELASTICIO_EXECUTION_RESULT_ID`
+- `ELASTICIO_FLOW_ID`
+- `ELASTICIO_FLOW_VERSION`
+- `ELASTICIO_FUNCTION`
+- `ELASTICIO_STEP_ID`
+- `ELASTICIO_TASK_USER_EMAIL`
+- `ELASTICIO_TENANT_ID`
+- `ELASTICIO_USER_ID`
+- `ELASTICIO_WORKSPACE_ID`
+
+## Component logging
+
+Sailor exposes logger object for use in a component. Component logger inherits log level from sailor's logger
+and adds the following extra context to log messages:
+
+- `messageId` (unique ID of the next RabbitMQ message)
+- `parentMessageId` (unique ID of previous RabbitMQ message)
+- `threadId` (unique ID of execution thread)
+
+Component logger usage example:
+
+```JavaScript
+this.logger.fatal('message');
+this.logger.error('message');
+this.logger.warn('message');
+this.logger.info('message');
+this.logger.debug('message');
+this.logger.trace('message');
+```
 
 ## Flow control
 
@@ -85,14 +133,14 @@ exports.process = process;
 
 async function process(msg, cfg, snapshot) {
     for (let i = 0; i < 100000; i++) {
-        console.log('Sending message %s', i);
+        this.logger.info('Sending message %s', i);
         await this.emit('data', {
             body: {
                 counter: i,
                 hi: 'there'
             }
         });
-        console.log('Message %s was sent', i);
+        this.logger.info('Message %s was sent', i);
     }
 }
 ```
