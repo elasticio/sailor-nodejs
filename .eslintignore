@@ -1,3 +1,13 @@
 syntax_error_trigger.js
 spec/component*/*
 spec-integration/integration_component/*
+lib/amqp.js
+lib/cipher.js
+lib/component_reader.js
+lib/emitter.js
+lib/encryptor.js
+lib/executor.js
+lib/hooksData.js
+lib/logging.js
+lib/sailor.js
+lib/settings.js
