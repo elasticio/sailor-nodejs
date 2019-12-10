@@ -4,7 +4,7 @@
   "version": "2.5.1",
   "main": "run.js",
   "scripts": {
-    "lint": "eslint lib spec spec-integration --fix",
+    "lint": "eslint lib spec spec-integration",
     "pretest": "npm run lint",
     "test": "mocha spec/*.js",
     "integration-test": "mocha spec-integration/**/*.js",

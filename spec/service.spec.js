@@ -194,6 +194,15 @@ describe('Service', () => {
             verified: false,
           });
         });
+
+        it('should run test 12 for verifyCredentials', async () => {
+          const result = await service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component12' }));
+          expect(result.status).to.be.equal('success');
+          expect(result.data).to.be.deep.equal({
+            reason: 'smth bad happened',
+            verified: false,
+          });
+        });
       });
 
       describe('getMetaModel', () => {
