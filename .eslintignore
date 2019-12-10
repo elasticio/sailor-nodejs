@@ -1,3 +1,5 @@
 syntax_error_trigger.js
 spec/component*/*
 spec-integration/integration_component/*
+lib/executor.js
+lib/sailor.js
