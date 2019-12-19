@@ -19,7 +19,9 @@ describe('Integration Test', () => {
         }
     ];
     const inputMessage = {
-        headers: {},
+        headers: {
+            stepId: 'step_1'
+        },
         body: {
             message: 'Just do it!'
         }
@@ -123,8 +125,7 @@ describe('Integration Test', () => {
                     }
                 });
 
-                done();
-            });
+            }, done);
 
             run = requireRun();
 
@@ -134,7 +135,7 @@ describe('Integration Test', () => {
             });
         });
 
-        it('should augment passthrough property with data', done => {
+        it('should paste data from incoming message into passthrough and not copy own data', done => {
             process.env.ELASTICIO_STEP_ID = 'step_2';
             process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
             process.env.ELASTICIO_FUNCTION = 'emit_data';
@@ -145,9 +146,9 @@ describe('Integration Test', () => {
 
             const psMsg = Object.assign(inputMessage, {
                 passthrough: {
-                    step_1: {
-                        id: '34',
-                        body: {},
+                    step_oth: { // emulating an another step – just to be sure that it's not lost
+                        id: 'id-56',
+                        body: { a: 1 },
                         attachments: {}
                     }
                 }
@@ -162,20 +163,14 @@ describe('Integration Test', () => {
                 expect(queueName).to.eql(amqpHelper.nextStepQueue);
 
                 expect(emittedMessage.passthrough).to.deep.eql({
-                    step_1: {
-                        id: '34',
-                        body: {},
+                    step_oth: { // emulating an another step – just to be sure that it's not lost
+                        id: 'id-56',
+                        body: { a: 1 },
                         attachments: {}
                     },
-                    step_2: {
-                        id: messageId,
-                        headers: {
-                            'x-custom-component-header': '123_abc'
-                        },
-                        body: {
-                            id: 'someId',
-                            hai: 'there'
-                        }
+                    step_1: {
+                        headers: inputMessage.headers,
+                        body: inputMessage.body
                     }
                 });
 
@@ -214,9 +209,7 @@ describe('Integration Test', () => {
                     appId: undefined,
                     clusterId: undefined
                 });
-
-                done();
-            });
+            }, done);
 
             run = requireRun();
         });
@@ -234,11 +227,15 @@ describe('Integration Test', () => {
 
             const psMsg = Object.assign(inputMessage, {
                 passthrough: {
-                    step_1: {
-                        id: '34',
+                    step_oth: { // emulating an another step – just to be sure that it's not lost
+                        id: 'm-34',
                         body: {},
                         attachments: {}
                     }
+                },
+                headers: {
+                    'x-custom-component-header': '123_abc',
+                    'stepId': 'step_1'
                 }
             });
 
@@ -254,19 +251,18 @@ describe('Integration Test', () => {
                 expect(queueName).to.eql(amqpHelper.nextStepQueue);
 
                 expect(emittedMessage.passthrough).to.deep.eql({
-                    step_1: {
-                        id: '34',
+                    step_oth: { // emulating an another step – just to be sure that it's not lost
+                        id: 'm-34',
                         body: {},
                         attachments: {}
                     },
-                    step_2: {
-                        id: messageId,
+                    step_1: {
                         headers: {
-                            'x-custom-component-header': '123_abc'
+                            'x-custom-component-header': '123_abc',
+                            'stepId': 'step_1'
                         },
                         body: {
-                            id: 'someId',
-                            hai: 'there'
+                            message: 'Just do it!'
                         }
                     }
                 });
@@ -307,7 +303,7 @@ describe('Integration Test', () => {
                     appId: undefined,
                     clusterId: undefined
                 });
-
+            }, () => {
                 counter++;
                 // We need 10 messages
                 if (counter > 10) {
@@ -405,9 +401,7 @@ describe('Integration Test', () => {
                                 }
                             }
                         });
-
-                        done();
-                    });
+                    }, done);
 
                     run = requireRun();
 
@@ -527,8 +521,7 @@ describe('Integration Test', () => {
                                 }
                             }
                         });
-                        done();
-                    });
+                    }, done);
 
                     run = requireRun();
 
@@ -611,9 +604,7 @@ describe('Integration Test', () => {
                                 }
                             }
                         });
-
-                        done();
-                    });
+                    }, done);
 
                     run = requireRun();
 
@@ -663,9 +654,7 @@ describe('Integration Test', () => {
                         });
 
                         expect(hooksDataNock.isDone()).to.be.ok;
-
-                        done();
-                    });
+                    }, done);
 
                     run = requireRun();
 
@@ -738,9 +727,7 @@ describe('Integration Test', () => {
                             }
                         }
                     });
-
-                    done();
-                });
+                }, done);
 
                 run = requireRun();
 
@@ -796,9 +783,7 @@ describe('Integration Test', () => {
                         body: 'Ok',
                         statusCode: 200
                     });
-
-                    done();
-                });
+                }, done);
 
                 run = requireRun();
 
@@ -831,9 +816,7 @@ describe('Integration Test', () => {
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION
                     });
-
-                    done();
-                });
+                }, done);
 
                 run = requireRun();
             });

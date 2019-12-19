@@ -35,7 +35,6 @@ describe('Sailor', () => {
     const encryptor = require('../lib/encryptor.js');
     const Sailor = require('../lib/sailor.js').Sailor;
     const _ = require('lodash');
-    const Q = require('q');
 
     const payload = { param1: 'Value1' };
 
@@ -52,6 +51,7 @@ describe('Sailor', () => {
             headers: {
                 taskId: '5559edd38968ec0736000003',
                 execId: 'some-exec-id',
+                stepId: 'step_0',
                 userId: '5559edd38968ec0736000002',
                 workspaceId: '5559edd38968ec073600683'
             },
@@ -186,7 +186,7 @@ describe('Sailor', () => {
     describe('disconnection', () => {
         it('should disconnect Mongo and RabbitMQ, and exit process', done => {
             const fakeAMQPConnection = jasmine.createSpyObj('AMQPConnection', ['disconnect']);
-            fakeAMQPConnection.disconnect.andReturn(Q.resolve());
+            fakeAMQPConnection.disconnect.andReturn(Promise.resolve());
 
             spyOn(amqp, 'Amqp').andReturn(fakeAMQPConnection);
             spyOn(process, 'exit').andReturn(0);
@@ -221,7 +221,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.connect()
@@ -283,7 +283,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.connect()
@@ -332,7 +332,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.connect()
@@ -353,20 +353,20 @@ describe('Sailor', () => {
                 .catch(done); //todo: use done.fail after migration to Jasmine 2.x
         });
 
-        it('should augment emitted message with passthrough data', done => {
+        it('should augment emitted message with passthrough with data from incoming message', done => {
             settings.FUNCTION = 'passthrough';
             const sailor = new Sailor(settings);
 
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({ is_passthrough: true });
+                return Promise.resolve({ is_passthrough: true });
             });
 
             const psPayload = {
                 body: payload,
                 passthrough: {
-                    step_0: {
+                    step_oth: {
                         body: { key: 'value' }
                     }
                 }
@@ -387,12 +387,12 @@ describe('Sailor', () => {
                             param1: 'Value1'
                         },
                         passthrough: {
-                            step_0: {
+                            step_oth: {
                                 body: {
                                     key: 'value'
                                 }
                             },
-                            step_1: {
+                            step_0: {
                                 body: { param1: 'Value1' }
                             }
                         }
@@ -432,7 +432,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({
+                return Promise.resolve({
                     is_passthrough: true,
                     variables: {
                         var1: 'val1',
@@ -469,7 +469,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({
+                return Promise.resolve({
                     config: {
                         _account: '1234567890'
                     }
@@ -479,7 +479,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.accounts, 'update').andCallFake((accountId, keys) => {
                 expect(accountId).toEqual('1234567890');
                 expect(keys).toEqual({ keys: { oauth: { access_token: 'newAccessToken' } } });
-                return Q();
+                return Promise.resolve();
             });
 
             sailor.prepare()
@@ -545,7 +545,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -575,7 +575,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -629,7 +629,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({
+                return Promise.resolve({
                     snapshot: {
                         someId: 'someData'
                     }
@@ -687,7 +687,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -718,7 +718,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -747,7 +747,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -785,7 +785,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -806,7 +806,7 @@ describe('Sailor', () => {
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');
-                return Q({});
+                return Promise.resolve({});
             });
 
             sailor.prepare()
@@ -992,7 +992,9 @@ describe('Sailor', () => {
             try {
                 sailor.readIncomingMessageHeaders({
                     properties: {
-                        headers: {}
+                        headers: {
+                            stepId: 'step_0'
+                        }
                     }
                 });
                 throw new Error('Must not be reached');
@@ -1008,6 +1010,7 @@ describe('Sailor', () => {
                 sailor.readIncomingMessageHeaders({
                     properties: {
                         headers: {
+                            stepId: 'step_0',
                             execId: 'my_exec_123'
                         }
                     }
@@ -1026,6 +1029,7 @@ describe('Sailor', () => {
                     properties: {
                         headers: {
                             execId: 'my_exec_123',
+                            stepId: 'step_0',
                             taskId: 'my_task_123'
                         }
                     }
@@ -1033,6 +1037,24 @@ describe('Sailor', () => {
                 throw new Error('Must not be reached');
             } catch (e) {
                 expect(e.message).toEqual('UserId is missing in message header');
+            }
+        });
+
+        it('stepId missing', () => {
+            const sailor = new Sailor(settings);
+
+            try {
+                sailor.readIncomingMessageHeaders({
+                    properties: {
+                        headers: {
+                            execId: 'my_exec_123',
+                            taskId: 'my_task_123'
+                        }
+                    }
+                });
+                throw new Error('Must not be reached');
+            } catch (e) {
+                expect(e.message).toEqual('StepId is missing in message header');
             }
         });
 
@@ -1045,6 +1067,7 @@ describe('Sailor', () => {
                         headers: {
                             execId: 'my_exec_123',
                             taskId: 'my_task_123',
+                            stepId: 'step_0',
                             userId: 'my_user_123'
                         }
                     }
@@ -1061,6 +1084,7 @@ describe('Sailor', () => {
             const headers = {
                 execId: 'my_exec_123',
                 taskId: settings.FLOW_ID,
+                stepId: settings.STEP_ID,
                 userId: 'my_user_123'
             };
 
@@ -1081,6 +1105,7 @@ describe('Sailor', () => {
             const headers = {
                 execId: 'my_exec_123',
                 taskId: settings.FLOW_ID,
+                stepId: settings.STEP_ID,
                 userId: 'my_user_123',
                 messageId
             };
@@ -1094,6 +1119,7 @@ describe('Sailor', () => {
             expect(result).toEqual({
                 execId: 'my_exec_123',
                 taskId: settings.FLOW_ID,
+                stepId: settings.STEP_ID,
                 userId: 'my_user_123',
                 parentMessageId: messageId
             });
@@ -1105,6 +1131,7 @@ describe('Sailor', () => {
             const headers = {
                 execId: 'my_exec_123',
                 taskId: settings.FLOW_ID,
+                stepId: settings.STEP_ID,
                 userId: 'my_user_123',
                 reply_to: 'my_reply_to_exchange'
             };
@@ -1124,6 +1151,7 @@ describe('Sailor', () => {
             const headers = {
                 'execId': 'my_exec_123',
                 'taskId': settings.FLOW_ID,
+                'stepId': settings.STEP_ID,
                 'userId': 'my_user_123',
                 'reply_to': 'my_reply_to_exchange',
                 'x-eio-meta-lowercase': 'I am lowercase',
@@ -1139,6 +1167,7 @@ describe('Sailor', () => {
             expect(result).toEqual({
                 'execId': 'my_exec_123',
                 'taskId': settings.FLOW_ID,
+                'stepId': settings.STEP_ID,
                 'userId': 'my_user_123',
                 'reply_to': 'my_reply_to_exchange',
                 'x-eio-meta-lowercase': 'I am lowercase',
