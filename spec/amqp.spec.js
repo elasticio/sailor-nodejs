@@ -164,28 +164,20 @@ describe('AMQP', () => {
         }, done);
     });
 
-    it('Should send error when message size exceeds limit', () => {
+    it('Should throw error when message size exceeds limit', (done) => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['publish', 'waitForConfirms', 'on']);
 
-        const body = 'a'.repeat(settings.OUTGOING_MESSAGE_SIZE_LIMIT);
+        const body = 'a'.repeat(settings.OUTGOING_MESSAGE_SIZE_LIMIT + 1);
         const headers = {};
-        const payload = { body, headers };
-        const payloadSize = encryptor.encryptMessageContent(payload).length;
 
-        amqp.sendData({ body }, { headers });
-
-        expect(amqp.publishChannel.publish).toHaveBeenCalled();
-        expect(amqp.publishChannel.publish.callCount).toEqual(1);
-
-        const [exchangeName, routingKey, data] = amqp.publishChannel.publish.calls[0].args;
-        const message = JSON.parse(data.toString());
-        const messagePayload = encryptor.decryptMessageContent(message.error);
-
-        expect(exchangeName).toEqual(envVars.ELASTICIO_PUBLISH_MESSAGES_TO);
-        expect(routingKey).toEqual(envVars.ELASTICIO_ERROR_ROUTING_KEY);
-        expect(messagePayload.message).toEqual(`Outgoing message size ${payloadSize} exceeds `
-            + `limit of ${settings.OUTGOING_MESSAGE_SIZE_LIMIT}`);
+        amqp.sendData({ body }, { headers })
+            .then(() => done.fail('Exception should be thrown'))
+            .catch(err => {
+                expect(err.message).toEqual('Outgoing message size 13981056 exceeds limit of 10485760.');
+                expect(amqp.publishChannel.publish).not.toHaveBeenCalled();
+                done();
+            });
     });
 
     it('Should sendHttpReply to outgoing channel using routing key from headers when process data', () => {
