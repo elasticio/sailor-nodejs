@@ -12,7 +12,7 @@
     "postpublish": "./postpublish.js"
   },
   "engines": {
-    "node": ">=10.15.0"
+    "node": ">=12.13.0"
   },
   "dependencies": {
     "amqplib": "0.5.1",

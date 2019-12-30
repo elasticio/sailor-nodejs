@@ -135,7 +135,7 @@ describe('Integration Test', () => {
             });
         });
 
-        it('should paste data from incoming message into passthrough and not copy own data', done => {
+        it('should augment passthrough property with data', done => {
             process.env.ELASTICIO_STEP_ID = 'step_2';
             process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
             process.env.ELASTICIO_FUNCTION = 'emit_data';
@@ -146,9 +146,9 @@ describe('Integration Test', () => {
 
             const psMsg = Object.assign(inputMessage, {
                 passthrough: {
-                    step_oth: { // emulating an another step – just to be sure that it's not lost
-                        id: 'id-56',
-                        body: { a: 1 },
+                    step_1: { // emulating an another step – just to be sure that it's not lost
+                        id: '34',
+                        body: {},
                         attachments: {}
                     }
                 }
@@ -163,14 +163,20 @@ describe('Integration Test', () => {
                 expect(queueName).to.eql(amqpHelper.nextStepQueue);
 
                 expect(emittedMessage.passthrough).to.deep.eql({
-                    step_oth: { // emulating an another step – just to be sure that it's not lost
-                        id: 'id-56',
-                        body: { a: 1 },
+                    step_1: { // emulating an another step – just to be sure that it's not lost
+                        id: '34',
+                        body: {},
                         attachments: {}
                     },
-                    step_1: {
-                        headers: inputMessage.headers,
-                        body: inputMessage.body
+                    step_2: {
+                        id: messageId,
+                        headers: {
+                            'x-custom-component-header': '123_abc'
+                        },
+                        body: {
+                            id: 'someId',
+                            hai: 'there'
+                        }
                     }
                 });
 
@@ -213,6 +219,89 @@ describe('Integration Test', () => {
 
             run = requireRun();
         });
+
+        it(
+            'should paste data from incoming message into passthrough and not copy own data if NO_SELF_PASSTRHOUGH',
+            done => {
+                process.env.ELASTICIO_STEP_ID = 'step_2';
+                process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                process.env.ELASTICIO_FUNCTION = 'emit_data';
+                process.env.ELASTICIO_NO_SELF_PASSTRHOUGH = 'true';
+
+                helpers.mockApiTaskStepResponse({
+                    is_passthrough: true
+                });
+
+                const psMsg = Object.assign(inputMessage, {
+                    passthrough: {
+                        step_oth: { // emulating an another step – just to be sure that it's not lost
+                            id: 'id-56',
+                            body: { a: 1 },
+                            attachments: {}
+                        }
+                    }
+                });
+
+                amqpHelper.publishMessage(psMsg, {
+                    parentMessageId,
+                    threadId
+                });
+
+                amqpHelper.on('data', ({ properties, emittedMessage }, queueName) => {
+                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+
+                    expect(emittedMessage.passthrough).to.deep.eql({
+                        step_oth: { // emulating an another step – just to be sure that it's not lost
+                            id: 'id-56',
+                            body: { a: 1 },
+                            attachments: {}
+                        },
+                        step_1: {
+                            headers: inputMessage.headers,
+                            body: inputMessage.body
+                        }
+                    });
+
+                    delete properties.headers.start;
+                    delete properties.headers.end;
+                    delete properties.headers.cid;
+
+                    expect(properties.headers).to.deep.equal({
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        execId: env.ELASTICIO_EXEC_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        threadId,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        messageId,
+                        parentMessageId
+                    });
+
+                    delete properties.headers;
+
+                    expect(properties).to.deep.eql({
+                        contentType: 'application/json',
+                        contentEncoding: 'utf8',
+                        deliveryMode: undefined,
+                        priority: undefined,
+                        correlationId: undefined,
+                        replyTo: undefined,
+                        expiration: undefined,
+                        messageId: undefined,
+                        timestamp: undefined,
+                        type: undefined,
+                        userId: undefined,
+                        appId: undefined,
+                        clusterId: undefined
+                    });
+                }, done);
+
+                run = requireRun();
+            }
+        );
 
         it('should work well with async process function emitting data', done => {
             process.env.ELASTICIO_STEP_ID = 'step_2';
