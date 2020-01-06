@@ -38,41 +38,41 @@ describe('Sailor', () => {
 
     const payload = { param1: 'Value1' };
 
-    const message = {
-        fields: {
-            consumerTag: 'abcde',
-            deliveryTag: 12345,
-            exchange: 'test',
-            routingKey: 'test.hello'
-        },
-        properties: {
-            contentType: 'application/json',
-            contentEncoding: 'utf8',
-            headers: {
-                taskId: '5559edd38968ec0736000003',
-                execId: 'some-exec-id',
-                stepId: 'step_0',
-                userId: '5559edd38968ec0736000002',
-                workspaceId: '5559edd38968ec073600683'
-            },
-            deliveryMode: undefined,
-            priority: undefined,
-            correlationId: undefined,
-            replyTo: undefined,
-            expiration: undefined,
-            messageId: undefined,
-            timestamp: undefined,
-            type: undefined,
-            userId: undefined,
-            appId: undefined,
-            mandatory: true,
-            clusterId: ''
-        },
-        content: Buffer.from(encryptor.encryptMessageContent(payload))
-    };
+    let message;
 
     beforeEach(() => {
         settings = require('../lib/settings').readFrom(envVars);
+        message = {
+            fields: {
+                consumerTag: 'abcde',
+                deliveryTag: 12345,
+                exchange: 'test',
+                routingKey: 'test.hello'
+            },
+            properties: {
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                headers: {
+                    taskId: '5559edd38968ec0736000003',
+                    execId: 'some-exec-id',
+                    userId: '5559edd38968ec0736000002',
+                    workspaceId: '5559edd38968ec073600683'
+                },
+                deliveryMode: undefined,
+                priority: undefined,
+                correlationId: undefined,
+                replyTo: undefined,
+                expiration: undefined,
+                messageId: undefined,
+                timestamp: undefined,
+                type: undefined,
+                userId: undefined,
+                appId: undefined,
+                mandatory: true,
+                clusterId: ''
+            },
+            content: Buffer.from(encryptor.encryptMessageContent(payload))
+        };
     });
 
     describe('init', () => {
@@ -430,6 +430,7 @@ describe('Sailor', () => {
             'should augment emitted message with passthrough with data from incoming message '
             + 'if NO_SELF_PASSTRHOUGH set',
             done => {
+                message.properties.headers.stepId = 'step_0';
                 settings.FUNCTION = 'passthrough';
                 settings.NO_SELF_PASSTRHOUGH = true;
                 const sailor = new Sailor(settings);
@@ -471,6 +472,81 @@ describe('Sailor', () => {
                                 },
                                 step_0: {
                                     body: { param1: 'Value1' }
+                                }
+                            }
+                        });
+                        expect(sendDataCalls[0].args[1]).toEqual(jasmine.any(Object));
+                        expect(sendDataCalls[0].args[1]).toEqual({
+                            contentType: 'application/json',
+                            contentEncoding: 'utf8',
+                            mandatory: true,
+                            headers: {
+                                execId: 'some-exec-id',
+                                taskId: '5559edd38968ec0736000003',
+                                userId: '5559edd38968ec0736000002',
+                                containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
+                                workspaceId: '5559edd38968ec073600683',
+                                stepId: 'step_1',
+                                compId: '5559edd38968ec0736000456',
+                                function: 'passthrough',
+                                start: jasmine.any(Number),
+                                cid: 1,
+                                end: jasmine.any(Number),
+                                messageId: jasmine.any(String)
+                            }
+                        });
+
+                        expect(fakeAMQPConnection.ack).toHaveBeenCalled();
+                        expect(fakeAMQPConnection.ack.callCount).toEqual(1);
+                        expect(fakeAMQPConnection.ack.calls[0].args[0]).toEqual(message);
+                        done();
+                    })
+                    .catch(done); //todo: use done.fail after migration to Jasmine 2.x
+            }
+        );
+
+        it(
+            'should not augment emitted message with passthrough with data from incoming message '
+            + 'if NO_SELF_PASSTRHOUGH set without stepId header',
+            done => {
+                settings.FUNCTION = 'passthrough';
+                settings.NO_SELF_PASSTRHOUGH = true;
+                const sailor = new Sailor(settings);
+
+                spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
+                    expect(taskId).toEqual('5559edd38968ec0736000003');
+                    expect(stepId).toEqual('step_1');
+                    return Promise.resolve({ is_passthrough: true });
+                });
+
+                const psPayload = {
+                    body: payload,
+                    passthrough: {
+                        step_oth: {
+                            body: { key: 'value' }
+                        }
+                    }
+                };
+
+                sailor.connect()
+                    .then(() => sailor.prepare())
+                    .then(() => sailor.processMessage(psPayload, message))
+                    .then(() => {
+                        expect(sailor.apiClient.tasks.retrieveStep).toHaveBeenCalled();
+                        expect(fakeAMQPConnection.connect).toHaveBeenCalled();
+                        expect(fakeAMQPConnection.sendData).toHaveBeenCalled();
+
+                        const sendDataCalls = fakeAMQPConnection.sendData.calls;
+
+                        expect(sendDataCalls[0].args[0]).toEqual({
+                            body: {
+                                param1: 'Value1'
+                            },
+                            passthrough: {
+                                step_oth: {
+                                    body: {
+                                        key: 'value'
+                                    }
                                 }
                             }
                         });
@@ -1116,24 +1192,6 @@ describe('Sailor', () => {
                 throw new Error('Must not be reached');
             } catch (e) {
                 expect(e.message).toEqual('UserId is missing in message header');
-            }
-        });
-
-        it('stepId missing', () => {
-            const sailor = new Sailor(settings);
-
-            try {
-                sailor.readIncomingMessageHeaders({
-                    properties: {
-                        headers: {
-                            execId: 'my_exec_123',
-                            taskId: 'my_task_123'
-                        }
-                    }
-                });
-                throw new Error('Must not be reached');
-            } catch (e) {
-                expect(e.message).toEqual('StepId is missing in message header');
             }
         });
 
