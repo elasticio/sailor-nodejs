@@ -42,12 +42,12 @@ co(function* putOutToSea() {
 
 process.on('SIGTERM', function onSigterm() {
     logger.info('Received SIGTERM');
-    disconnectAndExit();
+    gracefulShutdown();
 });
 
 process.on('SIGINT', function onSigint() {
     logger.info('Received SIGINT');
-    disconnectAndExit();
+    gracefulShutdown();
 });
 
 process.on('uncaughtException', logger.criticalErrorAndExit);
@@ -66,9 +66,23 @@ function disconnectAndExit() {
     co(function* putIn() {
         yield disconnect();
         logger.info('Successfully disconnected');
+        disconnectRequired = false;
         process.exit();
     }).catch((err) => {
         logger.error('Unable to disconnect', err.stack);
         process.exit(-1);
     });
+}
+
+function gracefulShutdown() {
+    if (!disconnectRequired) {
+        return;
+    }
+
+    if (!sailor) {
+        logger.warn('Something went wrong – sailor is falsy');
+        return;
+    }
+
+    sailor.scheduleShutdown().then(disconnectAndExit);
 }
