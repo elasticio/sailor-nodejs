@@ -18,7 +18,7 @@ co(function* putOutToSea() {
         sailor.reportError = () => {
         };
         yield sailor.prepare();
-        yield sailor.shutdown();
+        yield sailor.runHookShutdown();
         return;
     }
 
@@ -31,7 +31,7 @@ co(function* putOutToSea() {
         yield sailor.startup();
     }
 
-    yield sailor.init();
+    yield sailor.runHookInit();
     yield sailor.run();
 }).catch((e) => {
     if (sailor) {

@@ -914,7 +914,7 @@ describe('Integration Test', () => {
 
     describe('when sailor is being invoked for shutdown', () => {
         describe('when hooksdata is found', () => {
-            it('should execute shutdown successfully', (done) => {
+            it('should execute shutdown hook successfully', (done) => {
 
                 env.ELASTICIO_HOOK_SHUTDOWN = '1';
 
@@ -970,7 +970,7 @@ describe('Integration Test', () => {
 
         describe('when request for hooksdata is failed with an error', () => {
             // @todo
-            it('should not execute shutdown');
+            it('should not execute shutdown hook');
         });
 
         describe('when shutdown hook method is not found', () => {
