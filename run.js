@@ -63,10 +63,10 @@ function disconnectAndExit() {
     if (!disconnectRequired) {
         return;
     }
+    disconnectRequired = false;
     co(function* putIn() {
         yield disconnect();
         logger.info('Successfully disconnected');
-        disconnectRequired = false;
         process.exit();
     }).catch((err) => {
         logger.error('Unable to disconnect', err.stack);
