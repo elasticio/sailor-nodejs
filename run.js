@@ -37,7 +37,7 @@ co(function* putOutToSea() {
     if (sailor) {
         sailor.reportError(e);
     }
-    logger.criticalErrorAndExit(e);
+    logger.criticalErrorAndExit(e, 'putOutToSea.catch');
 });
 
 process.on('SIGTERM', function onSigterm() {
@@ -50,7 +50,7 @@ process.on('SIGINT', function onSigint() {
     gracefulShutdown();
 });
 
-process.on('uncaughtException', logger.criticalErrorAndExit);
+process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
 
 function disconnect() {
     return co(function* putIn() {
