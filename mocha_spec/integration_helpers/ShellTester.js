@@ -20,8 +20,6 @@ class ShellTester extends EventEmitter {
         this._timeoutHandlerActivate(timeout);
 
         this._exitResult = null;
-        this._stdout = [];
-        this._stderr = [];
     }
 
     static init(options) {

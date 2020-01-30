@@ -946,13 +946,14 @@ describe('AMQP', () => {
         const amqp = new Amqp(settings);
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['close']);
         amqp.publishChannel = jasmine.createSpyObj('subscribeChannel', ['close']);
-        amqp.amqp = jasmine.createSpyObj('amqp', ['close']);
+        amqp.amqp = jasmine.createSpyObj('amqp', ['close', 'removeAllListeners']);
 
         amqp.disconnect()
             .then(() => {
                 expect(amqp.subscribeChannel.close.callCount).toEqual(1);
                 expect(amqp.publishChannel.close.callCount).toEqual(1);
                 expect(amqp.amqp.close.callCount).toEqual(1);
+                expect(amqp.amqp.removeAllListeners).toHaveBeenCalledWith('close');
                 done();
             })
             .catch(done);

@@ -40,7 +40,7 @@ describe('Integration Test', () => {
         delete env.ELASTICIO_HOOK_SHUTDOWN;
 
         co(function* gen() {
-            yield run.disconnect();
+            yield run._disconnectOnly();
             done();
         }).catch(done);
 

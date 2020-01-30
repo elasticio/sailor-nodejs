@@ -3,8 +3,6 @@ const Sailor = require('./lib/sailor.js').Sailor;
 const settings = require('./lib/settings.js').readFrom(process.env);
 const co = require('co');
 
-exports.disconnect = disconnect;
-
 let sailor;
 let disconnectRequired;
 
@@ -52,26 +50,27 @@ process.on('SIGINT', function onSigint() {
 
 process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
 
-function disconnect() {
-    return co(function* putIn() {
-        logger.info('Disconnecting...');
-        return yield sailor.disconnect();
-    });
-}
-
 function disconnectAndExit() {
     if (!disconnectRequired) {
         return;
     }
     disconnectRequired = false;
     co(function* putIn() {
-        yield disconnect();
+        logger.info('Disconnecting...');
+        yield sailor.disconnect();
         logger.info('Successfully disconnected');
         process.exit();
     }).catch((err) => {
         logger.error('Unable to disconnect', err.stack);
         process.exit(-1);
     });
+}
+
+function _disconnectOnly() {
+    if (!disconnectRequired) {
+        return Promise.resolve();
+    }
+    return sailor.disconnect();
 }
 
 function gracefulShutdown() {
@@ -86,3 +85,5 @@ function gracefulShutdown() {
 
     sailor.scheduleShutdown().then(disconnectAndExit);
 }
+
+exports._disconnectOnly = _disconnectOnly;
