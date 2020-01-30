@@ -139,6 +139,40 @@ describe('Graceful shutdown', function test() {
         });
     });
 
+    describe('start, one message, slow processing, shutdown twice', () => {
+        it('should shutdown after processing', async () => {
+            // selecting certain trigger of the component
+            env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
+
+            const sailorTester = helpers.ShellTester.init();
+            await sailorTester.run();
+
+            amqpHelper.publishMessage(inputMessage);
+
+            // let (sailor + amqp) some time to handle all messages
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // just to double check, that sailor is not processed the message yet
+            // (otherwise this test is equal to previous)
+            expect(amqpHelper.dataMessages).to.have.lengthOf(0);
+
+            await sailorTester.sendKill();
+            await new Promise(resolve => setTimeout(resolve, 50));
+            await sailorTester.sendKill();
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // waiting until sailor finished
+            await sailorTester.getPromise();
+
+            // make sure that echo_incoming_data finished processing
+            expect(amqpHelper.dataMessages).to.have.lengthOf(1);
+
+            // make sure that incoming messages queue is empty
+            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor();
+            expect(messagesLeft).to.have.lengthOf(0);
+        });
+    });
+
     describe('start, two messages, slow processing, shutdown earlier than processing time', () => {
         it('should shutdown after processing of the first message', async () => {
             // selecting certain trigger of the component
