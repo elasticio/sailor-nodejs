@@ -35,7 +35,7 @@ co(function* putOutToSea() {
     if (sailor) {
         sailor.reportError(e);
     }
-    logger.criticalErrorAndExit(e, 'putOutToSea.catch');
+    logger.criticalErrorAndExit('putOutToSea.catch', e);
 });
 
 process.on('SIGTERM', function onSigterm() {
