@@ -32,6 +32,7 @@ describe('Integration Test', () => {
     beforeEach(() => {
         helpers.prepareEnv();
         env.ELASTICIO_FUNCTION = 'init_trigger';
+        env.ELASTICIO_PROTOCOL_VERSION = '2';
     });
 
     afterEach((done) => {
@@ -903,7 +904,8 @@ describe('Integration Test', () => {
                         userId: env.ELASTICIO_USER_ID,
                         stepId: env.ELASTICIO_STEP_ID,
                         compId: env.ELASTICIO_COMP_ID,
-                        function: env.ELASTICIO_FUNCTION
+                        function: env.ELASTICIO_FUNCTION,
+                        protocolVersion: 1
                     });
                 }, done);
 
