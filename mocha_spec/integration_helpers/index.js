@@ -8,7 +8,6 @@ const nock = require('nock');
 const ShellTester = require('./ShellTester');
 const express = require('express');
 const encryptor = require('../../lib/encryptor');
-const rabbitMQStats = require('rabbitmq-stats');
 const FAKE_API_PORT = 1244; // most likely the port won't be taken – https://www.adminsub.net/tcp-udp-port-finder/1244
 
 const env = process.env;
@@ -27,8 +26,6 @@ class AmqpHelper extends EventEmitter {
         this.errorMessages = [];
 
         this._amqp = null;
-
-        this._rabbitMQManagement = rabbitMQStats(env.ELASTICIO_AMQP_URI, 'guest', 'guest');
 
         this.counterData = 0;
     }
