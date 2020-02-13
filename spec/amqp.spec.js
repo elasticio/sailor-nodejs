@@ -101,7 +101,7 @@ describe('AMQP', () => {
                 expect(publishParameters).toEqual([
                     settings.PUBLISH_MESSAGES_TO,
                     settings.DATA_ROUTING_KEY,
-                    jasmine.any(Object),
+                    jasmine.any(Buffer),
                     {
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
@@ -109,12 +109,12 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 2
+                            protocolVersion: 1
                         }
                     },
                     jasmine.any(Function)
                 ]);
-                const payload = encryptor.decryptMessageContent(publishParameters[2]);
+                const payload = encryptor.decryptMessageContent(publishParameters[2], 'base64');
                 expect(payload).toEqual({
                     headers: {
                         'some-other-header': 'headerValue'
@@ -159,14 +159,15 @@ describe('AMQP', () => {
                 expect(publishParameters).toEqual([
                     settings.PUBLISH_MESSAGES_TO,
                     settings.DATA_ROUTING_KEY,
-                    jasmine.any(Object),
+                    jasmine.any(Buffer),
                     {
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
                         mandatory: true,
                         headers: {
                             taskId: 'task1234567890',
-                            stepId: 'step_456'
+                            stepId: 'step_456',
+                            protocolVersion: 1
                         }
                     },
                     jasmine.any(Function)
@@ -236,12 +237,12 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 2
+                            protocolVersion: 1
                         }
                     },
                     jasmine.any(Function)
                 ]);
-                const payload = encryptor.decryptMessageContent(publishParameters[2]);
+                const payload = encryptor.decryptMessageContent(publishParameters[2], 'base64');
                 expect(payload).toEqual({
                     headers: {
                         'some-other-header': 'headerValue',
@@ -269,7 +270,7 @@ describe('AMQP', () => {
             headers: {
                 taskId: 'task1234567890',
                 stepId: 'step_456',
-                protocolVersion: 2
+                protocolVersion: 1
             }
         };
         // One request every 500 ms
@@ -319,7 +320,7 @@ describe('AMQP', () => {
                 jasmine.any(Function)
             ]);
 
-            const payload = encryptor.decryptMessageContent(publishParameters[2]);
+            const payload = encryptor.decryptMessageContent(publishParameters[2], 'base64');
             expect(payload).toEqual({
                 headers: {
                     'some-other-header': 'headerValue'
@@ -340,7 +341,7 @@ describe('AMQP', () => {
         amqp.sendData({ body }, { headers })
             .then(() => done(new Error('Exception should not be thrown')))
             .catch(err => {
-                expect(err.message).toEqual('Outgoing message size 10485792 exceeds limit of 10485760.');
+                expect(err.message).toEqual('Outgoing message size 13981056 exceeds limit of 10485760.');
                 expect(amqp.publishChannel.publish).not.toHaveBeenCalled();
                 done();
             });
@@ -365,7 +366,7 @@ describe('AMQP', () => {
             headers: {
                 taskId: 'task1234567890',
                 stepId: 'step_456',
-                protocolVersion: 2
+                protocolVersion: 1
             }
         };
 
@@ -391,13 +392,13 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 2
+                            protocolVersion: 1
                         }
                     },
                     jasmine.any(Function)
                 ]);
 
-                const payload = encryptor.decryptMessageContent(publishParameters[2]);
+                const payload = encryptor.decryptMessageContent(publishParameters[2], 'base64');
                 expect(payload).toEqual({
                     headers: {
                         'some-other-header': 'headerValue'
@@ -422,7 +423,7 @@ describe('AMQP', () => {
             headers: {
                 taskId: 'task1234567890',
                 stepId: 'step_456',
-                protocolVersion: 2
+                protocolVersion: 1
             }
         };
 
@@ -449,13 +450,13 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 2
+                            protocolVersion: 1
                         }
                     },
                     jasmine.any(Function)
                 ]);
 
-                const payload = encryptor.decryptMessageContent(publishParameters[2]);
+                const payload = encryptor.decryptMessageContent(publishParameters[2], 'base64');
                 expect(payload).toEqual({
                     headers: {
                         'some-other-header': 'headerValue'
@@ -503,7 +504,7 @@ describe('AMQP', () => {
                 expect(publishParameters[0]).toEqual(settings.PUBLISH_MESSAGES_TO);
                 expect(publishParameters[1]).toEqual('my-special-routing-key');
                 expect(publishParameters[2].toString('hex')).toEqual(
-                    encryptor.encryptMessageContent(msg).toString('hex')
+                    encryptor.encryptMessageContent(msg, 'base64').toString('hex')
                 );
                 expect(publishParameters[3]).toEqual({
                     contentType: 'application/json',
@@ -512,7 +513,8 @@ describe('AMQP', () => {
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
-                        reply_to: 'my-special-routing-key'
+                        reply_to: 'my-special-routing-key',
+                        protocolVersion: 1
                     }
                 });
 
@@ -606,13 +608,13 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 2
+                            protocolVersion: 1
                         }
                     },
                     jasmine.any(Function)
                 ]);
 
-                const payload = encryptor.decryptMessageContent(publishParameters[2]);
+                const payload = encryptor.decryptMessageContent(publishParameters[2], 'base64');
                 expect(payload).toEqual({
                     headers: {},
                     body: {
@@ -641,11 +643,11 @@ describe('AMQP', () => {
             headers: {
                 taskId: 'task1234567890',
                 stepId: 'step_456',
-                protocolVersion: 2
+                protocolVersion: 1
             }
         };
 
-        amqp.sendError(new Error('Test error'), props, message.content)
+        amqp.sendError(new Error('Test error'), props, message)
             .then(() => {
 
                 expect(amqp.publishChannel.publish).toHaveBeenCalled();
@@ -716,11 +718,11 @@ describe('AMQP', () => {
                 taskId: 'task1234567890',
                 stepId: 'step_456',
                 reply_to: 'my-special-routing-key',
-                protocolVersion: 2
+                protocolVersion: 1
             }
         };
 
-        amqp.sendError(new Error('Test error'), props, message.content)
+        amqp.sendError(new Error('Test error'), props, message)
             .then(() => {
                 expect(amqp.publishChannel.publish).toHaveBeenCalled();
                 expect(amqp.publishChannel.publish.callCount).toEqual(2);
@@ -793,7 +795,7 @@ describe('AMQP', () => {
             }
         };
 
-        amqp.sendError(new Error('Test error'), props, '')
+        amqp.sendError(new Error('Test error'), props, {})
             .then(() => {
                 expect(amqp.publishChannel.publish).toHaveBeenCalled();
                 expect(amqp.publishChannel.publish.callCount).toEqual(1);
@@ -821,7 +823,7 @@ describe('AMQP', () => {
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
-                        protocolVersion: 1
+                        protocolVersion: 2
                     }
                 });
                 done();
@@ -878,7 +880,7 @@ describe('AMQP', () => {
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
-                        protocolVersion: 1
+                        protocolVersion: 2
                     }
                 });
                 done();
@@ -1049,7 +1051,7 @@ describe('AMQP', () => {
                 expect(publishParameters).toEqual([
                     settings.PUBLISH_MESSAGES_TO,
                     settings.ERROR_ROUTING_KEY,
-                    jasmine.any(Object),
+                    jasmine.any(Buffer),
                     {
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
@@ -1061,7 +1063,7 @@ describe('AMQP', () => {
                             compId: 'comp1',
                             function: 'list',
                             start: '1432815685034',
-                            protocolVersion: 1
+                            protocolVersion: 2
                         }
                     },
                     jasmine.any(Function)
@@ -1133,23 +1135,38 @@ describe('AMQP', () => {
                 mandatory: true,
                 clusterId: ''
             },
-            content: encryptor.encryptMessageContent({ content: 'Message content' })
+            content: encryptor.encryptMessageContent(
+                { content: 'Message content' },
+                'base64'
+            )
         };
 
         const amqp = new Amqp(settings);
+        let rejectedMessage;
         const clientFunction = jasmine.createSpy('clientFunction');
-        amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['consume', 'prefetch']);
+        amqp.subscribeChannel = jasmine.createSpyObj(
+            'subscribeChannel',
+            [
+                'consume',
+                'prefetch',
+                'reject'
+            ]
+        );
         amqp.subscribeChannel.consume.andCallFake((queueName, callback) => {
             callback(message);
+        });
+        amqp.subscribeChannel.reject.andCallFake(message => {
+            rejectedMessage = message;
         });
 
         runs(() => {
             amqp.listenQueue('testQueue', clientFunction);
         });
 
-        waitsFor(() => clientFunction.callCount > 0);
+        waitsFor(() => clientFunction.callCount > 0 || !!rejectedMessage);
 
         runs(() => {
+            expect(rejectedMessage).toBeUndefined();
             expect(amqp.subscribeChannel.prefetch).toHaveBeenCalledWith(1);
             expect(clientFunction.callCount).toEqual(1);
             expect(clientFunction.calls[0].args[0]).toEqual(
@@ -1163,12 +1180,13 @@ describe('AMQP', () => {
             expect(clientFunction.calls[0].args[1]).toEqual(message);
             //eslint-disable-next-line max-len
             expect(clientFunction.calls[0].args[1].content.toString('hex')).toEqual(
-                encryptor.encryptMessageContent({ content: 'Message content' }).toString('hex')
+                encryptor.encryptMessageContent(
+                    { content: 'Message content' }, 'base64'
+                ).toString('hex')
             );
 
             expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(
                 message.content,
-                message.properties.headers,
                 'base64'
             );
         });
@@ -1207,7 +1225,6 @@ describe('AMQP', () => {
 
             expect(encryptor.decryptMessageContent).toHaveBeenCalledWith(
                 message.content,
-                message.properties.headers,
                 undefined
             );
         });
