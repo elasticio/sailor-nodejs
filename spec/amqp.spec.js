@@ -1102,7 +1102,7 @@ describe('AMQP', () => {
         expect(amqp.subscribeChannel.reject).toHaveBeenCalled();
         expect(amqp.subscribeChannel.reject.callCount).toEqual(1);
         expect(amqp.subscribeChannel.reject.calls[0].args[0]).toEqual(message);
-        expect(amqp.subscribeChannel.reject.calls[0].args[1]).toEqual(false);
+        expect(amqp.subscribeChannel.reject.calls[0].args[1]).toEqual(true);
     });
 
     it('Should listen queue and pass decrypted message to client function with protocol version 1', () => {
