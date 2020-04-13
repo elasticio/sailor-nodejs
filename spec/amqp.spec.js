@@ -1096,13 +1096,13 @@ describe('AMQP', () => {
     it('Should reject message when ack is called with false', () => {
 
         const amqp = new Amqp(settings);
-        amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['reject']);
-        amqp.reject(message);
+        amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['nack']);
+        amqp.nack(message);
 
-        expect(amqp.subscribeChannel.reject).toHaveBeenCalled();
-        expect(amqp.subscribeChannel.reject.callCount).toEqual(1);
-        expect(amqp.subscribeChannel.reject.calls[0].args[0]).toEqual(message);
-        expect(amqp.subscribeChannel.reject.calls[0].args[1]).toEqual(true);
+        expect(amqp.subscribeChannel.nack).toHaveBeenCalled();
+        expect(amqp.subscribeChannel.nack.callCount).toEqual(1);
+        expect(amqp.subscribeChannel.nack.calls[0].args[0]).toEqual(message);
+        expect(amqp.subscribeChannel.nack.calls[0].args[1]).toEqual(true);
     });
 
     it('Should listen queue and pass decrypted message to client function with protocol version 1', () => {
