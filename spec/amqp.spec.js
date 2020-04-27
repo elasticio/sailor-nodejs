@@ -347,14 +347,14 @@ describe('AMQP', () => {
             });
     });
 
-    it('Should send message to outgoing channel after 3 attempts', done => {
+    it(`Should send message to outgoing channel after ${settings.AMQP_PUBLISH_RETRY_ATTEMPTS} attempts`, done => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['on']);
         amqp.publishChannel.publish = () => true;
         let iteration = 0;
         spyOn(amqp.publishChannel, 'publish')
             .andCallFake((exchangeName, routingKey, payloadBuffer, options, cb) => {
-                iteration < 3 ? cb('Some error') : cb(null, 'Success');
+                iteration < settings.AMQP_PUBLISH_RETRY_ATTEMPTS - 1 ? cb('Some error') : cb(null, 'Success');
                 iteration++;
                 return true;
             });
@@ -378,7 +378,7 @@ describe('AMQP', () => {
         }, props)
             .then(() => {
                 expect(amqp.publishChannel.publish).toHaveBeenCalled();
-                expect(amqp.publishChannel.publish.callCount).toEqual(4);
+                expect(amqp.publishChannel.publish.callCount).toEqual(settings.AMQP_PUBLISH_RETRY_ATTEMPTS);
 
                 const publishParameters = amqp.publishChannel.publish.calls[0].args;
                 expect(publishParameters).toEqual([
@@ -392,7 +392,8 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 1
+                            protocolVersion: 1,
+                            retry: settings.AMQP_PUBLISH_RETRY_ATTEMPTS
                         }
                     },
                     jasmine.any(Function)
@@ -409,7 +410,7 @@ describe('AMQP', () => {
             }, () => done(new Error('Exception should not be thrown')));
     });
 
-    it('Should throw error after 3 attempts to publish message', done => {
+    it(`Should throw error after ${settings.AMQP_PUBLISH_RETRY_ATTEMPTS} attempts to publish message`, done => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['on']);
         amqp.publishChannel.publish = () => true;
@@ -450,7 +451,8 @@ describe('AMQP', () => {
                         headers: {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
-                            protocolVersion: 1
+                            protocolVersion: 1,
+                            retry: settings.AMQP_PUBLISH_RETRY_ATTEMPTS
                         }
                     },
                     jasmine.any(Function)
@@ -1154,6 +1156,9 @@ describe('AMQP', () => {
         );
         amqp.subscribeChannel.consume.andCallFake((queueName, callback) => {
             callback(message);
+            return {
+                consumerTag: message.fields.consumerTag
+            };
         });
         amqp.subscribeChannel.reject.andCallFake(message => {
             rejectedMessage = message;
@@ -1198,6 +1203,9 @@ describe('AMQP', () => {
         amqp.subscribeChannel = jasmine.createSpyObj('subscribeChannel', ['consume', 'prefetch']);
         amqp.subscribeChannel.consume.andCallFake((queueName, callback) => {
             callback(message);
+            return {
+                consumerTag: message.fields.consumerTag
+            };
         });
 
         runs(() => {
