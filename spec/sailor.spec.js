@@ -4,6 +4,8 @@ describe('Sailor', () => {
     const envVars = {};
 
     envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
+    envVars.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 10,
+    envVars.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000,
     envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
     envVars.ELASTICIO_STEP_ID = 'step_1';
     envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
@@ -210,7 +212,6 @@ describe('Sailor', () => {
                 'connect', 'sendData', 'sendError', 'sendRebound', 'ack', 'reject',
                 'sendSnapshot', 'sendHttpReply'
             ]);
-
             spyOn(amqp, 'Amqp').andReturn(fakeAMQPConnection);
         });
 
@@ -957,7 +958,6 @@ describe('Sailor', () => {
         it('should catch all data calls and all error calls', done => {
             settings.FUNCTION = 'datas_and_errors';
             const sailor = new Sailor(settings);
-
             spyOn(sailor.apiClient.tasks, 'retrieveStep').andCallFake((taskId, stepId) => {
                 expect(taskId).toEqual('5559edd38968ec0736000003');
                 expect(stepId).toEqual('step_1');

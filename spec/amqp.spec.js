@@ -4,6 +4,8 @@ describe('AMQP', () => {
 
     const envVars = {};
     envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
+    envVars.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 10,
+    envVars.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000,
     envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
     envVars.ELASTICIO_STEP_ID = 'step_1';
     envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
@@ -30,7 +32,6 @@ describe('AMQP', () => {
     const encryptor = require('../lib/encryptor.js');
     const _ = require('lodash');
     const pThrottle = require('p-throttle');
-
     const message = {
         fields: {
             consumerTag: 'abcde',
@@ -409,13 +410,14 @@ describe('AMQP', () => {
             }, () => done(new Error('Exception should not be thrown')));
     });
 
-    it('Should throw error after 3 attempts to publish message', done => {
+    it('Should throw error after 10 attempts to publish message', done => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['on']);
         amqp.publishChannel.publish = () => true;
         spyOn(amqp.publishChannel, 'publish')
             .andCallFake((exchangeName, routingKey, payloadBuffer, options, cb) => cb('Some error'));
-
+        spyOn(amqp, '_getDelay').andCallThrough();
+        spyOn(amqp, '_sleep').andCallThrough();
         const props = {
             contentType: 'application/json',
             contentEncoding: 'utf8',
@@ -437,7 +439,15 @@ describe('AMQP', () => {
             .catch(() => {
                 expect(amqp.publishChannel.publish).toHaveBeenCalled();
                 expect(amqp.publishChannel.publish.callCount).toEqual(10);
-
+                expect(amqp._getDelay).toHaveBeenCalled();
+                expect(amqp._getDelay.callCount).toEqual(10);
+                const calls = amqp._getDelay.calls;
+                calls.forEach(call => {
+                    expect(amqp._getDelay(call.args[0], call.args[1], call.args[2]))
+                        .toEqual(call.args[0] * (call.args[2] + 1));
+                });
+                expect(amqp._sleep).toHaveBeenCalled();
+                expect(amqp._sleep.callCount).toEqual(10);
                 const publishParameters = amqp.publishChannel.publish.calls[0].args;
                 expect(publishParameters).toEqual([
                     settings.PUBLISH_MESSAGES_TO,
@@ -465,7 +475,7 @@ describe('AMQP', () => {
                 });
                 done();
             });
-    });
+    }, 20000);
 
     it('Should sendHttpReply to outgoing channel using routing key from headers when process data', done => {
         const amqp = new Amqp(settings);
