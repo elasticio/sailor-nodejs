@@ -393,7 +393,7 @@ describe('AMQP', () => {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
                             protocolVersion: 1,
-                            retry: settings.AMQP_PUBLISH_RETRY_ATTEMPTS
+                            retry: settings.AMQP_PUBLISH_RETRY_ATTEMPTS - 1
                         }
                     },
                     jasmine.any(Function)
@@ -452,7 +452,7 @@ describe('AMQP', () => {
                             taskId: 'task1234567890',
                             stepId: 'step_456',
                             protocolVersion: 1,
-                            retry: settings.AMQP_PUBLISH_RETRY_ATTEMPTS
+                            retry: settings.AMQP_PUBLISH_RETRY_ATTEMPTS - 1
                         }
                     },
                     jasmine.any(Function)
