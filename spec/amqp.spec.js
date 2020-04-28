@@ -410,13 +410,14 @@ describe('AMQP', () => {
             }, () => done(new Error('Exception should not be thrown')));
     });
 
-    it('Should throw error after 3 attempts to publish message', done => {
+    it('Should throw error after 10 attempts to publish message', done => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = jasmine.createSpyObj('publishChannel', ['on']);
         amqp.publishChannel.publish = () => true;
         spyOn(amqp.publishChannel, 'publish')
             .andCallFake((exchangeName, routingKey, payloadBuffer, options, cb) => cb('Some error'));
-
+        spyOn(amqp, '_getDelay').andCallThrough();
+        spyOn(amqp, '_sleep').andCallThrough();
         const props = {
             contentType: 'application/json',
             contentEncoding: 'utf8',
@@ -438,7 +439,15 @@ describe('AMQP', () => {
             .catch(() => {
                 expect(amqp.publishChannel.publish).toHaveBeenCalled();
                 expect(amqp.publishChannel.publish.callCount).toEqual(10);
-
+                expect(amqp._getDelay).toHaveBeenCalled();
+                expect(amqp._getDelay.callCount).toEqual(10);
+                const calls = amqp._getDelay.calls;
+                calls.forEach(call => {
+                    expect(amqp._getDelay(call.args[0], call.args[1], call.args[2]))
+                        .toEqual(call.args[0] * (call.args[2] + 1));
+                });
+                expect(amqp._sleep).toHaveBeenCalled();
+                expect(amqp._sleep.callCount).toEqual(10);
                 const publishParameters = amqp.publishChannel.publish.calls[0].args;
                 expect(publishParameters).toEqual([
                     settings.PUBLISH_MESSAGES_TO,
