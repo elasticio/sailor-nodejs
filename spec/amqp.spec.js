@@ -475,7 +475,7 @@ describe('AMQP', () => {
                 });
                 done();
             });
-    });
+    }, 20000);
 
     it('Should sendHttpReply to outgoing channel using routing key from headers when process data', done => {
         const amqp = new Amqp(settings);
