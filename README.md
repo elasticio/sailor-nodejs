@@ -16,7 +16,7 @@
 
 ## Building components in Node.js
 
-If you plan to build a component for [elastic.io platform](http://www.elastic.io) in Node.js then you can visit our dedicated documentation page which describes [how to build a component in node.js](https://support.elastic.io/support/solutions/articles/14000027123-how-to-build-a-component-in-node-js).
+If you plan to build a component for [elastic.io platform](http://www.elastic.io) in Node.js then you can visit our dedicated documentation page which describes [how to build a component in node.js](https://docs.elastic.io/guides/building-nodejs-component.html).
 
 ### Before you start
 
@@ -24,7 +24,7 @@ Before you can deploy any code into our system **you must be a registered elasti
 
 > Any attempt to deploy a code into our platform without a registration would fail.
 
-After the registration and opening of the account you must **[upload your SSH Key](https://support.elastic.io/support/solutions/articles/14000038794-manage-your-ssh-keys)** into our platform.
+After the registration and opening of the account you must **[upload your SSH Key](https://docs.elastic.io/guides/ssh-keys.html)** into our platform.
 
 > If you fail to upload you SSH Key you will get **permission denied** error during the deployment.
 
