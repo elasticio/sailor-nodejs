@@ -12,73 +12,78 @@ const encryptor = require('../../lib/encryptor.js');
 const Amqp = require('../../lib/amqp.js').Amqp;
 
 describe('AMQP', () => {
-    process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
-    process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
-
-    const envVars = {};
-    envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
-    envVars.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 10;
-    envVars.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000;
-
-    envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
-    envVars.ELASTICIO_STEP_ID = 'step_1';
-    envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
-    envVars.ELASTICIO_WORKSPACE_ID = '5559edd38968ec073600683';
-    envVars.ELASTICIO_CONTAINER_ID = 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948';
-
-    envVars.ELASTICIO_USER_ID = '5559edd38968ec0736000002';
-    envVars.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
-    envVars.ELASTICIO_FUNCTION = 'list';
-
-    envVars.ELASTICIO_LISTEN_MESSAGES_ON = '5559edd38968ec0736000003:step_1:1432205514864:messages';
-    envVars.ELASTICIO_PUBLISH_MESSAGES_TO = 'userexchange:5527f0ea43238e5d5f000001';
-    envVars.ELASTICIO_DATA_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:message';
-    envVars.ELASTICIO_ERROR_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:error';
-    envVars.ELASTICIO_REBOUND_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:rebound';
-    envVars.ELASTICIO_SNAPSHOT_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:snapshot';
-
-    envVars.ELASTICIO_API_URI = 'http://apihost.com';
-    envVars.ELASTICIO_API_USERNAME = 'test@test.com';
-    envVars.ELASTICIO_API_KEY = '5559edd';
-
-    const settings = Settings.readFrom(envVars);
-
-    const message = {
-        fields: {
-            consumerTag: 'abcde',
-            deliveryTag: 12345,
-            exchange: 'test',
-            routingKey: 'test.hello'
-        },
-        properties: {
-            contentType: 'application/json',
-            contentEncoding: 'utf8',
-            headers: {
-                taskId: 'task1234567890',
-                execId: 'exec1234567890',
-                reply_to: 'replyTo1234567890',
-                protocolVersion: 2
-            },
-            deliveryMode: undefined,
-            priority: undefined,
-            correlationId: undefined,
-            replyTo: undefined,
-            expiration: undefined,
-            messageId: undefined,
-            timestamp: undefined,
-            type: undefined,
-            userId: undefined,
-            appId: undefined,
-            mandatory: true,
-            clusterId: ''
-        },
-        content: encryptor.encryptMessageContent({ content: 'Message content' })
-    };
+    let settings;
+    let message;
     let sandbox;
 
     beforeEach(() => {
         sandbox = sinon.createSandbox();
         sandbox.spy(encryptor, 'decryptMessageContent');
+
+        // specially for cipher.js
+        // TODO fix cipher.js to accept encryption settings
+        // though argument.
+        process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+        process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+        const envVars = {};
+        envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
+        envVars.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 10;
+        envVars.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000;
+
+        envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+        envVars.ELASTICIO_STEP_ID = 'step_1';
+        envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
+        envVars.ELASTICIO_WORKSPACE_ID = '5559edd38968ec073600683';
+        envVars.ELASTICIO_CONTAINER_ID = 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948';
+
+        envVars.ELASTICIO_USER_ID = '5559edd38968ec0736000002';
+        envVars.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
+        envVars.ELASTICIO_FUNCTION = 'list';
+
+        envVars.ELASTICIO_LISTEN_MESSAGES_ON = '5559edd38968ec0736000003:step_1:1432205514864:messages';
+        envVars.ELASTICIO_PUBLISH_MESSAGES_TO = 'userexchange:5527f0ea43238e5d5f000001';
+        envVars.ELASTICIO_DATA_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:message';
+        envVars.ELASTICIO_ERROR_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:error';
+        envVars.ELASTICIO_REBOUND_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:rebound';
+        envVars.ELASTICIO_SNAPSHOT_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:snapshot';
+
+        envVars.ELASTICIO_API_URI = 'http://apihost.com';
+        envVars.ELASTICIO_API_USERNAME = 'test@test.com';
+        envVars.ELASTICIO_API_KEY = '5559edd';
+
+        settings = Settings.readFrom(envVars);
+
+        message = {
+            fields: {
+                consumerTag: 'abcde',
+                deliveryTag: 12345,
+                exchange: 'test',
+                routingKey: 'test.hello'
+            },
+            properties: {
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                headers: {
+                    taskId: 'task1234567890',
+                    execId: 'exec1234567890',
+                    reply_to: 'replyTo1234567890',
+                    protocolVersion: 2
+                },
+                deliveryMode: undefined,
+                priority: undefined,
+                correlationId: undefined,
+                replyTo: undefined,
+                expiration: undefined,
+                messageId: undefined,
+                timestamp: undefined,
+                type: undefined,
+                userId: undefined,
+                appId: undefined,
+                mandatory: true,
+                clusterId: ''
+            },
+            content: encryptor.encryptMessageContent({ content: 'Message content' })
+        };
     });
     afterEach(() => {
         sandbox.restore();
@@ -385,7 +390,7 @@ describe('AMQP', () => {
     it('Should throw error after ${settings.AMQP_PUBLISH_RETRY_ATTEMPTS} attempts to publish message',
         async function test() {
             this.timeout(20000); // eslint-disable-line
-            const retryCount = envVars.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS;
+            const retryCount = settings.AMQP_PUBLISH_RETRY_ATTEMPTS;
             const amqp = new Amqp(settings);
             amqp.publishChannel = {
                 on: sandbox.stub(),
@@ -704,6 +709,63 @@ describe('AMQP', () => {
                 }
             );
     });
+    it('Should not send message to reply_to queue if NO_ERROR_REPLIES is set to true', async () => {
+        settings.NO_ERROR_REPLIES = true;
+        const expectedErrorPayload = {
+            error: {
+                name: 'Error',
+                message: 'Test error',
+                stack: sinon.match.string
+            },
+            errorInput: {
+                content: 'Message content'
+            }
+        };
+
+        const amqp = new Amqp(settings);
+        amqp.publishChannel = {
+            on: sandbox.stub(),
+            publish: sandbox.stub().callsFake((exchangeName, routingKey, payloadBuffer, options, cb) => {
+                cb(null, 'Success');
+                return true;
+            })
+        };
+        const messageId = uuid.v4();
+        const headers = {
+            taskId: 'task1234567890',
+            stepId: 'step_456',
+            reply_to: 'my-special-routing-key',
+            protocolVersion: 1,
+            messageId
+        };
+
+        await amqp.sendError(new Error('Test error'), headers, message);
+        expect(amqp.publishChannel.publish).to.have.been.calledOnce
+            .and.calledWith(
+                settings.PUBLISH_MESSAGES_TO,
+                '5559edd38968ec0736000003:step_1:1432205514864:error',
+                sinon.match(arg => {
+                    const payload = JSON.parse(arg.toString());
+                    payload.error = encryptor.decryptMessageContent(payload.error, 'base64');
+                    payload.errorInput = encryptor.decryptMessageContent(payload.errorInput, 'base64');
+
+                    return sinon.match(expectedErrorPayload).test(payload);
+                }),
+                {
+                    contentType: 'application/json',
+                    contentEncoding: 'utf8',
+                    mandatory: true,
+                    headers: {
+                        messageId,
+                        taskId: 'task1234567890',
+                        stepId: 'step_456',
+                        reply_to: 'my-special-routing-key',
+                        protocolVersion: 1
+                    }
+                }
+            );
+    });
+
 
     it('Should not provide errorInput if errorInput was empty', async () => {
         const amqp = new Amqp(settings);
