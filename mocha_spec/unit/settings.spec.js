@@ -28,7 +28,10 @@ describe('Settings', () => {
         envVars.ELASTICIO_API_USERNAME = 'test@test.com';
         envVars.ELASTICIO_API_KEY = '5559edd';
 
+        envVars.ELASTICIO_MESSAGE_CRYPTO_IV = 'initiailization vector';
+        envVars.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'this is password';
     });
+
     it('should throw error if no important settings provided', () => {
         expect(() => {
             settings.readFrom({});
@@ -37,6 +40,7 @@ describe('Settings', () => {
 
     it('should not throw error if all important settings provided', () => {
         const result = settings.readFrom(envVars);
+
         expect(result.LISTEN_MESSAGES_ON).to.equal('5559edd38968ec0736000003:step_1:1432205514864:messages');
     });
 

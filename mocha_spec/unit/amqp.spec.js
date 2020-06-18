@@ -8,24 +8,17 @@ const _ = require('lodash');
 const pThrottle = require('p-throttle');
 
 const Settings = require('../../lib/settings');
-const encryptor = require('../../lib/encryptor.js');
+const Encryptor = require('../../lib/encryptor.js');
 const Amqp = require('../../lib/amqp.js').Amqp;
 
 describe('AMQP', () => {
-    let settings;
-    let message;
+    let envVars;
     let sandbox;
-
+    let encryptor;
+    let message;
+    let settings;
     beforeEach(() => {
-        sandbox = sinon.createSandbox();
-        sandbox.spy(encryptor, 'decryptMessageContent');
-
-        // specially for cipher.js
-        // TODO fix cipher.js to accept encryption settings
-        // though argument.
-        process.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
-        process.env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
-        const envVars = {};
+        envVars = {};
         envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
         envVars.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 10;
         envVars.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000;
@@ -50,8 +43,11 @@ describe('AMQP', () => {
         envVars.ELASTICIO_API_URI = 'http://apihost.com';
         envVars.ELASTICIO_API_USERNAME = 'test@test.com';
         envVars.ELASTICIO_API_KEY = '5559edd';
+        envVars.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+        envVars.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
 
         settings = Settings.readFrom(envVars);
+        encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
 
         message = {
             fields: {
@@ -84,7 +80,9 @@ describe('AMQP', () => {
             },
             content: encryptor.encryptMessageContent({ content: 'Message content' })
         };
+        sandbox = sinon.createSandbox();
     });
+
     afterEach(() => {
         sandbox.restore();
     });
@@ -318,7 +316,6 @@ describe('AMQP', () => {
             on: sandbox.stub(),
             publish: sandbox.stub()
         };
-
         const body = 'a'.repeat(settings.OUTGOING_MESSAGE_SIZE_LIMIT + 1);
         const headers = {};
         let caughtError;
@@ -1025,7 +1022,7 @@ describe('AMQP', () => {
     });
 
     it('Should ack message when confirmed', () => {
-        const amqp = new Amqp();
+        const amqp = new Amqp(settings);
         amqp.subscribeChannel = {
             ack: sandbox.stub()
         };
@@ -1046,7 +1043,6 @@ describe('AMQP', () => {
     });
 
     it('Should listen queue and pass decrypted message to client function with protocol version 1', async () => {
-
         const message = {
             fields: {
                 consumerTag: 'abcde',
@@ -1114,11 +1110,6 @@ describe('AMQP', () => {
             },
             message
         );
-
-        expect(encryptor.decryptMessageContent).to.have.been.calledOnce.and.calledWith(
-            message.content,
-            'base64'
-        );
     });
     it('Should listen queue and pass decrypted message to client function with protocol version 2', async () => {
         const amqp = new Amqp(settings);
@@ -1150,11 +1141,468 @@ describe('AMQP', () => {
             },
             message
         );
+    });
 
-        expect(encryptor.decryptMessageContent).to.have.been.calledOnce.and.calledWith(
-            message.content,
-            undefined
-        );
+    describe('_decodeDefaultMessage', () => {
+        let amqp;
+        beforeEach(() => {
+            settings = Settings.readFrom(envVars);
+            amqp = new Amqp(settings);
+        });
+        it('should decode message with missing protocol version as base64-encoded', () => {
+            const messageBody = {
+                headers: {
+                    'x-does-not-matter': 'value'
+                },
+                body: {
+                    key: 'value'
+                }
+            };
+            const message = {
+                properties: {
+                    headers: {
+                        flowId: 'XXX',
+                        stepId: 'step_1'
+                    }
+                },
+                fields: {
+                    deliveryTag: 'XXXXX'
+                },
+                content: encryptor.encryptMessageContent(messageBody, 'base64')
+            };
+            expect(amqp._decodeDefaultMessage(message)).to.deep.equal(messageBody);
+        });
+        it('should decode message with configured procotol version 2 as raw buffer', () => {
+            const messageBody = {
+                headers: {
+                    'x-does-not-matter': 'value'
+                },
+                body: {
+                    key: 'value'
+                }
+            };
+            const message = {
+                properties: {
+                    headers: {
+                        flowId: 'XXX',
+                        stepId: 'step_1',
+                        protocolVersion: 2
+                    }
+                },
+                fields: {
+                    deliveryTag: 'XXXXX'
+                },
+                content: encryptor.encryptMessageContent(messageBody)
+            };
+            expect(amqp._decodeDefaultMessage(message)).to.deep.equal(messageBody);
+        });
+    });
+    describe('_decodeErrorMessage', () => {
+        let amqp;
+        beforeEach(() => {
+            settings = Settings.readFrom(envVars);
+            amqp = new Amqp(settings);
+        });
+        it('should decode message without protol version as base64', () => {
+            const error = new Error('smth bad happens');
+            const originalMessage = {
+                body: {
+                    does: 'not matter'
+                },
+                headers: {
+                    'x-ipaas-some-header': 'and it\'s value'
+                }
+            };
+            const message = {
+                error: encryptor.encryptMessageContent(
+                    _.pick(error, ['name', 'message', 'stack']),
+                    'base64'
+                ).toString(),
+                errorInput: encryptor.encryptMessageContent(
+                    originalMessage,
+                    'base64'
+                ).toString()
+            };
+
+            const amqpMessage = {
+                properties: {
+                    headers: {}
+                },
+                content: Buffer.from(JSON.stringify(message))
+            };
+            expect(amqp._decodeErrorMessage(amqpMessage)).to.deep.equal({
+                headers: {},
+                body: {
+                    error: _.pick(error, ['name', 'message', 'stack']),
+                    errorInput: originalMessage
+                }
+            });
+        });
+        it('should decode message with protocol version =2 as base64', () => {
+            const error = new Error('smth bad happens');
+            const originalMessage = {
+                body: {
+                    does: 'not matter'
+                },
+                headers: {
+                    'x-ipaas-some-header': 'and it\'s value'
+                }
+            };
+            const message = {
+                error: encryptor.encryptMessageContent(
+                    _.pick(error, ['name', 'message', 'stack']),
+                    'base64'
+                ).toString(),
+                errorInput: encryptor.encryptMessageContent(
+                    originalMessage,
+                    'base64'
+                ).toString()
+            };
+
+            const amqpMessage = {
+                properties: {
+                    headers: {
+                        protocolVersion: 2
+                    }
+                },
+                content: Buffer.from(JSON.stringify(message))
+            };
+            expect(amqp._decodeErrorMessage(amqpMessage)).to.deep.equal({
+                headers: {
+                    protocolVersion: 2
+                },
+                body: {
+                    error: _.pick(error, ['name', 'message', 'stack']),
+                    errorInput: originalMessage
+                }
+            });
+        });
+        it('should not fail if errorInput missing', () => {
+            const error = new Error('smth bad happens');
+            const message = {
+                error: encryptor.encryptMessageContent(
+                    _.pick(error, ['name', 'message', 'stack']),
+                    'base64'
+                ).toString()
+            };
+
+            const amqpMessage = {
+                properties: {
+                    headers: {
+                        protocolVersion: 2
+                    }
+                },
+                content: Buffer.from(JSON.stringify(message))
+            };
+            expect(amqp._decodeErrorMessage(amqpMessage)).to.deep.equal({
+                headers: {
+                    protocolVersion: 2
+                },
+                body: {
+                    error: _.pick(error, ['name', 'message', 'stack'])
+                }
+            });
+        });
+    });
+
+    describe('_decodeMessage', () => {
+        describe('INPUT_FORMAT === error', () => {
+            let amqp;
+            beforeEach(() => {
+                envVars.ELASTICIO_INPUT_FORMAT = 'error';
+                settings = Settings.readFrom(envVars);
+                amqp = new Amqp(settings);
+            });
+            it('should process message as error message', () => {
+                const error = new Error('smth bad happens');
+                const originalMessage = {
+                    body: {
+                        does: 'not matter'
+                    },
+                    headers: {
+                        'x-ipaas-some-header': 'and it\'s value'
+                    }
+                };
+                const message = {
+                    error: encryptor.encryptMessageContent(
+                        _.pick(error, ['name', 'message', 'stack']),
+                        'base64'
+                    ).toString(),
+                    errorInput: encryptor.encryptMessageContent(
+                        originalMessage,
+                        'base64'
+                    ).toString()
+                };
+
+                const amqpMessage = {
+                    properties: {
+                        headers: {
+                            protocolVersion: 2
+                        }
+                    },
+                    content: Buffer.from(JSON.stringify(message))
+                };
+                expect(amqp._decodeMessage(amqpMessage)).to.deep.equal({
+                    headers: {
+                        protocolVersion: 2
+                    },
+                    body: {
+                        error: _.pick(error, ['name', 'message', 'stack']),
+                        errorInput: originalMessage
+                    }
+                });
+            });
+            it('should fail if message is not in error format', () => {
+                const message = {
+                    body: {
+                        does: 'not matter'
+                    },
+                    headers: {
+                        'x-ipaas-some-header': 'and it\'s value'
+                    }
+                };
+
+                const amqpMessage = {
+                    properties: {
+                        headers: {
+                            protocolVersion: 2
+                        }
+                    },
+                    content: encryptor.encryptMessageContent(message)
+                };
+                expect(() => amqp._decodeMessage(amqpMessage)).to.throw();
+            });
+            it('should add reply_to header', () => {
+                const error = new Error('smth bad happens');
+                const originalMessage = {
+                    body: {
+                        does: 'not matter'
+                    },
+                    headers: {
+                        'x-ipaas-some-header': 'and it\'s value'
+                    }
+                };
+                const message = {
+                    error: encryptor.encryptMessageContent(
+                        _.pick(error, ['name', 'message', 'stack']),
+                        'base64'
+                    ).toString(),
+                    errorInput: encryptor.encryptMessageContent(
+                        originalMessage,
+                        'base64'
+                    ).toString()
+                };
+
+                const amqpMessage = {
+                    properties: {
+                        headers: {
+                            protocolVersion: 2,
+                            reply_to: 'reply_to_queue_name',
+                            flowId: 'flow-id'
+                        }
+                    },
+                    content: Buffer.from(JSON.stringify(message))
+                };
+                expect(amqp._decodeMessage(amqpMessage)).to.deep.equal({
+                    headers: {
+                        reply_to: amqpMessage.properties.headers.reply_to,
+                        protocolVersion: 2,
+                        flowId: 'flow-id'
+                    },
+                    body: {
+                        error: _.pick(error, ['name', 'message', 'stack']),
+                        errorInput: originalMessage
+                    }
+                });
+            });
+        });
+        describe('INPUT_FORMAT is default or missing', () => {
+            let amqp;
+            beforeEach(() => {
+                envVars.ELASTICIO_INPUT_FORMAT = 'default';
+                settings = Settings.readFrom(envVars);
+                amqp = new Amqp(settings);
+            });
+
+            it('should process message as normal message', () => {
+                const message = {
+                    body: {
+                        does: 'not matter'
+                    },
+                    headers: {
+                        'x-ipaas-some-header': 'and it\'s value'
+                    }
+                };
+
+                const amqpMessage = {
+                    properties: {
+                        headers: {
+                            protocolVersion: 2
+                        }
+                    },
+                    content: encryptor.encryptMessageContent(message)
+                };
+                expect(amqp._decodeMessage(amqpMessage)).to.deep.equal(message);
+            });
+            it('should fail if message is not in normal message format', () => {
+                const error = new Error('smth bad happens');
+                const originalMessage = {
+                    body: {
+                        does: 'not matter'
+                    },
+                    headers: {
+                        'x-ipaas-some-header': 'and it\'s value'
+                    }
+                };
+                const message = {
+                    error: encryptor.encryptMessageContent(
+                        _.pick(error, ['name', 'message', 'stack']),
+                        'base64'
+                    ).toString(),
+                    errorInput: encryptor.encryptMessageContent(
+                        originalMessage,
+                        'base64'
+                    ).toString()
+                };
+
+                const amqpMessage = {
+                    properties: {
+                        headers: {
+                            protocolVersion: 2
+                        }
+                    },
+                    content: Buffer.from(JSON.stringify(message))
+                };
+                expect(() => amqp._decodeMessage(amqpMessage)).to.throw();
+            });
+            it('should add reply_to header', () => {
+                const message = {
+                    body: {
+                        does: 'not matter'
+                    },
+                    headers: {
+                        'x-ipaas-some-header': 'and it\'s value'
+                    }
+                };
+
+                const amqpMessage = {
+                    properties: {
+                        headers: {
+                            protocolVersion: 2,
+                            reply_to: 'reply_to_queue'
+                        }
+                    },
+                    content: encryptor.encryptMessageContent(message)
+                };
+                expect(amqp._decodeMessage(amqpMessage)).to.deep.equal({
+                    headers: { ...message.headers, reply_to: amqpMessage.properties.headers.reply_to },
+                    body: message.body
+                });
+            });
+        });
+    });
+
+    describe('_onMessage', () => {
+        let amqp;
+        beforeEach(() => {
+            settings = Settings.readFrom(envVars);
+            amqp = new Amqp(settings);
+        });
+        it('should simply return if message is null', () => {
+            const callbackStub = sandbox.stub();
+            amqp._onMessage(callbackStub, null);
+            expect(callbackStub).not.to.have.been.called;
+        });
+        it('should try to decode message', () => {
+            const callbackStub = sandbox.stub();
+            const message = {
+                properties: {
+                    headers: {
+                        flowId: 'XXX',
+                        stepId: 'step_1'
+                    }
+                },
+                content: Buffer.alloc(0)
+            };
+            sinon.stub(amqp, '_decodeMessage');
+            amqp._onMessage(callbackStub, message);
+            expect(amqp._decodeMessage).to.have.been.calledOnce.and.calledWith(message);
+        });
+        it('should reject message if failed to decode and not call callback', () => {
+            const callbackStub = sandbox.stub();
+            const message = {
+                properties: {
+                    headers: {
+                        flowId: 'XXX',
+                        stepId: 'step_1'
+                    }
+                },
+                fields: {
+                    deliveryTag: 'XXXXX'
+                },
+                content: Buffer.alloc(0)
+            };
+            sinon.stub(amqp, '_decodeMessage').throws(new Error('incorrect message'));
+            sinon.stub(amqp, 'reject');
+            amqp._onMessage(callbackStub, message);
+            expect(amqp._decodeMessage).to.have.been.calledOnce.and.calledWith(message);
+            expect(callbackStub).not.to.have.been.called;
+            expect(amqp.reject).to.have.been.calledOnce.and.calledWith(message);
+        });
+        it('should call callback with decoded message', () => {
+            const callbackStub = sandbox.stub();
+            const messageBody = {
+                headers: {
+                    'x-does-not-matter': 'value'
+                },
+                body: {
+                    key: 'value'
+                }
+            };
+            const message = {
+                properties: {
+                    headers: {
+                        flowId: 'XXX',
+                        stepId: 'step_1',
+                        protocolVersion: 2
+                    }
+                },
+                fields: {
+                    deliveryTag: 'XXXXX'
+                },
+                content: encryptor.encryptMessageContent(messageBody)
+            };
+            amqp._onMessage(callbackStub, message);
+            expect(callbackStub).to.have.been.calledOnce.and.calledWith(messageBody, message);
+        });
+        it('should reject message if callback throws', () => {
+            const callbackStub = sandbox.stub().throws(new Error('failed to process message'));
+            const messageBody = {
+                headers: {
+                    'x-does-not-matter': 'value'
+                },
+                body: {
+                    key: 'value'
+                }
+            };
+            const message = {
+                properties: {
+                    headers: {
+                        flowId: 'XXX',
+                        stepId: 'step_1',
+                        protocolVersion: 2
+                    }
+                },
+                fields: {
+                    deliveryTag: 'XXXXX'
+                },
+                content: encryptor.encryptMessageContent(messageBody)
+            };
+            sandbox.stub(amqp, 'reject');
+            amqp._onMessage(callbackStub, message);
+            expect(callbackStub).to.have.been.calledOnce.and.calledWith(messageBody, message);
+            expect(amqp.reject).to.have.been.calledOnce.and.calledWith(message);
+        });
     });
 
     it('Should disconnect from all channels and connection', async () => {
