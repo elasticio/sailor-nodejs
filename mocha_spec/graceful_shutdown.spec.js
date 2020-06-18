@@ -1,8 +1,6 @@
 const expect = require('chai').expect;
 const helpers = require('./integration_helpers');
 
-const env = process.env;
-
 describe('Graceful shutdown', function test() {
     this.timeout(helpers.ShellTester.TIMEOUT_DEFAULT * 1.1);
 
@@ -15,14 +13,14 @@ describe('Graceful shutdown', function test() {
         }
     };
 
-    let fakeApiServer;
-    let amqpHelper = helpers.amqp();
+    let amqpHelper;
+    let env;
 
     beforeEach(async () => {
-        helpers.prepareEnv();
+        env = helpers.prepareEnv();
+        amqpHelper = helpers.amqp(env);
         await amqpHelper.prepare();
-
-        fakeApiServer = await helpers.fakeApiServerStart();
+        await helpers.fakeApiServerStart(env);
     });
 
     afterEach(async () => {
@@ -35,7 +33,8 @@ describe('Graceful shutdown', function test() {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
             const sailorTester = helpers.ShellTester.init({
-                timeout: 1000
+                timeout: 1000,
+                env
             });
 
             await sailorTester.run();
@@ -55,7 +54,8 @@ describe('Graceful shutdown', function test() {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
             const sailorTester = helpers.ShellTester.init({
-                timeout: 1500
+                timeout: 1500,
+                env
             });
 
             await sailorTester.run();
@@ -86,7 +86,7 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init();
+            const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
             amqpHelper.publishMessage(inputMessage);
@@ -113,7 +113,7 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init();
+            const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
             amqpHelper.publishMessage(inputMessage);
@@ -144,7 +144,7 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init();
+            const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
             amqpHelper.publishMessage(inputMessage);
@@ -178,7 +178,7 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init();
+            const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
             amqpHelper.publishMessage(inputMessage);
@@ -215,7 +215,7 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init();
+            const sailorTester = helpers.ShellTester.init({ env });
 
             amqpHelper.publishMessage(inputMessage);
             amqpHelper.publishMessage(inputMessage);

@@ -6,10 +6,9 @@ const uuid = require('uuid');
 const sinonjs = require('sinon');
 const logging = require('../lib/logging.js');
 const helpers = require('./integration_helpers');
-const encryptor = require('../lib/encryptor');
+const Encryptor = require('../lib/encryptor');
 const settings = require('../lib/settings');
 
-const env = process.env;
 function requireRun() {
     //@todo it would be great to use something like this https://github.com/jveski/shelltest
     const path = '../run.js';
@@ -18,6 +17,10 @@ function requireRun() {
     return require(path);
 }
 describe('Integration Test', () => {
+    let encryptor;
+    let env;
+    let amqpHelper;
+    const originalEnvironment = { ...process.env };
     const customers = [
         {
             name: 'Homer Simpson'
@@ -28,8 +31,10 @@ describe('Integration Test', () => {
     ];
     let inputMessage;
     let runner;
+    let sinon;
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        sinon = sinonjs.createSandbox();
         inputMessage = {
             headers: {
                 stepId: 'step_1'
@@ -38,24 +43,21 @@ describe('Integration Test', () => {
                 message: 'Just do it!'
             }
         };
-        helpers.prepareEnv();
+        process.env = { ...originalEnvironment };
+        env = helpers.prepareEnv();
+        Object.assign(process.env, env);
+
+        encryptor = new Encryptor(env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD, env.ELASTICIO_MESSAGE_CRYPTO_IV);
         env.ELASTICIO_FUNCTION = 'init_trigger';
+        amqpHelper = helpers.amqp(env);
+        await amqpHelper.prepare();
+        runner = requireRun();
     });
 
     afterEach(async () => {
-        delete env.ELASTICIO_STARTUP_REQUIRED;
-        delete env.ELASTICIO_FUNCTION;
-        delete env.ELASTICIO_HOOK_SHUTDOWN;
-
         await runner._disconnectOnly();
         nock.cleanAll();
-    });
-
-    let sinon;
-    beforeEach(() => {
-        sinon = sinonjs.createSandbox();
-    });
-    afterEach(() => {
+        amqpHelper.cleanUp();
         sinon.restore();
     });
 
@@ -64,14 +66,11 @@ describe('Integration Test', () => {
         let threadId;
         let messageId;
 
-        let amqpHelper = helpers.amqp();
         beforeEach(async () => {
-            await amqpHelper.prepare();
             threadId = uuid.v4();
             parentMessageId = uuid.v4();
             messageId = uuid.v4();
         });
-        afterEach(() => amqpHelper.cleanUp());
 
         for (let protocolVersion of [1,2]) {
             describe(`for output protocolVersion ${protocolVersion}`, () => {
@@ -83,7 +82,7 @@ describe('Integration Test', () => {
                 });
 
                 it('should run trigger successfully for input protocolVersion 1', async () => {
-                    helpers.mockApiTaskStepResponse();
+                    helpers.mockApiTaskStepResponse(env);
 
                     nock('https://api.acme.com')
                         .post('/subscribe')
@@ -93,19 +92,16 @@ describe('Integration Test', () => {
                         .get('/customers')
                         .reply(200, customers);
 
-                    runner = requireRun();
-
                     await amqpHelper.publishMessage(inputMessage, {
                         parentMessageId,
                         threadId
                     });
-
                     const [{ message, queueName }] = await Promise.all([
                         new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
                         )),
-                        runner.run(settings.readFrom(process.env))
+                        runner.run(settings.readFrom(env))
                     ]);
 
                     const { properties, content } = message;
@@ -164,7 +160,7 @@ describe('Integration Test', () => {
 
 
                 it('should run trigger successfully for input protocolVersion 2', async () => {
-                    helpers.mockApiTaskStepResponse();
+                    helpers.mockApiTaskStepResponse(env);
 
                     nock('https://api.acme.com')
                         .post('/subscribe')
@@ -185,14 +181,12 @@ describe('Integration Test', () => {
                         }
                     );
 
-                    runner = requireRun();
-
                     const [{ message, queueName }] = await Promise.all([
                         new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
                         )),
-                        runner.run(settings.readFrom(process.env))
+                        runner.run(settings.readFrom(env))
                     ]);
 
                     const { properties, content } = message;
@@ -250,11 +244,11 @@ describe('Integration Test', () => {
                 });
 
                 it('should augment passthrough property with data', async () => {
-                    process.env.ELASTICIO_STEP_ID = 'step_2';
-                    process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
-                    process.env.ELASTICIO_FUNCTION = 'emit_data';
+                    env.ELASTICIO_STEP_ID = 'step_2';
+                    env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                    env.ELASTICIO_FUNCTION = 'emit_data';
 
-                    helpers.mockApiTaskStepResponse({
+                    helpers.mockApiTaskStepResponse(env, {
                         is_passthrough: true
                     });
 
@@ -280,14 +274,12 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    runner = requireRun();
-
                     const [{ message, queueName }] = await Promise.all([
                         new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
                         )),
-                        runner.run(settings.readFrom(process.env))
+                        runner.run(settings.readFrom(env))
                     ]);
 
                     const { properties, content } = message;
@@ -345,13 +337,13 @@ describe('Integration Test', () => {
                     'should paste data from incoming message into passthrough '
                     + 'and not copy own data if NO_SELF_PASSTRHOUGH',
                     async () => {
-                        process.env.ELASTICIO_STEP_ID = 'step_2';
-                        process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
-                        process.env.ELASTICIO_FUNCTION = 'emit_data';
-                        const sailorSettings = settings.readFrom(process.env);
+                        env.ELASTICIO_STEP_ID = 'step_2';
+                        env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                        env.ELASTICIO_FUNCTION = 'emit_data';
+                        const sailorSettings = settings.readFrom(env);
                         sailorSettings.NO_SELF_PASSTRHOUGH = true;
 
-                        helpers.mockApiTaskStepResponse({
+                        helpers.mockApiTaskStepResponse(env, {
                             is_passthrough: true
                         });
 
@@ -375,8 +367,6 @@ describe('Integration Test', () => {
                             parentMessageId,
                             threadId
                         });
-
-                        runner = requireRun();
 
                         const [{ message, queueName }] = await Promise.all([
                             new Promise(resolve => amqpHelper.on(
@@ -443,13 +433,13 @@ describe('Integration Test', () => {
                 );
 
                 it('should work well with async process function emitting data', async () => {
-                    process.env.ELASTICIO_STEP_ID = 'step_2';
-                    process.env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
-                    process.env.ELASTICIO_FUNCTION = 'async_trigger';
-                    process.env.ELASTICIO_DATA_RATE_LIMIT = '1';
-                    process.env.ELASTICIO_RATE_INTERVAL = '110';
+                    env.ELASTICIO_STEP_ID = 'step_2';
+                    env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                    env.ELASTICIO_FUNCTION = 'async_trigger';
+                    env.ELASTICIO_DATA_RATE_LIMIT = '1';
+                    env.ELASTICIO_RATE_INTERVAL = '110';
 
-                    helpers.mockApiTaskStepResponse({
+                    helpers.mockApiTaskStepResponse(env, {
                         is_passthrough: true
                     });
 
@@ -472,14 +462,12 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    runner = requireRun();
-
                     const [{ message, queueName }] = await Promise.all([
                         new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
                         )),
-                        runner.run(settings.readFrom(process.env))
+                        runner.run(settings.readFrom(env))
                     ]);
 
                     const { properties, content } = message;
@@ -544,7 +532,7 @@ describe('Integration Test', () => {
                 describe('when env ELASTICIO_STARTUP_REQUIRED is set', () => {
                     let sailorSettings;
                     beforeEach(() => {
-                        sailorSettings = settings.readFrom(process.env);
+                        sailorSettings = settings.readFrom(env);
                         sailorSettings.STARTUP_REQUIRED = '1';
                     });
 
@@ -560,7 +548,7 @@ describe('Integration Test', () => {
                                     };
                                 });
 
-                            helpers.mockApiTaskStepResponse();
+                            helpers.mockApiTaskStepResponse(env);
 
                             // sailor persists startup data via sailor-support API
                             let hooksDataRequest;
@@ -584,8 +572,6 @@ describe('Integration Test', () => {
                                 })
                                 .get('/customers')
                                 .reply(200, customers);
-
-                            runner = requireRun();
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
@@ -659,7 +645,7 @@ describe('Integration Test', () => {
                                     };
                                 });
 
-                            helpers.mockApiTaskStepResponse();
+                            helpers.mockApiTaskStepResponse(env);
 
                             let hooksDataRequest1;
                             let hooksDataRequest2;
@@ -708,8 +694,6 @@ describe('Integration Test', () => {
                                 })
                                 .get('/customers')
                                 .reply(200, customers);
-
-                            runner = requireRun();
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
@@ -794,7 +778,7 @@ describe('Integration Test', () => {
                                     };
                                 });
 
-                            helpers.mockApiTaskStepResponse();
+                            helpers.mockApiTaskStepResponse(env);
 
                             // sailor persists startup data via sailor-support API
                             const hooksDataNock = nock(env.ELASTICIO_API_URI)
@@ -816,8 +800,6 @@ describe('Integration Test', () => {
                                 })
                                 .get('/customers')
                                 .reply(200, customers);
-
-                            runner = requireRun();
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
@@ -878,7 +860,7 @@ describe('Integration Test', () => {
                         it('should store an empty hooks data and run trigger successfully', async () => {
                             sailorSettings.FUNCTION = 'trigger_with_no_hooks';
 
-                            helpers.mockApiTaskStepResponse();
+                            helpers.mockApiTaskStepResponse(env);
 
                             // sailor persists startup data via sailor-support API
                             const hooksDataNock = nock(env.ELASTICIO_API_URI)
@@ -890,8 +872,6 @@ describe('Integration Test', () => {
                             nock('https://api.acme.com')
                                 .get('/customers')
                                 .reply(200, customers);
-
-                            runner = requireRun();
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
@@ -958,7 +938,7 @@ describe('Integration Test', () => {
                     it('should run trigger successfully and pass additional vars to headers', async () => {
 
 
-                        helpers.mockApiTaskStepResponse();
+                        helpers.mockApiTaskStepResponse(env);
 
                         nock('https://api.acme.com')
                             .post('/subscribe')
@@ -967,8 +947,6 @@ describe('Integration Test', () => {
                             })
                             .get('/customers')
                             .reply(200, customers);
-
-                        runner = requireRun();
 
                         await amqpHelper.publishMessage(inputMessage, {
                             parentMessageId,
@@ -980,7 +958,7 @@ describe('Integration Test', () => {
                                 'data',
                                 (message, queueName) => resolve({ message, queueName })
                             )),
-                            runner.run(settings.readFrom(process.env))
+                            runner.run(settings.readFrom(env))
                         ]);
 
 
@@ -1030,7 +1008,7 @@ describe('Integration Test', () => {
 
                         env.ELASTICIO_FUNCTION = 'http_reply_action';
 
-                        helpers.mockApiTaskStepResponse();
+                        helpers.mockApiTaskStepResponse(env);
 
                         nock('https://api.acme.com')
                             .post('/subscribe')
@@ -1045,14 +1023,13 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner = requireRun();
 
                         const [{ message, queueName }] = await Promise.all([
                             new Promise(resolve => amqpHelper.on(
                                 'data',
                                 (message, queueName) => resolve({ message, queueName })
                             )),
-                            runner.run(settings.readFrom(process.env))
+                            runner.run(settings.readFrom(env))
                         ]);
 
                         const { properties, content } = message;
@@ -1099,12 +1076,10 @@ describe('Integration Test', () => {
 
                         env.ELASTICIO_FUNCTION = 'fails_to_init';
 
-                        helpers.mockApiTaskStepResponse();
+                        helpers.mockApiTaskStepResponse(env);
 
-                        const sailorSettings = settings.readFrom(process.env);
+                        const sailorSettings = settings.readFrom(env);
                         sailorSettings.FUNCTION = 'fails_to_init';
-
-                        runner = requireRun();
 
                         const [{ message, queueName }] = await Promise.all([
                             new Promise(resolve => amqpHelper.on(
@@ -1139,8 +1114,7 @@ describe('Integration Test', () => {
     describe('when sailor is being invoked for shutdown', () => {
         describe('when hooksdata is found', () => {
             it('should execute shutdown hook successfully', async () => {
-                helpers.amqp().prepareEnv();
-                const sailorSettings = settings.readFrom(process.env);
+                const sailorSettings = settings.readFrom(env);
                 sailorSettings.HOOK_SHUTDOWN = '1';
 
                 const subsriptionResponse = {
@@ -1169,9 +1143,7 @@ describe('Integration Test', () => {
                     .delete('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data')
                     .reply(204);
 
-                helpers.mockApiTaskStepResponse();
-
-                runner = requireRun();
+                helpers.mockApiTaskStepResponse(env);
 
                 await Promise.all([
                     runner.run(sailorSettings),
