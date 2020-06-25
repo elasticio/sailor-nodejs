@@ -982,7 +982,7 @@ describe('Sailor', () => {
                 };
                 payload = {
                     headers: {
-                        'x-ipaas-object-storage-id': bodyObjectId
+                        [Sailor.OBJECT_ID_HEADER]: bodyObjectId
                     },
                     body: {},
                     passthrough: {
@@ -999,7 +999,7 @@ describe('Sailor', () => {
                         },
                         step_4: {
                             headers: {
-                                'x-ipaas-object-storage-id': passthroughObjectId
+                                [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
                             },
                             body: {}
                         }
@@ -1047,7 +1047,9 @@ describe('Sailor', () => {
                     expect(taskId).to.deep.equal('5559edd38968ec0736000003');
                     expect(stepId).to.deep.equal('step_1');
 
-                    return Promise.resolve({});
+                    return Promise.resolve({
+                        is_passthrough: true
+                    });
                 });
 
                 await sailor.connect();
@@ -1086,7 +1088,29 @@ describe('Sailor', () => {
                         sinon.match.object
                     );
                     expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
-                        { headers: {}, body: { items: [1, 2, 3, 4, 5, 6] } },
+                        {
+                            headers: {},
+                            body: { items: [1, 2, 3, 4, 5, 6] },
+                            passthrough: {
+                                step_1: {
+                                    headers: {},
+                                    body: { items: [1, 2, 3, 4, 5, 6] }
+                                },
+                                step_2: {
+                                    body: { step_1: 'body' }
+                                },
+                                step_3: {
+                                    body: { step_2: 'body' },
+                                    headers: {}
+                                },
+                                step_4: {
+                                    headers: {
+                                        [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                                    },
+                                    body: passThroughBody
+                                }
+                            }
+                        },
                         sinon.match({
                             cid: 1,
                             compId: '5559edd38968ec0736000456',
@@ -1157,7 +1181,7 @@ describe('Sailor', () => {
                     passthrough: {
                         step_2: {
                             headers: {
-                                'x-ipaas-object-storage-id': passthroughObjectId
+                                [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
                             },
                             body: {}
                         },
@@ -1213,18 +1237,18 @@ describe('Sailor', () => {
                         expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                             {
                                 body: {},
-                                headers: { 'x-ipaas-object-storage-id': bodyObjectId },
+                                headers: { [Sailor.OBJECT_ID_HEADER]: bodyObjectId },
                                 passthrough: {
                                     ...payload.passthrough,
                                     step_1: {
                                         headers: {
-                                            'x-ipaas-object-storage-id': bodyObjectId
+                                            [Sailor.OBJECT_ID_HEADER]: bodyObjectId
                                         },
                                         body: {}
                                     },
                                     step_3: {
                                         headers: {
-                                            'x-ipaas-object-storage-id': bodyObjectId
+                                            [Sailor.OBJECT_ID_HEADER]: bodyObjectId
                                         },
                                         body: {}
                                     }
@@ -1276,13 +1300,13 @@ describe('Sailor', () => {
                             fakeAMQPConnection.sendData,
                             {
                                 body: sinon.match({}).or(sinon.match({ items: [1,2,3,4,5,6] })),
-                                headers: sinon.match({}).or(sinon.match({ 'x-ipaas-object-storage-id': bodyObjectId })),
+                                headers: sinon.match({}).or(sinon.match({ [Sailor.OBJECT_ID_HEADER]: bodyObjectId })),
                                 passthrough: {
                                     ...payload.passthrough,
                                     step_1: sinon
                                         .match({
                                             headers: {
-                                                'x-ipaas-object-storage-id': bodyObjectId
+                                                [Sailor.OBJECT_ID_HEADER]: bodyObjectId
                                             },
                                             body: {}
                                         })
@@ -1293,7 +1317,7 @@ describe('Sailor', () => {
                                     step_3: sinon
                                         .match({
                                             headers: {
-                                                'x-ipaas-object-storage-id': bodyObjectId
+                                                [Sailor.OBJECT_ID_HEADER]: bodyObjectId
                                             },
                                             body: {}
                                         })
@@ -1325,9 +1349,9 @@ describe('Sailor', () => {
                         const [{ headers, passthrough }] = fakeAMQPConnection.sendData.getCall(0).args;
                         // there should be at least one uploaded object
                         expect(
-                            (headers && headers['x-ipaas-object-storage-id']) ||
+                            (headers && headers[[Sailor.OBJECT_ID_HEADER]]) ||
                             [...Object.keys(passthrough)].find(stepId =>
-                                passthrough.headers && passthrough.headers['x-ipaas-object-storage-id'])
+                                passthrough.headers && passthrough.headers[[Sailor.OBJECT_ID_HEADER]])
                         ).to.be.ok;
                     });
                 });
