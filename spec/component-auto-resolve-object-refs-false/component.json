@@ -1,0 +1,14 @@
+{
+  "autoResolveObjectReferences": false,
+  "title": "Client component",
+  "description": "Client component description",
+  "external": true,
+  "credentials": {
+  },
+  "triggers": {
+    "data_trigger": {
+      "main": "./triggers/data_trigger.js",
+      "title": "Get data"
+    }
+  }
+}
