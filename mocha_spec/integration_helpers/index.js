@@ -7,16 +7,14 @@ const PREFIX = 'sailor_nodejs_integration_test';
 const nock = require('nock');
 const ShellTester = require('./ShellTester');
 const express = require('express');
-const encryptor = require('../../lib/encryptor');
+const Encryptor = require('../../lib/encryptor');
 const FAKE_API_PORT = 1244; // most likely the port won't be taken – https://www.adminsub.net/tcp-udp-port-finder/1244
-
-const env = process.env;
 
 // @todo move AmqpHelper to dedicated file (will be done in the future refactoring)
 class AmqpHelper extends EventEmitter {
-    constructor() {
+    constructor(env) {
         super();
-
+        this.env = env;
         this.httpReplyQueueName = PREFIX + 'request_reply_queue';
         this.httpReplyQueueRoutingKey = PREFIX + 'request_reply_routing_key';
         this.nextStepQueue = PREFIX + '_next_step_queue';
@@ -28,34 +26,27 @@ class AmqpHelper extends EventEmitter {
         this._amqp = null;
 
         this.counterData = 0;
-    }
-
-    prepareEnv() {
-        env.ELASTICIO_LISTEN_MESSAGES_ON = PREFIX + ':messages';
-        env.ELASTICIO_PUBLISH_MESSAGES_TO = PREFIX + ':exchange';
-        env.ELASTICIO_DATA_ROUTING_KEY = PREFIX + ':routing_key:message';
-        env.ELASTICIO_ERROR_ROUTING_KEY = PREFIX + ':routing_key:error';
-        env.ELASTICIO_REBOUND_ROUTING_KEY = PREFIX + ':routing_key:rebound';
-        env.ELASTICIO_SNAPSHOT_ROUTING_KEY = PREFIX + ':routing_key:snapshot';
-        env.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 3;
-        env.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000;
+        this._encryptor = new Encryptor(
+            this.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
+            this.env.ELASTICIO_MESSAGE_CRYPTO_IV
+        );
     }
 
     publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
         let msgHeaders = Object.assign({
-            execId: env.ELASTICIO_EXEC_ID,
-            taskId: env.ELASTICIO_FLOW_ID,
-            workspaceId: env.ELASTICIO_WORKSPACE_ID,
-            userId: env.ELASTICIO_USER_ID,
+            execId: this.env.ELASTICIO_EXEC_ID,
+            taskId: this.env.ELASTICIO_FLOW_ID,
+            workspaceId: this.env.ELASTICIO_WORKSPACE_ID,
+            userId: this.env.ELASTICIO_USER_ID,
             threadId,
             stepId: message.headers.stepId,
             messageId: parentMessageId
         }, headers);
         const protocolVersion = Number(msgHeaders.protocolVersion || 1);
         return this.subscriptionChannel.publish(
-            env.ELASTICIO_LISTEN_MESSAGES_ON,
-            env.ELASTICIO_DATA_ROUTING_KEY,
-            encryptor.encryptMessageContent(
+            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
+            this.env.ELASTICIO_DATA_ROUTING_KEY,
+            this._encryptor.encryptMessageContent(
                 message,
                 protocolVersion < 2 ? 'base64' : undefined
             ),
@@ -66,12 +57,12 @@ class AmqpHelper extends EventEmitter {
     }
 
     *prepareQueues() {
-        const amqp = yield amqplib.connect(env.ELASTICIO_AMQP_URI);
+        const amqp = yield amqplib.connect(this.env.ELASTICIO_AMQP_URI);
         this._amqp = amqp;
         const subscriptionChannel = yield amqp.createChannel();
         const publishChannel = yield amqp.createChannel();
 
-        yield subscriptionChannel.assertQueue(env.ELASTICIO_LISTEN_MESSAGES_ON);
+        yield subscriptionChannel.assertQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
         yield publishChannel.assertQueue(this.nextStepQueue);
         yield publishChannel.assertQueue(this.nextStepErrorQueue);
 
@@ -80,34 +71,34 @@ class AmqpHelper extends EventEmitter {
             autoDelete: false
         };
 
-        yield subscriptionChannel.assertExchange(env.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', exchangeOptions);
-        yield publishChannel.assertExchange(env.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
+        yield subscriptionChannel.assertExchange(this.env.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', exchangeOptions);
+        yield publishChannel.assertExchange(this.env.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
 
         yield subscriptionChannel.bindQueue(
-            env.ELASTICIO_LISTEN_MESSAGES_ON,
-            env.ELASTICIO_LISTEN_MESSAGES_ON,
-            env.ELASTICIO_DATA_ROUTING_KEY);
+            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
+            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
+            this.env.ELASTICIO_DATA_ROUTING_KEY);
 
         yield publishChannel.bindQueue(
             this.nextStepQueue,
-            env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            env.ELASTICIO_DATA_ROUTING_KEY);
+            this.env.ELASTICIO_PUBLISH_MESSAGES_TO,
+            this.env.ELASTICIO_DATA_ROUTING_KEY);
 
         yield publishChannel.bindQueue(
             this.nextStepErrorQueue,
-            env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            env.ELASTICIO_ERROR_ROUTING_KEY);
+            this.env.ELASTICIO_PUBLISH_MESSAGES_TO,
+            this.env.ELASTICIO_ERROR_ROUTING_KEY);
 
         yield publishChannel.assertQueue(this.httpReplyQueueName);
         yield publishChannel.bindQueue(
             this.httpReplyQueueName,
-            env.ELASTICIO_PUBLISH_MESSAGES_TO,
+            this.env.ELASTICIO_PUBLISH_MESSAGES_TO,
             this.httpReplyQueueRoutingKey);
 
         yield publishChannel.purgeQueue(this.nextStepQueue);
         yield publishChannel.purgeQueue(this.nextStepErrorQueue);
         yield publishChannel.purgeQueue(this.httpReplyQueueName);
-        yield publishChannel.purgeQueue(env.ELASTICIO_LISTEN_MESSAGES_ON);
+        yield publishChannel.purgeQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
 
         this.subscriptionChannel = subscriptionChannel;
         this.publishChannel = publishChannel;
@@ -129,7 +120,6 @@ class AmqpHelper extends EventEmitter {
     prepare() {
         const that = this;
         return co(function * gen() {
-            that.prepareEnv();
             yield that.prepareQueues();
 
             yield that.publishChannel.consume(
@@ -163,12 +153,12 @@ class AmqpHelper extends EventEmitter {
             const data = [];
 
             yield this.subscriptionChannel.consume(
-                env.ELASTICIO_LISTEN_MESSAGES_ON,
+                this.env.ELASTICIO_LISTEN_MESSAGES_ON,
                 (message) => {
                     this.subscriptionChannel.ack(message);
                     const protocolVersion = Number(message.properties.headers.protocolVersion || 1);
 
-                    const emittedMessage = encryptor.decryptMessageContent(
+                    const emittedMessage = this._encryptor.decryptMessageContent(
                         message.content,
                         protocolVersion < 2 ? 'base64' : undefined
                     );
@@ -191,16 +181,8 @@ class AmqpHelper extends EventEmitter {
     }
 }
 
-function amqp() {
-    const handle = {
-        //eslint-disable-next-line no-empty-function
-        getMessages() {
-        }
-    };
-    return handle;
-}
-
 function prepareEnv() {
+    const env = {};
     env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672';
     env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '1';
     env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
@@ -225,9 +207,18 @@ function prepareEnv() {
     env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
 
     env.DEBUG = 'sailor:debug';
+    env.ELASTICIO_LISTEN_MESSAGES_ON = PREFIX + ':messages';
+    env.ELASTICIO_PUBLISH_MESSAGES_TO = PREFIX + ':exchange';
+    env.ELASTICIO_DATA_ROUTING_KEY = PREFIX + ':routing_key:message';
+    env.ELASTICIO_ERROR_ROUTING_KEY = PREFIX + ':routing_key:error';
+    env.ELASTICIO_REBOUND_ROUTING_KEY = PREFIX + ':routing_key:rebound';
+    env.ELASTICIO_SNAPSHOT_ROUTING_KEY = PREFIX + ':routing_key:snapshot';
+    env.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 3;
+    env.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000;
+    return env;
 }
 
-function mockApiTaskStepResponse(response) {
+function mockApiTaskStepResponse(env, response) {
     const defaultResponse = {
         config: {
             apiKey: 'secret'
@@ -245,7 +236,7 @@ function mockApiTaskStepResponse(response) {
 
 let fakeApiServer;
 
-async function fakeApiServerStart(response, { responseCode = 200, logger = console } = {}) {
+async function fakeApiServerStart(env, response, { responseCode = 200, logger = console } = {}) {
     const app = express();
     const requests = [];
 
@@ -287,8 +278,8 @@ async function fakeApiServerStop() {
 
 exports.PREFIX = PREFIX;
 
-exports.amqp = function amqp() {
-    return new AmqpHelper();
+exports.amqp = function amqp(env) {
+    return new AmqpHelper(env);
 };
 
 exports.prepareEnv = prepareEnv;

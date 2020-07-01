@@ -9,12 +9,13 @@ const _ = require('lodash');
 const { Sailor } = require('../../lib/sailor');
 const Settings = require('../../lib/settings');
 const amqp = require('../../lib/amqp.js');
-const encryptor = require('../../lib/encryptor.js');
+const Encryptor = require('../../lib/encryptor.js');
 
 describe('Sailor', () => {
     let settings;
     let sandbox;
     let envVars;
+    let encryptor;
     beforeEach(() => {
         sandbox = sinon.createSandbox();
         envVars = {};
@@ -46,10 +47,14 @@ describe('Sailor', () => {
         envVars.ELASTICIO_API_USERNAME = 'test@test.com';
         envVars.ELASTICIO_API_KEY = '5559edd';
 
+        envVars.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
+        envVars.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+
         envVars.ELASTICIO_OBJECT_STORAGE_URI = 'http://maester.service:3002';
         envVars.ELASTICIO_OBJECT_STORAGE_TOKEN = 'this is jwt token, believe me!';
 
         settings = Settings.readFrom(envVars);
+        encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
     });
     afterEach(() => {
         sandbox.restore();
@@ -234,7 +239,6 @@ describe('Sailor', () => {
             expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                 { headers: {}, body: { items: [1, 2, 3, 4, 5, 6] } },
                 sinon.match({
-                    cid: 1,
                     compId: '5559edd38968ec0736000456',
                     containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                     end: sinon.match.number,
@@ -295,7 +299,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'data_trigger',
                     start: sinon.match.number,
-                    cid: 1,
                     end: sinon.match.number,
                     messageId: sinon.match.string
                 })
@@ -374,7 +377,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'passthrough',
                     start: sinon.match.number,
-                    cid: 1,
                     end: sinon.match.number,
                     messageId: sinon.match.string
                 })
@@ -438,7 +440,6 @@ describe('Sailor', () => {
                         compId: '5559edd38968ec0736000456',
                         function: 'passthrough',
                         start: sinon.match.number,
-                        cid: 1,
                         end: sinon.match.number,
                         messageId: sinon.match.string
                     })
@@ -500,7 +501,6 @@ describe('Sailor', () => {
                         compId: '5559edd38968ec0736000456',
                         function: 'passthrough',
                         start: sinon.match.number,
-                        cid: 1,
                         end: sinon.match.number,
                         messageId: sinon.match.string
                     })
@@ -658,7 +658,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'update',
                     start: sinon.match.number,
-                    cid: 1,
                     snapshotEvent: 'snapshot',
                     messageId: sinon.match.string
                 })
@@ -703,7 +702,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'update',
                     start: sinon.match.number,
-                    cid: 1,
                     snapshotEvent: 'updateSnapshot',
                     messageId: sinon.match.string
                 })
@@ -876,7 +874,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'http_reply',
                     start: sinon.match.number,
-                    cid: 1,
                     messageId: sinon.match.string,
                     parentMessageId: message.properties.headers.messageId,
                     threadId: message.properties.headers.threadId
@@ -898,7 +895,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'http_reply',
                     start: sinon.match.number,
-                    cid: 1,
                     end: sinon.match.number,
                     messageId: sinon.match.string,
                     parentMessageId: message.properties.headers.messageId,
@@ -943,7 +939,6 @@ describe('Sailor', () => {
                     compId: '5559edd38968ec0736000456',
                     function: 'http_reply',
                     start: sinon.match.number,
-                    cid: 1,
                     messageId: sinon.match.string,
                     parentMessageId: message.properties.headers.messageId,
                     threadId: message.properties.headers.threadId
