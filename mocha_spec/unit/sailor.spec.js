@@ -1114,7 +1114,6 @@ describe('Sailor', () => {
                                 }
                             },
                             sinon.match({
-                                cid: 1,
                                 compId: '5559edd38968ec0736000456',
                                 containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                                 end: sinon.match.number,
@@ -1240,7 +1239,6 @@ describe('Sailor', () => {
                             }
                         },
                         sinon.match({
-                            cid: 1,
                             compId: '5559edd38968ec0736000456',
                             containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                             end: sinon.match.number,
@@ -1356,7 +1354,6 @@ describe('Sailor', () => {
                                 }
                             },
                             sinon.match({
-                                cid: 1,
                                 compId: '5559edd38968ec0736000456',
                                 containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                                 end: sinon.match.number,
@@ -1411,7 +1408,6 @@ describe('Sailor', () => {
                                 }
                             },
                             sinon.match({
-                                cid: 1,
                                 compId: '5559edd38968ec0736000456',
                                 containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                                 end: sinon.match.number,
@@ -1484,7 +1480,6 @@ describe('Sailor', () => {
                                 }
                             },
                             sinon.match({
-                                cid: 1,
                                 compId: '5559edd38968ec0736000456',
                                 containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
                                 end: sinon.match.number,
