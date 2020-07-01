@@ -1297,7 +1297,7 @@ describe('Sailor', () => {
                 settings.EMIT_LIGHTWEIGHT_MESSAGE = true;
             });
 
-            describe('when all objects are above OBJECT_STORAGE_SIZE_THRESHOLD', () => {
+            describe('when message is above OBJECT_STORAGE_SIZE_THRESHOLD', () => {
                 beforeEach(async () => {
                     settings.OBJECT_STORAGE_SIZE_THRESHOLD = 1;
                     sailor = new Sailor(settings);
@@ -1340,6 +1340,12 @@ describe('Sailor', () => {
                                 headers: { [Sailor.OBJECT_ID_HEADER]: bodyObjectId },
                                 passthrough: {
                                     ...payload.passthrough,
+                                    step_2: {
+                                        body: {},
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                                        }
+                                    },
                                     step_1: {
                                         headers: {
                                             [Sailor.OBJECT_ID_HEADER]: bodyObjectId
@@ -1376,19 +1382,13 @@ describe('Sailor', () => {
                     });
                 });
 
-                describe('and not all objects can be uploaded successfully', () => {
+                describe('and objects can not be uploaded successfully', () => {
                     let addObjectStub;
-                    let bodyObjectId;
                     beforeEach(async () => {
-                        bodyObjectId = 'body-object-id';
-                        addObjectStub = sandbox.stub(sailor.objectStorage, 'addAsStream')
-                            .onFirstCall()
-                            .resolves(bodyObjectId)
-                            .onSecondCall()
-                            .rejects(new Error());
+                        addObjectStub = sandbox.stub(sailor.objectStorage, 'addAsStream').rejects(new Error());
                     });
 
-                    it('should send partial lightweight', async () => {
+                    it('should not upload lightweight', async () => {
                         await sailor.processMessage(payload, message);
                         await new Promise(resolve => setTimeout(resolve, 100)); //wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
@@ -1399,32 +1399,20 @@ describe('Sailor', () => {
                         sinon.assert.calledWith(
                             fakeAMQPConnection.sendData,
                             {
-                                body: sinon.match({}).or(sinon.match({ items: [1,2,3,4,5,6] })),
-                                headers: sinon.match({}).or(sinon.match({ [Sailor.OBJECT_ID_HEADER]: bodyObjectId })),
+                                body: { items: [1,2,3,4,5,6] },
+                                headers: {},
                                 passthrough: {
                                     ...payload.passthrough,
-                                    step_1: sinon
-                                        .match({
-                                            headers: {
-                                                [Sailor.OBJECT_ID_HEADER]: bodyObjectId
-                                            },
-                                            body: {}
-                                        })
-                                        .or(sinon.match({
-                                            headers: {},
-                                            body: { items: [1,2,3,4,5,6] }
-                                        })),
-                                    step_3: sinon
-                                        .match({
-                                            headers: {
-                                                [Sailor.OBJECT_ID_HEADER]: bodyObjectId
-                                            },
-                                            body: {}
-                                        })
-                                        .or(sinon.match({
-                                            headers: {},
-                                            body: payload.passthrough.step_3.body
-                                        }))
+                                    step_2: {
+                                        body: {},
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: passthroughObjectId //reuse already uploaded
+                                        }
+                                    },
+                                    step_1: {
+                                        headers: {},
+                                        body: { items: [1,2,3,4,5,6] }
+                                    }
                                 }
                             },
                             sinon.match({
@@ -1447,19 +1435,13 @@ describe('Sailor', () => {
 
                         expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
                         const [{ headers, passthrough }] = fakeAMQPConnection.sendData.getCall(0).args;
-                        // there should be at least one uploaded object
-                        expect(
-                            (headers && headers[[Sailor.OBJECT_ID_HEADER]]) ||
-                            [...Object.keys(passthrough)].find(stepId =>
-                                passthrough.headers && passthrough.headers[[Sailor.OBJECT_ID_HEADER]])
-                        ).to.be.ok;
                     });
                 });
             });
 
-            describe('when all objects are below OBJECT_STORAGE_SIZE_THRESHOLD', () => {
+            describe('when message is below OBJECT_STORAGE_SIZE_THRESHOLD', () => {
                 beforeEach(async () => {
-                    settings.OBJECT_STORAGE_SIZE_THRESHOLD = 24;
+                    settings.OBJECT_STORAGE_SIZE_THRESHOLD = 61;
                     sailor = new Sailor(settings);
 
                     sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
@@ -1481,9 +1463,7 @@ describe('Sailor', () => {
 
                 describe('and all objects can be uploaded successfully', () => {
                     let addObjectSpy;
-                    let bodyObjectId;
                     beforeEach(async () => {
-                        bodyObjectId = 'body-object-id';
                         addObjectSpy = sandbox.spy(sailor.objectStorage, 'addAsStream');
                     });
 
