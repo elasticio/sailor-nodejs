@@ -1074,7 +1074,7 @@ describe('Sailor', () => {
 
                     it('should fetch message bodies and process', async () => {
                         await sailor.processMessage(payload, message);
-                        // await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 50));
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledOnce(bodyRequestStub);
@@ -1327,7 +1327,7 @@ describe('Sailor', () => {
 
                     it('should send lightweight', async () => {
                         await sailor.processMessage(payload, message);
-                        await new Promise(resolve => setTimeout(resolve, 10)); //wait for upload
+                        await new Promise(resolve => setTimeout(resolve, 50)); //wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
@@ -1391,7 +1391,7 @@ describe('Sailor', () => {
 
                     it('should not upload lightweight', async () => {
                         await sailor.processMessage(payload, message);
-                        await new Promise(resolve => setTimeout(resolve, 100)); //wait for upload
+                        await new Promise(resolve => setTimeout(resolve, 50)); //wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
@@ -1473,7 +1473,7 @@ describe('Sailor', () => {
 
                     it('should not send lightweight', async () => {
                         await sailor.processMessage(payload, message);
-                        await new Promise(resolve => setTimeout(resolve, 10)); //wait for upload
+                        await new Promise(resolve => setTimeout(resolve, 50)); //wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.notCalled(addObjectSpy);
