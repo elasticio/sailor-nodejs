@@ -1,5 +1,6 @@
 const chai = require('chai');
 const sinon = require('sinon');
+const { Readable } = require('stream');
 const { expect } = chai;
 chai.use(require('sinon-chai'));
 
@@ -1061,7 +1062,9 @@ describe('Sailor', () => {
                     let runExecSpy;
                     beforeEach(async () => {
                         const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
-                        bodyRequestStub = getObjectStub.withArgs(bodyObjectId).resolves(body);
+                        bodyRequestStub = getObjectStub
+                            .withArgs(bodyObjectId, settings.OBJECT_STORAGE_TOKEN)
+                            .resolves(body);
                         passthroughRequestStub = bodyRequestStub
                             .withArgs(passthroughObjectId)
                             .resolves(passThroughBody);
@@ -1140,7 +1143,9 @@ describe('Sailor', () => {
                     let runExecSpy;
                     beforeEach(async () => {
                         const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
-                        bodyRequestStub = getObjectStub.withArgs(bodyObjectId).resolves(body);
+                        bodyRequestStub = getObjectStub
+                            .withArgs(bodyObjectId, settings.OBJECT_STORAGE_TOKEN)
+                            .resolves(body);
                         passthroughRequestStub = bodyRequestStub.withArgs(passthroughObjectId).rejects(new Error());
 
                         runExecSpy = sandbox.spy(sailor, 'runExec');
@@ -1190,7 +1195,7 @@ describe('Sailor', () => {
 
                     passthroughRequestStub = sandbox
                         .stub(sailor.objectStorage, 'getAsJSON')
-                        .withArgs(passthroughObjectId)
+                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
                         .resolves(passThroughBody);
 
                     await sailor.connect();
@@ -1305,7 +1310,7 @@ describe('Sailor', () => {
                     });
 
                     sandbox.stub(sailor.objectStorage, 'getAsJSON')
-                        .withArgs(passthroughObjectId)
+                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
                         .resolves({ passthrough: 'body' });
 
                     await sailor.connect();
@@ -1326,6 +1331,10 @@ describe('Sailor', () => {
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
+                        sinon.assert.calledWith(
+                            addObjectStub,
+                            sinon.match.instanceOf(Readable), settings.OBJECT_STORAGE_TOKEN
+                        );
                         sinon.assert.notCalled(fakeAMQPConnection.sendError);
                         expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                             {
@@ -1386,6 +1395,10 @@ describe('Sailor', () => {
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
+                        sinon.assert.calledWith(
+                            addObjectStub,
+                            sinon.match.instanceOf(Readable), settings.OBJECT_STORAGE_TOKEN
+                        );
                         sinon.assert.notCalled(fakeAMQPConnection.sendError);
                         sinon.assert.calledOnce(fakeAMQPConnection.sendData);
                         sinon.assert.calledWith(
@@ -1445,7 +1458,7 @@ describe('Sailor', () => {
                     });
 
                     sandbox.stub(sailor.objectStorage, 'getAsJSON')
-                        .withArgs(passthroughObjectId)
+                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
                         .resolves({ passthrough: 'body' });
 
                     await sailor.connect();

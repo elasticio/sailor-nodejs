@@ -1,7 +1,7 @@
 {
   "name": "elasticio-sailor-nodejs",
   "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-  "version": "2.6.14-dev.1",
+  "version": "2.6.14-dev.5",
   "main": "run.js",
   "scripts": {
     "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
@@ -15,7 +15,7 @@
     "node": ">=12.13.0"
   },
   "dependencies": {
-    "@elastic.io/object-storage-client": "0.0.1-dev.12",
+    "@elastic.io/object-storage-client": "0.0.2-dev",
     "amqplib": "0.5.1",
     "bunyan": "1.8.10",
     "co": "4.6.0",
@@ -39,7 +39,7 @@
     "gulp-istanbul": "1.1.1",
     "gulp-jasmine": "0.2.0",
     "jasmine-node": "3.0.0",
-    "mocha": "7.1.2",
+    "mocha": "^7.1.2",
     "nock": "^12.0.3",
     "request": "2.88.0",
     "sinon": "^9.0.2",
