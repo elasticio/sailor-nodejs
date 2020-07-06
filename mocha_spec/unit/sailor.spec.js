@@ -1,5 +1,6 @@
 const chai = require('chai');
 const sinon = require('sinon');
+const { Readable } = require('stream');
 const { expect } = chai;
 chai.use(require('sinon-chai'));
 
@@ -49,6 +50,9 @@ describe('Sailor', () => {
 
         envVars.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
         envVars.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
+
+        envVars.ELASTICIO_OBJECT_STORAGE_URI = 'http://maester.service:3002';
+        envVars.ELASTICIO_OBJECT_STORAGE_TOKEN = 'this is jwt token, believe me!';
 
         settings = Settings.readFrom(envVars);
         encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
@@ -234,7 +238,7 @@ describe('Sailor', () => {
             expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
             expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
-                { items: [1, 2, 3, 4, 5, 6] },
+                { headers: {}, body: { items: [1, 2, 3, 4, 5, 6] } },
                 sinon.match({
                     compId: '5559edd38968ec0736000456',
                     containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
@@ -282,7 +286,7 @@ describe('Sailor', () => {
             expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
             expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
-                { items: [1, 2, 3, 4, 5, 6] },
+                { headers: {}, body: { items: [1, 2, 3, 4, 5, 6] } },
                 sinon.match({
                     first: 'first',
                     secondElasticioEnv: 'second',
@@ -348,6 +352,7 @@ describe('Sailor', () => {
             expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
             expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                 {
+                    headers: {},
                     body: {
                         param1: 'Value1'
                     },
@@ -358,6 +363,7 @@ describe('Sailor', () => {
                             }
                         },
                         step_1: {
+                            headers: {},
                             body: { param1: 'Value1' }
                         }
                     }
@@ -410,6 +416,7 @@ describe('Sailor', () => {
                 expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                 expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                     {
+                        headers: {},
                         body: {
                             param1: 'Value1'
                         },
@@ -473,6 +480,7 @@ describe('Sailor', () => {
                 expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                 expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                     {
+                        headers: {},
                         body: {
                             param1: 'Value1'
                         },
@@ -875,6 +883,7 @@ describe('Sailor', () => {
 
             expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
                 {
+                    headers: {},
                     body: {}
                 },
                 sinon.match({
@@ -948,6 +957,562 @@ describe('Sailor', () => {
 
             // ack
             expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+        });
+
+        describe('for incoming lightweight message', () => {
+            let message;
+            let payload;
+            let bodyObjectId;
+            let passthroughObjectId;
+            let body;
+            let passThroughBody;
+
+            beforeEach(() => {
+                bodyObjectId = 'body-object-id';
+                passthroughObjectId = 'passthrough-object-id';
+                body = {
+                    some: 'body'
+                };
+                passThroughBody = {
+                    passThrough: 'body'
+                };
+                payload = {
+                    headers: {
+                        [Sailor.OBJECT_ID_HEADER]: bodyObjectId
+                    },
+                    body: {},
+                    passthrough: {
+                        step_2: {
+                            body: {
+                                step_1: 'body'
+                            }
+                        },
+                        step_3: {
+                            headers: {},
+                            body: {
+                                step_2: 'body'
+                            }
+                        },
+                        step_4: {
+                            headers: {
+                                [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                            },
+                            body: {}
+                        }
+                    }
+                };
+                message = {
+                    fields: {
+                        consumerTag: 'abcde',
+                        deliveryTag: 12345,
+                        exchange: 'test',
+                        routingKey: 'test.hello'
+                    },
+                    properties: {
+                        contentType: 'application/json',
+                        contentEncoding: 'utf8',
+                        headers: {
+                            taskId: '5559edd38968ec0736000003',
+                            execId: 'some-exec-id',
+                            userId: '5559edd38968ec0736000002',
+                            workspaceId: '5559edd38968ec073600683',
+                            threadId: uuid.v4(),
+                            messageId: uuid.v4(),
+                            parentMessageId: uuid.v4()
+                        },
+                        deliveryMode: undefined,
+                        priority: undefined,
+                        correlationId: undefined,
+                        replyTo: undefined,
+                        expiration: undefined,
+                        messageId: undefined,
+                        timestamp: undefined,
+                        type: undefined,
+                        userId: undefined,
+                        appId: undefined,
+                        mandatory: true,
+                        clusterId: ''
+                    },
+                    content: Buffer.from(encryptor.encryptMessageContent(payload))
+                };
+            });
+
+            describe('when autoResolveObjectReference enabled', () => {
+                let sailor;
+                beforeEach(async () => {
+                    settings.FUNCTION = 'data_trigger';
+                    sailor = new Sailor(settings);
+
+                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
+                        expect(taskId).to.deep.equal('5559edd38968ec0736000003');
+                        expect(stepId).to.deep.equal('step_1');
+
+                        return Promise.resolve({
+                            is_passthrough: true
+                        });
+                    });
+
+                    await sailor.connect();
+                    await sailor.prepare();
+                });
+
+                describe('and all objects can be downloaded successfully', () => {
+                    let bodyRequestStub;
+                    let passthroughRequestStub;
+                    let runExecSpy;
+                    beforeEach(async () => {
+                        const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
+                        bodyRequestStub = getObjectStub
+                            .withArgs(bodyObjectId, settings.OBJECT_STORAGE_TOKEN)
+                            .resolves(body);
+                        passthroughRequestStub = bodyRequestStub
+                            .withArgs(passthroughObjectId)
+                            .resolves(passThroughBody);
+
+                        runExecSpy = sandbox.spy(sailor, 'runExec');
+                    });
+
+                    it('should fetch message bodies and process', async () => {
+                        await sailor.processMessage(payload, message);
+                        // await new Promise(resolve => setTimeout(resolve, 50));
+                        expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+                        expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
+                        sinon.assert.calledOnce(bodyRequestStub);
+                        sinon.assert.calledOnce(passthroughRequestStub);
+                        sinon.assert.calledOnce(runExecSpy);
+                        sinon.assert.calledWith(
+                            runExecSpy,
+                            sinon.match.object,
+                            sinon.match
+                                .hasNested('body', body)
+                                .and(sinon.match.hasNested('passthrough.step_4.body', passThroughBody)),
+                            message,
+                            sinon.match.object,
+                            sinon.match.object,
+                            sinon.match.number,
+                            sinon.match.object
+                        );
+                        expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
+                            {
+                                headers: {},
+                                body: { items: [1, 2, 3, 4, 5, 6] },
+                                passthrough: {
+                                    step_1: {
+                                        headers: {},
+                                        body: { items: [1, 2, 3, 4, 5, 6] }
+                                    },
+                                    step_2: {
+                                        body: { step_1: 'body' }
+                                    },
+                                    step_3: {
+                                        body: { step_2: 'body' },
+                                        headers: {}
+                                    },
+                                    step_4: {
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                                        },
+                                        body: passThroughBody
+                                    }
+                                }
+                            },
+                            sinon.match({
+                                compId: '5559edd38968ec0736000456',
+                                containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
+                                end: sinon.match.number,
+                                execId: 'some-exec-id',
+                                function: 'data_trigger',
+                                messageId: sinon.match.string,
+                                parentMessageId: message.properties.headers.messageId,
+                                start: sinon.match.number,
+                                stepId: 'step_1',
+                                taskId: '5559edd38968ec0736000003',
+                                threadId: message.properties.headers.threadId,
+                                userId: '5559edd38968ec0736000002',
+                                workspaceId: '5559edd38968ec073600683'
+                            })
+                        );
+
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                    });
+                });
+
+                describe('and one object can not be downloaded successfully', () => {
+                    let bodyRequestStub;
+                    let passthroughRequestStub;
+                    let runExecSpy;
+                    beforeEach(async () => {
+                        const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
+                        bodyRequestStub = getObjectStub
+                            .withArgs(bodyObjectId, settings.OBJECT_STORAGE_TOKEN)
+                            .resolves(body);
+                        passthroughRequestStub = bodyRequestStub.withArgs(passthroughObjectId).rejects(new Error());
+
+                        runExecSpy = sandbox.spy(sailor, 'runExec');
+                    });
+
+                    it('should fetch message bodies and reject', async () => {
+                        await sailor.processMessage(payload, message);
+                        expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+                        expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
+                        sinon.assert.calledOnce(bodyRequestStub);
+                        sinon.assert.calledOnce(passthroughRequestStub);
+                        sinon.assert.notCalled(runExecSpy);
+
+                        expect(fakeAMQPConnection.sendError).to.have.been.calledOnce.and.calledWith(
+                            sinon.match({
+                                message: `Failed to get message body with id=${passthroughObjectId}`,
+                                stack: sinon.match.string
+                            }),
+                            sinon.match.object,
+                            message
+                        );
+
+                        expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+                    });
+                });
+            });
+
+            describe('when autoResolveObjectReference disabled', () => {
+                let sailor;
+                let runExecSpy;
+                let passthroughRequestStub;
+                beforeEach(async () => {
+                    settings.FUNCTION = 'data_trigger';
+                    settings.COMPONENT_PATH = '/spec/component-auto-resolve-object-refs-false';
+                    sailor = new Sailor(settings);
+
+                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
+                        expect(taskId).to.deep.equal('5559edd38968ec0736000003');
+                        expect(stepId).to.deep.equal('step_1');
+
+                        return Promise.resolve({
+                            is_passthrough: true
+                        });
+                    });
+
+                    runExecSpy = sandbox.spy(sailor, 'runExec');
+
+                    passthroughRequestStub = sandbox
+                        .stub(sailor.objectStorage, 'getAsJSON')
+                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
+                        .resolves(passThroughBody);
+
+                    await sailor.connect();
+                    await sailor.prepare();
+                });
+
+                it('should not fetch message bodies and process', async () => {
+                    await sailor.processMessage(payload, message);
+                    await new Promise(resolve => setTimeout(resolve, 50)); // wait for upload
+                    expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+                    expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
+                    sinon.assert.calledOnce(passthroughRequestStub);
+                    sinon.assert.calledOnce(runExecSpy);
+                    sinon.assert.calledWith(
+                        runExecSpy,
+                        sinon.match.object,
+                        payload,
+                        message,
+                        sinon.match.object,
+                        sinon.match.object,
+                        sinon.match.number,
+                        sinon.match.object
+                    );
+                    expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
+                        {
+                            headers: {},
+                            body: { items: [1, 2, 3, 4, 5, 6] },
+                            passthrough: {
+                                step_1: {
+                                    headers: {},
+                                    body: { items: [1, 2, 3, 4, 5, 6] }
+                                },
+                                step_2: {
+                                    body: { step_1: 'body' }
+                                },
+                                step_3: {
+                                    body: { step_2: 'body' },
+                                    headers: {}
+                                },
+                                step_4: {
+                                    headers: {
+                                        [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                                    },
+                                    body: passThroughBody
+                                }
+                            }
+                        },
+                        sinon.match({
+                            compId: '5559edd38968ec0736000456',
+                            containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
+                            end: sinon.match.number,
+                            execId: 'some-exec-id',
+                            function: 'data_trigger',
+                            messageId: sinon.match.string,
+                            parentMessageId: message.properties.headers.messageId,
+                            start: sinon.match.number,
+                            stepId: 'step_1',
+                            taskId: '5559edd38968ec0736000003',
+                            threadId: message.properties.headers.threadId,
+                            userId: '5559edd38968ec0736000002',
+                            workspaceId: '5559edd38968ec073600683'
+                        })
+                    );
+
+                    expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                });
+            });
+        });
+
+        describe('when outgoing lightweight is enabled', () => {
+            let payload;
+            let sailor;
+            let passthroughObjectId;
+            beforeEach(async () => {
+                passthroughObjectId = 'passthrough-object-id';
+                payload = {
+                    headers: {},
+                    body: {
+                        some: 'body'
+                    },
+                    passthrough: {
+                        step_2: {
+                            headers: {
+                                [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                            },
+                            body: {}
+                        },
+                        step_3: {
+                            headers: {},
+                            body: {
+                                pass: 'body'
+                            }
+                        }
+                    }
+                };
+                settings.FUNCTION = 'data_trigger';
+                settings.EMIT_LIGHTWEIGHT_MESSAGE = true;
+            });
+
+            describe('when message is above OBJECT_STORAGE_SIZE_THRESHOLD', () => {
+                beforeEach(async () => {
+                    settings.OBJECT_STORAGE_SIZE_THRESHOLD = 1;
+                    sailor = new Sailor(settings);
+
+                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
+                        expect(taskId).to.deep.equal('5559edd38968ec0736000003');
+                        expect(stepId).to.deep.equal('step_1');
+
+                        return Promise.resolve({
+                            is_passthrough: true
+                        });
+                    });
+
+                    sandbox.stub(sailor.objectStorage, 'getAsJSON')
+                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
+                        .resolves({ passthrough: 'body' });
+
+                    await sailor.connect();
+                    await sailor.prepare();
+                });
+
+                describe('and all objects can be uploaded successfully', () => {
+                    let addObjectStub;
+                    let bodyObjectId;
+                    beforeEach(async () => {
+                        bodyObjectId = 'body-object-id';
+                        addObjectStub = sandbox.stub(sailor.objectStorage, 'addAsStream').resolves(bodyObjectId);
+                    });
+
+                    it('should send lightweight', async () => {
+                        await sailor.processMessage(payload, message);
+                        await new Promise(resolve => setTimeout(resolve, 10)); //wait for upload
+                        expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+                        expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
+                        sinon.assert.calledTwice(addObjectStub);
+                        sinon.assert.calledWith(
+                            addObjectStub,
+                            sinon.match.instanceOf(Readable), settings.OBJECT_STORAGE_TOKEN
+                        );
+                        sinon.assert.notCalled(fakeAMQPConnection.sendError);
+                        expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
+                            {
+                                body: {},
+                                headers: { [Sailor.OBJECT_ID_HEADER]: bodyObjectId },
+                                passthrough: {
+                                    ...payload.passthrough,
+                                    step_2: {
+                                        body: {},
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
+                                        }
+                                    },
+                                    step_1: {
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: bodyObjectId
+                                        },
+                                        body: {}
+                                    },
+                                    step_3: {
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: bodyObjectId
+                                        },
+                                        body: {}
+                                    }
+                                }
+                            },
+                            sinon.match({
+                                compId: '5559edd38968ec0736000456',
+                                containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
+                                end: sinon.match.number,
+                                execId: 'some-exec-id',
+                                function: 'data_trigger',
+                                messageId: sinon.match.string,
+                                parentMessageId: message.properties.headers.messageId,
+                                start: sinon.match.number,
+                                stepId: 'step_1',
+                                taskId: '5559edd38968ec0736000003',
+                                threadId: message.properties.headers.threadId,
+                                userId: '5559edd38968ec0736000002',
+                                workspaceId: '5559edd38968ec073600683'
+                            })
+                        );
+
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                    });
+                });
+
+                describe('and objects can not be uploaded successfully', () => {
+                    let addObjectStub;
+                    beforeEach(async () => {
+                        addObjectStub = sandbox.stub(sailor.objectStorage, 'addAsStream').rejects(new Error());
+                    });
+
+                    it('should not upload lightweight', async () => {
+                        await sailor.processMessage(payload, message);
+                        await new Promise(resolve => setTimeout(resolve, 100)); //wait for upload
+                        expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+                        expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
+                        sinon.assert.calledTwice(addObjectStub);
+                        sinon.assert.calledWith(
+                            addObjectStub,
+                            sinon.match.instanceOf(Readable), settings.OBJECT_STORAGE_TOKEN
+                        );
+                        sinon.assert.notCalled(fakeAMQPConnection.sendError);
+                        sinon.assert.calledOnce(fakeAMQPConnection.sendData);
+                        sinon.assert.calledWith(
+                            fakeAMQPConnection.sendData,
+                            {
+                                body: { items: [1,2,3,4,5,6] },
+                                headers: {},
+                                passthrough: {
+                                    ...payload.passthrough,
+                                    step_2: {
+                                        body: {},
+                                        headers: {
+                                            [Sailor.OBJECT_ID_HEADER]: passthroughObjectId //reuse already uploaded
+                                        }
+                                    },
+                                    step_1: {
+                                        headers: {},
+                                        body: { items: [1,2,3,4,5,6] }
+                                    }
+                                }
+                            },
+                            sinon.match({
+                                compId: '5559edd38968ec0736000456',
+                                containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
+                                end: sinon.match.number,
+                                execId: 'some-exec-id',
+                                function: 'data_trigger',
+                                messageId: sinon.match.string,
+                                parentMessageId: message.properties.headers.messageId,
+                                start: sinon.match.number,
+                                stepId: 'step_1',
+                                taskId: '5559edd38968ec0736000003',
+                                threadId: message.properties.headers.threadId,
+                                userId: '5559edd38968ec0736000002',
+                                workspaceId: '5559edd38968ec073600683'
+                            })
+                        );
+
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                        const [{ headers, passthrough }] = fakeAMQPConnection.sendData.getCall(0).args;
+                    });
+                });
+            });
+
+            describe('when message is below OBJECT_STORAGE_SIZE_THRESHOLD', () => {
+                beforeEach(async () => {
+                    settings.OBJECT_STORAGE_SIZE_THRESHOLD = 61;
+                    sailor = new Sailor(settings);
+
+                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
+                        expect(taskId).to.deep.equal('5559edd38968ec0736000003');
+                        expect(stepId).to.deep.equal('step_1');
+
+                        return Promise.resolve({
+                            is_passthrough: true
+                        });
+                    });
+
+                    sandbox.stub(sailor.objectStorage, 'getAsJSON')
+                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
+                        .resolves({ passthrough: 'body' });
+
+                    await sailor.connect();
+                    await sailor.prepare();
+                });
+
+                describe('and all objects can be uploaded successfully', () => {
+                    let addObjectSpy;
+                    beforeEach(async () => {
+                        addObjectSpy = sandbox.spy(sailor.objectStorage, 'addAsStream');
+                    });
+
+                    it('should not send lightweight', async () => {
+                        await sailor.processMessage(payload, message);
+                        await new Promise(resolve => setTimeout(resolve, 10)); //wait for upload
+                        expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
+                        expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
+                        sinon.assert.notCalled(addObjectSpy);
+                        sinon.assert.notCalled(fakeAMQPConnection.sendError);
+                        sinon.assert.calledOnce(fakeAMQPConnection.sendData);
+                        sinon.assert.calledWith(
+                            fakeAMQPConnection.sendData,
+                            {
+                                body: { items: [1, 2, 3, 4, 5, 6] },
+                                headers: {},
+                                passthrough: {
+                                    ...payload.passthrough,
+                                    step_1: {
+                                        body: { items: [1, 2, 3, 4, 5, 6] },
+                                        headers: {}
+                                    }
+                                }
+                            },
+                            sinon.match({
+                                compId: '5559edd38968ec0736000456',
+                                containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
+                                end: sinon.match.number,
+                                execId: 'some-exec-id',
+                                function: 'data_trigger',
+                                messageId: sinon.match.string,
+                                parentMessageId: message.properties.headers.messageId,
+                                start: sinon.match.number,
+                                stepId: 'step_1',
+                                taskId: '5559edd38968ec0736000003',
+                                threadId: message.properties.headers.threadId,
+                                userId: '5559edd38968ec0736000002',
+                                workspaceId: '5559edd38968ec073600683'
+                            })
+                        );
+
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                    });
+                });
+            });
         });
     });
 });
