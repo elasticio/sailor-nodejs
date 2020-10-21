@@ -13,6 +13,7 @@
 ## 2.6.14 (July 06, 2020)
 
 * Add Lightweight messages support
+* Sync this.emit() calls are not supported anymore. Use async process() interface and await this.emit() calls instead
 
 ## 2.6.13 (July 01, 2020)
 
@@ -75,6 +76,7 @@
 ## 2.4.0 (June 11, 2019)
 
 * Add elastic's Threads functionality support
+* Add component custom logger. E.g. `this.logger.info('hello')`
 
 ## 2.3.0 (October 19, 2018)
 
