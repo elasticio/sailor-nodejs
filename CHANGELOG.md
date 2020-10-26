@@ -1,3 +1,7 @@
+## 2.6.18 (October 26, 2020)
+
+* Remove the logging of triggers and actions processing errors stack 
+
 ## 2.6.17 (October 15, 2020)
 
 * Annual audit of the component code to check if it exposes a sensitive data in the logs
