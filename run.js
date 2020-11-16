@@ -56,6 +56,10 @@ function _disconnectOnly() {
     return sailor.disconnect();
 }
 
+function _closeConsumerChannel() {
+    return sailor.amqpConnection.consumerChannel.close();
+}
+
 function gracefulShutdown() {
     if (!disconnectRequired) {
         return;
@@ -81,7 +85,9 @@ async function run(settings) {
 }
 
 exports._disconnectOnly = _disconnectOnly;
+exports._closeConsumerChannel = _closeConsumerChannel;
 exports.run = run;
+exports.putOutToSea = putOutToSea;
 
 if (require.main === module || process.mainModule.filename === __filename) {
     process.on('SIGTERM', function onSigterm() {

@@ -59,10 +59,9 @@ class AmqpHelper extends EventEmitter {
     *prepareQueues() {
         const amqp = yield amqplib.connect(this.env.ELASTICIO_AMQP_URI);
         this._amqp = amqp;
-        const subscriptionChannel = yield amqp.createChannel();
         const publishChannel = yield amqp.createChannel();
 
-        yield subscriptionChannel.assertQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
+        yield this.prepareListen();
         yield publishChannel.assertQueue(this.nextStepQueue);
         yield publishChannel.assertQueue(this.nextStepErrorQueue);
 
@@ -71,13 +70,7 @@ class AmqpHelper extends EventEmitter {
             autoDelete: false
         };
 
-        yield subscriptionChannel.assertExchange(this.env.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', exchangeOptions);
         yield publishChannel.assertExchange(this.env.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
-
-        yield subscriptionChannel.bindQueue(
-            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
-            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
-            this.env.ELASTICIO_DATA_ROUTING_KEY);
 
         yield publishChannel.bindQueue(
             this.nextStepQueue,
@@ -100,8 +93,25 @@ class AmqpHelper extends EventEmitter {
         yield publishChannel.purgeQueue(this.httpReplyQueueName);
         yield publishChannel.purgeQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
 
-        this.subscriptionChannel = subscriptionChannel;
         this.publishChannel = publishChannel;
+    }
+
+    async prepareListen() {
+        const subscriptionChannel = await this._amqp.createChannel();
+        subscriptionChannel.assertQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
+        await subscriptionChannel.assertExchange(this.env.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', {
+            durable: true,
+            autoDelete: false
+        });
+        await subscriptionChannel.bindQueue(
+            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
+            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
+            this.env.ELASTICIO_DATA_ROUTING_KEY);
+        this.subscriptionChannel = subscriptionChannel;
+    }
+
+    removeListenQueue() {
+        return this.subscriptionChannel.deleteQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
     }
 
     cleanUp() {
@@ -183,6 +193,7 @@ class AmqpHelper extends EventEmitter {
 
 function prepareEnv() {
     const env = {};
+    env.LOG_LEVEL = process.env.LOG_LEVEL;
     env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672';
     env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '1';
     env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
