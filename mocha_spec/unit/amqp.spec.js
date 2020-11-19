@@ -1092,9 +1092,13 @@ describe('AMQP', () => {
 
         await amqp.connect();
 
-        amqp.listenQueue('testQueue', clientFunction);
-        await new Promise(resolve => setImmediate(resolve));
-        amqp.stopConsume();
+        await Promise.all([
+            amqp.listenQueue('testQueue', clientFunction),
+            (async () => {
+                await new Promise(resolve => setImmediate(resolve));
+                await amqp.disconnect();
+            })()
+        ]);
         expect(rejectedMessage).to.be.undefined;
         expect(clientFunction).to.have.been.calledOnce.and.calledWith(
             {
