@@ -81,7 +81,7 @@ describe('Integration Test', () => {
                     encoding = protocolVersion < 2 ? 'base64' : undefined;
                 });
 
-                it('should run trigger successfully for input protocolVersion 1', async () => {
+                it('should run trigger successfully', async () => {
                     helpers.mockApiTaskStepResponse(env);
 
                     nock('https://api.acme.com')
@@ -96,13 +96,11 @@ describe('Integration Test', () => {
                         parentMessageId,
                         threadId
                     });
-                    const [{ message, queueName }] = await Promise.all([
-                        new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        )),
-                        runner.run(settings.readFrom(env))
-                    ]);
+                    runner.run(settings.readFrom(env));
+                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                        'data',
+                        (message, queueName) => resolve({ message, queueName })
+                    ));
 
                     const { properties, content } = message;
                     const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -158,6 +156,80 @@ describe('Integration Test', () => {
                     });
                 });
 
+                it('should run trigger successfully', async () => {
+                    helpers.mockApiTaskStepResponse(env);
+
+                    nock('https://api.acme.com')
+                        .post('/subscribe')
+                        .reply(200, {
+                            id: 'subscription_12345'
+                        })
+                        .get('/customers')
+                        .reply(200, customers);
+
+                    await amqpHelper.publishMessage(inputMessage, {
+                        parentMessageId,
+                        threadId
+                    });
+                    runner.run(settings.readFrom(env));
+                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                        'data',
+                        (message, queueName) => resolve({ message, queueName })
+                    ));
+
+                    const { properties, content } = message;
+                    const { body } = encryptor.decryptMessageContent(content, encoding);
+                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+
+                    expect(properties.headers.messageId).to.be.a('string');
+                    delete properties.headers.start;
+                    delete properties.headers.end;
+                    delete properties.headers.cid;
+                    delete properties.headers.messageId;
+
+                    expect(properties.headers).to.deep.equal({
+                        execId: env.ELASTICIO_EXEC_ID,
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        threadId,
+                        parentMessageId,
+                        protocolVersion: protocolVersion
+                    });
+
+                    delete properties.headers;
+
+                    expect(properties).to.deep.equal({
+                        contentType: 'application/json',
+                        contentEncoding: 'utf8',
+                        deliveryMode: undefined,
+                        priority: undefined,
+                        correlationId: undefined,
+                        replyTo: undefined,
+                        expiration: undefined,
+                        messageId: undefined,
+                        timestamp: undefined,
+                        type: undefined,
+                        userId: undefined,
+                        appId: undefined,
+                        clusterId: undefined
+                    });
+
+                    expect(body).to.deep.equal({
+                        originalMsg: inputMessage,
+                        customers: customers,
+                        subscription: {
+                            id: 'subscription_12345',
+                            cfg: {
+                                apiKey: 'secret'
+                            }
+                        }
+                    });
+                });
 
                 it('should run trigger successfully for input protocolVersion 2', async () => {
                     helpers.mockApiTaskStepResponse(env);
@@ -181,13 +253,11 @@ describe('Integration Test', () => {
                         }
                     );
 
-                    const [{ message, queueName }] = await Promise.all([
-                        new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        )),
-                        runner.run(settings.readFrom(env))
-                    ]);
+                    runner.run(settings.readFrom(env));
+                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                        'data',
+                        (message, queueName) => resolve({ message, queueName })
+                    ));
 
                     const { properties, content } = message;
                     const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -274,13 +344,11 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    const [{ message, queueName }] = await Promise.all([
-                        new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        )),
-                        runner.run(settings.readFrom(env))
-                    ]);
+                    runner.run(settings.readFrom(env));
+                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                        'data',
+                        (message, queueName) => resolve({ message, queueName })
+                    ));
 
                     const { properties, content } = message;
                     const { passthrough } = encryptor.decryptMessageContent(content, encoding);
@@ -368,13 +436,11 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        const [{ message, queueName }] = await Promise.all([
-                            new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            )),
-                            runner.run(sailorSettings)
-                        ]);
+                        runner.run(sailorSettings);
+                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                            'data',
+                            (message, queueName) => resolve({ message, queueName })
+                        ));
 
                         const { properties, content } = message;
                         const { passthrough } = encryptor.decryptMessageContent(content, encoding);
@@ -462,13 +528,11 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    const [{ message, queueName }] = await Promise.all([
-                        new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        )),
-                        runner.run(settings.readFrom(env))
-                    ]);
+                    runner.run(settings.readFrom(env));
+                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                        'data',
+                        (message, queueName) => resolve({ message, queueName })
+                    ));
 
                     const { properties, content } = message;
                     const { passthrough } = encryptor.decryptMessageContent(content, encoding);
@@ -529,6 +593,90 @@ describe('Integration Test', () => {
                     });
                 });
 
+
+                it('should reopen if consumer channel closed', async () => {
+                    helpers.mockApiTaskStepResponse(env);
+
+                    nock('https://api.acme.com')
+                        .post('/subscribe')
+                        .reply(200, {
+                            id: 'subscription_12345'
+                        })
+                        .get('/customers')
+                        .reply(200, customers);
+
+
+                    runner.run(settings.readFrom(env));
+
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    await runner._closeConsumerChannel();
+
+                    await amqpHelper.publishMessage(inputMessage, {
+                        parentMessageId,
+                        threadId
+                    });
+
+                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                        'data',
+                        (message, queueName) => resolve({ message, queueName })
+                    ));
+
+                    const { properties, content } = message;
+                    const { body } = encryptor.decryptMessageContent(content, encoding);
+                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+
+                    expect(properties.headers.messageId).to.be.a('string');
+                    delete properties.headers.start;
+                    delete properties.headers.end;
+                    delete properties.headers.cid;
+                    delete properties.headers.messageId;
+
+                    expect(properties.headers).to.deep.equal({
+                        execId: env.ELASTICIO_EXEC_ID,
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        threadId,
+                        parentMessageId,
+                        protocolVersion: protocolVersion
+                    });
+
+                    delete properties.headers;
+
+                    expect(properties).to.deep.equal({
+                        contentType: 'application/json',
+                        contentEncoding: 'utf8',
+                        deliveryMode: undefined,
+                        priority: undefined,
+                        correlationId: undefined,
+                        replyTo: undefined,
+                        expiration: undefined,
+                        messageId: undefined,
+                        timestamp: undefined,
+                        type: undefined,
+                        userId: undefined,
+                        appId: undefined,
+                        clusterId: undefined
+                    });
+
+                    expect(body).to.deep.equal({
+                        originalMsg: inputMessage,
+                        customers: customers,
+                        subscription: {
+                            id: 'subscription_12345',
+                            cfg: {
+                                apiKey: 'secret'
+                            }
+                        }
+                    });
+
+                });
+
                 describe('when env ELASTICIO_STARTUP_REQUIRED is set', () => {
                     let sailorSettings;
                     beforeEach(() => {
@@ -575,13 +723,11 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            const [{ message, queueName }] = await Promise.all([
-                                new Promise(resolve => amqpHelper.on(
-                                    'data',
-                                    (message, queueName) => resolve({ message, queueName })
-                                )),
-                                runner.run(sailorSettings)
-                            ]);
+                            runner.run(sailorSettings);
+                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                                'data',
+                                (message, queueName) => resolve({ message, queueName })
+                            ));
 
                             const { properties, content } = message;
                             const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -697,13 +843,11 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            const [{ message, queueName }] = await Promise.all([
-                                new Promise(resolve => amqpHelper.on(
-                                    'data',
-                                    (message, queueName) => resolve({ message, queueName })
-                                )),
-                                runner.run(sailorSettings)
-                            ]);
+                            runner.run(sailorSettings);
+                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                                'data',
+                                (message, queueName) => resolve({ message, queueName })
+                            ));
 
                             const { properties, content } = message;
                             const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -803,13 +947,11 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            const [{ message, queueName }] = await Promise.all([
-                                new Promise(resolve => amqpHelper.on(
-                                    'data',
-                                    (message, queueName) => resolve({ message, queueName })
-                                )),
-                                runner.run(sailorSettings)
-                            ]);
+                            runner.run(sailorSettings);
+                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                                'data',
+                                (message, queueName) => resolve({ message, queueName })
+                            ));
 
                             const { properties, content } = message;
                             const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -875,13 +1017,11 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            const [{ message, queueName }] = await Promise.all([
-                                new Promise(resolve => amqpHelper.on(
-                                    'data',
-                                    (message, queueName) => resolve({ message, queueName })
-                                )),
-                                runner.run(sailorSettings)
-                            ]);
+                            runner.run(sailorSettings);
+                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                                'data',
+                                (message, queueName) => resolve({ message, queueName })
+                            ));
 
                             const { properties, content } = message;
                             const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -953,13 +1093,11 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        const [{ message, queueName }] = await Promise.all([
-                            new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            )),
-                            runner.run(settings.readFrom(env))
-                        ]);
+                        runner.run(settings.readFrom(env));
+                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                            'data',
+                            (message, queueName) => resolve({ message, queueName })
+                        ));
 
 
                         const { properties, content } = message;
@@ -1023,14 +1161,11 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-
-                        const [{ message, queueName }] = await Promise.all([
-                            new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            )),
-                            runner.run(settings.readFrom(env))
-                        ]);
+                        runner.run(settings.readFrom(env));
+                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                            'data',
+                            (message, queueName) => resolve({ message, queueName })
+                        ));
 
                         const { properties, content } = message;
                         const emittedMessage = encryptor.decryptMessageContent(content, 'base64');
@@ -1081,13 +1216,11 @@ describe('Integration Test', () => {
                         const sailorSettings = settings.readFrom(env);
                         sailorSettings.FUNCTION = 'fails_to_init';
 
-                        const [{ message, queueName }] = await Promise.all([
-                            new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            )),
-                            runner.run(sailorSettings)
-                        ]);
+                        runner.run(settings.readFrom(env));
+                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
+                            'data',
+                            (message, queueName) => resolve({ message, queueName })
+                        ));
 
                         const { properties, content } = message;
                         const emittedMessage = JSON.parse(content);
@@ -1108,6 +1241,35 @@ describe('Integration Test', () => {
                 });
             });
         }
+
+        it('should fail if queue deleted', async () => {
+            helpers.mockApiTaskStepResponse(env);
+
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .reply(200, customers);
+
+            await amqpHelper.publishMessage(inputMessage, {
+                parentMessageId,
+                threadId
+            });
+            try {
+                await Promise.all([
+                    runner.putOutToSea(settings.readFrom(env)),
+                    amqpHelper.removeListenQueue()
+                ]);
+            } catch (e) {
+                expect(e).to.be.ok;
+                await runner._disconnectOnly();
+                return;
+            }
+
+            throw new Error('Error expected!');
+        });
 
     });
 
@@ -1145,12 +1307,10 @@ describe('Integration Test', () => {
 
                 helpers.mockApiTaskStepResponse(env);
 
-                await Promise.all([
-                    runner.run(sailorSettings),
-                    new Promise(resolve =>
-                        // hooksDataDeleteNock.on('replied', () => setTimeout(() => resolve(), 50)))
-                        hooksDataDeleteNock.on('replied', () => resolve()))
-                ]);
+                runner.run(sailorSettings);
+                await new Promise(resolve =>
+                    // hooksDataDeleteNock.on('replied', () => setTimeout(() => resolve(), 50)))
+                    hooksDataDeleteNock.on('replied', () => resolve()));
 
                 expect(hooksDataGetNock.isDone()).to.be.ok;
 

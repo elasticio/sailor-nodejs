@@ -1023,23 +1023,23 @@ describe('AMQP', () => {
 
     it('Should ack message when confirmed', () => {
         const amqp = new Amqp(settings);
-        amqp.subscribeChannel = {
+        amqp.consumerChannel = {
             ack: sandbox.stub()
         };
 
         amqp.ack(message);
 
-        expect(amqp.subscribeChannel.ack).to.have.been.calledOnce.and.calledWith(message);
+        expect(amqp.consumerChannel.ack).to.have.been.calledOnce.and.calledWith(message);
     });
 
     it('Should reject message when ack is called with false', () => {
         const amqp = new Amqp(settings);
-        amqp.subscribeChannel = {
+        amqp.consumerChannel = {
             reject: sandbox.stub()
         };
         amqp.reject(message);
 
-        expect(amqp.subscribeChannel.reject).to.have.been.calledOnce.and.calledWith(message, false);
+        expect(amqp.consumerChannel.reject).to.have.been.calledOnce.and.calledWith(message, false);
     });
 
     it('Should listen queue and pass decrypted message to client function with protocol version 1', async () => {
@@ -1077,30 +1077,29 @@ describe('AMQP', () => {
             )
         };
 
-        const amqp = new Amqp(settings);
         let rejectedMessage;
-        const clientFunction = sandbox.stub();
-        amqp.subscribeChannel = {
-            consume: sandbox.stub(),
+        const amqp = new Amqp(settings);
+        const consumerChannel = {
+            get: sandbox.stub().onFirstCall().resolves(message).resolves(),
             prefetch: sandbox.stub(),
-            reject: sandbox.stub()
+            reject: sandbox.stub().callsFake(message => {
+                rejectedMessage = message;
+            })
         };
-        amqp.subscribeChannel.consume.callsFake((queueName, callback) => {
-            callback(message);
-            return {
-                consumerTag: message.fields.consumerTag
-            };
-        });
-        amqp.subscribeChannel.reject.callsFake(message => {
-            rejectedMessage = message;
-        });
+        sandbox.stub(amqp, '_ensurePublishChannel').resolves();
+        sandbox.stub(amqp, '_ensureConsumerChannel').resolves(consumerChannel);
+        const clientFunction = sandbox.stub();
 
-        await amqp.listenQueue('testQueue', clientFunction);
-        while (clientFunction.callCount <= 0 && !rejectedMessage) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        await amqp.connect();
+
+        await Promise.all([
+            amqp.listenQueue('testQueue', clientFunction),
+            (async () => {
+                await new Promise(resolve => setImmediate(resolve));
+                await amqp.disconnect();
+            })()
+        ]);
         expect(rejectedMessage).to.be.undefined;
-        expect(amqp.subscribeChannel.prefetch).to.have.been.calledOnce;
         expect(clientFunction).to.have.been.calledOnce.and.calledWith(
             {
                 headers: {
@@ -1112,26 +1111,25 @@ describe('AMQP', () => {
         );
     });
     it('Should listen queue and pass decrypted message to client function with protocol version 2', async () => {
+        let rejectedMessage;
         const amqp = new Amqp(settings);
-        const clientFunction = sandbox.stub();
-        amqp.subscribeChannel = {
-            consume: sandbox.stub(),
-            prefetch: sandbox.stub()
+        const consumerChannel = {
+            get: sandbox.stub().onFirstCall().resolves(message).resolves(),
+            prefetch: sandbox.stub(),
+            reject: sandbox.stub().callsFake(message => {
+                rejectedMessage = message;
+            })
         };
+        sandbox.stub(amqp, '_ensurePublishChannel').resolves();
+        sandbox.stub(amqp, '_ensureConsumerChannel').resolves(consumerChannel);
+        const clientFunction = sandbox.stub();
 
-        amqp.subscribeChannel.consume.callsFake((queueName, callback) => {
-            callback(message);
-            return {
-                consumerTag: message.fields.consumerTag
-            };
-        });
+        await amqp.connect();
 
-        await amqp.listenQueue('testQueue', clientFunction);
-        while (clientFunction.callCount <= 0) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        expect(amqp.subscribeChannel.prefetch).to.have.been.calledOnce.and.calledWith(1);
+        amqp.listenQueue('testQueue', clientFunction);
+        await new Promise(resolve => setImmediate(resolve));
+        amqp.stopConsume();
+        expect(rejectedMessage).to.be.undefined;
         expect(clientFunction).to.have.been.calledOnce.and.calledWith(
             {
                 headers: {
@@ -1502,127 +1500,34 @@ describe('AMQP', () => {
         });
     });
 
-    describe('_onMessage', () => {
-        let amqp;
-        beforeEach(() => {
-            settings = Settings.readFrom(envVars);
-            amqp = new Amqp(settings);
-        });
-        it('should simply return if message is null', () => {
-            const callbackStub = sandbox.stub();
-            amqp._onMessage(callbackStub, null);
-            expect(callbackStub).not.to.have.been.called;
-        });
-        it('should try to decode message', () => {
-            const callbackStub = sandbox.stub();
-            const message = {
-                properties: {
-                    headers: {
-                        flowId: 'XXX',
-                        stepId: 'step_1'
-                    }
-                },
-                content: Buffer.alloc(0)
-            };
-            sinon.stub(amqp, '_decodeMessage');
-            amqp._onMessage(callbackStub, message);
-            expect(amqp._decodeMessage).to.have.been.calledOnce.and.calledWith(message);
-        });
-        it('should reject message if failed to decode and not call callback', () => {
-            const callbackStub = sandbox.stub();
-            const message = {
-                properties: {
-                    headers: {
-                        flowId: 'XXX',
-                        stepId: 'step_1'
-                    }
-                },
-                fields: {
-                    deliveryTag: 'XXXXX'
-                },
-                content: Buffer.alloc(0)
-            };
-            sinon.stub(amqp, '_decodeMessage').throws(new Error('incorrect message'));
-            sinon.stub(amqp, 'reject');
-            amqp._onMessage(callbackStub, message);
-            expect(amqp._decodeMessage).to.have.been.calledOnce.and.calledWith(message);
-            expect(callbackStub).not.to.have.been.called;
-            expect(amqp.reject).to.have.been.calledOnce.and.calledWith(message);
-        });
-        it('should call callback with decoded message', () => {
-            const callbackStub = sandbox.stub();
-            const messageBody = {
-                headers: {
-                    'x-does-not-matter': 'value'
-                },
-                body: {
-                    key: 'value'
-                }
-            };
-            const message = {
-                properties: {
-                    headers: {
-                        flowId: 'XXX',
-                        stepId: 'step_1',
-                        protocolVersion: 2
-                    }
-                },
-                fields: {
-                    deliveryTag: 'XXXXX'
-                },
-                content: encryptor.encryptMessageContent(messageBody)
-            };
-            amqp._onMessage(callbackStub, message);
-            expect(callbackStub).to.have.been.calledOnce.and.calledWith(messageBody, message);
-        });
-        it('should reject message if callback throws', () => {
-            const callbackStub = sandbox.stub().throws(new Error('failed to process message'));
-            const messageBody = {
-                headers: {
-                    'x-does-not-matter': 'value'
-                },
-                body: {
-                    key: 'value'
-                }
-            };
-            const message = {
-                properties: {
-                    headers: {
-                        flowId: 'XXX',
-                        stepId: 'step_1',
-                        protocolVersion: 2
-                    }
-                },
-                fields: {
-                    deliveryTag: 'XXXXX'
-                },
-                content: encryptor.encryptMessageContent(messageBody)
-            };
-            sandbox.stub(amqp, 'reject');
-            amqp._onMessage(callbackStub, message);
-            expect(callbackStub).to.have.been.calledOnce.and.calledWith(messageBody, message);
-            expect(amqp.reject).to.have.been.calledOnce.and.calledWith(message);
-        });
-    });
-
     it('Should disconnect from all channels and connection', async () => {
         const amqp = new Amqp(settings);
-        amqp.subscribeChannel = {
-            close: sandbox.stub()
+        amqp.consumerChannel = {
+            close: sandbox.stub(),
+            removeAllListeners: sandbox.stub()
         };
         amqp.publishChannel = {
-            close: sandbox.stub()
+            close: sandbox.stub(),
+            removeAllListeners: sandbox.stub()
         };
-        amqp.amqp = {
+        amqp._readConnection = {
+            close: sandbox.stub(),
+            removeAllListeners: sandbox.stub()
+        };
+        amqp._writeConnection = {
             close: sandbox.stub(),
             removeAllListeners: sandbox.stub()
         };
 
         await amqp.disconnect();
-        expect(amqp.subscribeChannel.close).to.have.been.calledOnce;
+        expect(amqp.consumerChannel.close).to.have.been.calledOnce;
         expect(amqp.publishChannel.close).to.have.been.calledOnce;
-        expect(amqp.amqp.close).to.have.been.calledOnce;
-        expect(amqp.amqp.removeAllListeners).to.have.been.calledOnce.and.calledWith('close');
+        expect(amqp.consumerChannel.removeAllListeners).to.have.been.calledOnce.and.calledWith('close');
+        expect(amqp.publishChannel.removeAllListeners).to.have.been.calledOnce.and.calledWith('close');
+        expect(amqp._readConnection.close).to.have.been.calledOnce;
+        expect(amqp._readConnection.removeAllListeners).to.have.been.calledOnce.and.calledWith('close');
+        expect(amqp._writeConnection.close).to.have.been.calledOnce;
+        expect(amqp._writeConnection.removeAllListeners).to.have.been.calledOnce.and.calledWith('close');
     });
     describe('_getDelay', () => {
         let amqp;
