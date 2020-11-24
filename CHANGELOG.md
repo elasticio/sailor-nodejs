@@ -2,7 +2,7 @@
 
 * Separate connections for consuming and publishing
 * Cosuming is done with polling instead of pushing
-* Recconects on connection errors
+* Reconnects on connection errors
 * Hadling cosumer cancel notification
 * Lowered log levels of some developers' log messages
 * Addded env vars:
