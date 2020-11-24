@@ -7,7 +7,7 @@
 * Lowered log levels of some developers' log messages
 * Addded env vars:
     * AMQP_RECONNECT_ATTEMPTS - number of retries on connection close
-    * AMQP_RECONNECT_TIMEOUT - deplay between connection retries
+    * AMQP_RECONNECT_TIMEOUT - delay between connection retries
     * WAIT_MESSAGES_TIMEOUT - delay betwee next poll when queue is empty
 
 ## 2.6.18 (October 26, 2020)
