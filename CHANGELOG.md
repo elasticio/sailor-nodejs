@@ -3,7 +3,7 @@
 * Separate connections for consuming and publishing
 * Consuming is done with polling instead of pushing
 * Reconnects on connection errors
-* Hadling cosumer cancel notification
+* Hadling consumer cancel notification
 * Lowered log levels of some developers' log messages
 * Addded env vars:
     * AMQP_RECONNECT_ATTEMPTS - number of retries on connection close
