@@ -1,7 +1,7 @@
 ## 2.6.19 (November 23, 2020)
 
 * Separate connections for consuming and publishing
-* Cosuming is done with polling instead of pushing
+* Consuming is done with polling instead of pushing
 * Reconnects on connection errors
 * Hadling cosumer cancel notification
 * Lowered log levels of some developers' log messages
