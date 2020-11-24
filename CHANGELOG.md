@@ -1,6 +1,18 @@
+## 2.6.19 (November 23, 2020)
+
+* Separate connections for consuming and publishing
+* Cosuming is done with polling instead of pushing
+* Recconects on connection errors
+* Hadling cosumer cancel notification
+* Lowered log levels of some developers' log messages
+* Addded env vars:
+    * AMQP_RECONNECT_ATTEMPTS - number of retries on connection close
+    * AMQP_RECONNECT_TIMEOUT - deplay between connection retries
+    * WAIT_MESSAGES_TIMEOUT - delay betwee next poll when queue is empty
+
 ## 2.6.18 (October 26, 2020)
 
-* Remove the logging of triggers and actions processing errors stack 
+* Remove the logging of triggers and actions processing errors stack
 
 ## 2.6.17 (October 15, 2020)
 
