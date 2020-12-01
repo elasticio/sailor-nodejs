@@ -869,19 +869,9 @@ describe('AMQP', () => {
                 return true;
             })
         };
-        const messageId = uuid.v4();
-        const headers = {
-            execId: 'exec1234567890',
-            taskId: 'task1234567890',
-            stepId: 'step_1',
-            compId: 'comp1',
-            function: 'list',
-            start: '1432815685034',
-            protocolVersion: 2,
-            messageId
-        };
 
-        await amqp.sendRebound(new Error('Rebound error'), message, headers);
+        const reboundError = new Error('Rebound error');
+        await amqp.sendRebound(reboundError, message);
         expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
             settings.PUBLISH_MESSAGES_TO,
             settings.REBOUND_ROUTING_KEY,
@@ -891,20 +881,13 @@ describe('AMQP', () => {
                 return true;
             }),
             {
-                contentType: 'application/json',
-                contentEncoding: 'utf8',
-                mandatory: true,
-                expiration: 15000,
+                ...message.properties,
                 headers: {
-                    execId: 'exec1234567890',
-                    taskId: 'task1234567890',
-                    stepId: 'step_1',
-                    compId: 'comp1',
-                    function: 'list',
-                    start: '1432815685034',
-                    reboundIteration: 1,
-                    protocolVersion: 2,
-                    messageId
+                    ...message.properties.headers,
+                    end: sinon.match.number,
+                    reboundReason: reboundError.message,
+                    expiration: settings.REBOUND_INITIAL_EXPIRATION,
+                    reboundIteration: 1
                 }
             },
             sinon.match.func
@@ -920,22 +903,12 @@ describe('AMQP', () => {
                 return true;
             })
         };
-        const messageId = uuid.v4();
-        const headers = {
-            execId: 'exec1234567890',
-            taskId: 'task1234567890',
-            stepId: 'step_1',
-            compId: 'comp1',
-            function: 'list',
-            start: '1432815685034',
-            protocolVersion: 2,
-            messageId
-        };
 
         const clonedMessage = _.cloneDeep(message);
         clonedMessage.properties.headers.reboundIteration = 2;
 
-        await amqp.sendRebound(new Error('Rebound error'), clonedMessage, headers);
+        const reboundError = new Error('Rebound error');
+        await amqp.sendRebound(reboundError, clonedMessage);
         expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
             settings.PUBLISH_MESSAGES_TO,
             settings.REBOUND_ROUTING_KEY,
@@ -945,20 +918,13 @@ describe('AMQP', () => {
                 return true;
             }),
             {
-                contentType: 'application/json',
-                contentEncoding: 'utf8',
-                mandatory: true,
-                expiration: 60000,
+                ...message.properties,
                 headers: {
-                    execId: 'exec1234567890',
-                    taskId: 'task1234567890',
-                    stepId: 'step_1',
-                    compId: 'comp1',
-                    function: 'list',
-                    start: '1432815685034',
-                    reboundIteration: 3,
-                    protocolVersion: 2,
-                    messageId
+                    ...message.properties.headers,
+                    end: sinon.match.number,
+                    reboundReason: reboundError.message,
+                    expiration: 60000,
+                    reboundIteration: 3
                 }
             },
             sinon.match.func
@@ -975,21 +941,14 @@ describe('AMQP', () => {
             })
         };
         const messageId = uuid.v4();
-        const headers = {
-            execId: 'exec1234567890',
-            taskId: 'task1234567890',
-            stepId: 'step_1',
-            compId: 'comp1',
-            function: 'list',
-            start: '1432815685034',
-            protocolVersion: 2,
-            messageId
-        };
 
         const clonedMessage = _.cloneDeep(message);
         clonedMessage.properties.headers.reboundIteration = 100;
+        delete clonedMessage.properties.headers.reply_to;
+        clonedMessage.properties.headers.messageId = messageId;
 
-        await amqp.sendRebound(new Error('Rebound error'), clonedMessage, headers);
+        const reboundError = new Error('Rebound error');
+        await amqp.sendRebound(reboundError, clonedMessage);
         expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
             settings.PUBLISH_MESSAGES_TO,
             settings.ERROR_ROUTING_KEY,
@@ -1003,18 +962,18 @@ describe('AMQP', () => {
                 return true;
             }),
             {
-                contentType: 'application/json',
+
                 contentEncoding: 'utf8',
+                contentType: 'application/json',
                 mandatory: true,
                 headers: {
+                    end: sinon.match.number,
                     execId: 'exec1234567890',
-                    taskId: 'task1234567890',
-                    stepId: 'step_1',
-                    compId: 'comp1',
-                    function: 'list',
-                    start: '1432815685034',
+                    messageId,
                     protocolVersion: 2,
-                    messageId
+                    reboundIteration: 100,
+                    reboundReason: reboundError.message,
+                    taskId: 'task1234567890'
                 }
             },
             sinon.match.func
