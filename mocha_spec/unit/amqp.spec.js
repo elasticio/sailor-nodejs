@@ -882,11 +882,11 @@ describe('AMQP', () => {
             }),
             {
                 ...message.properties,
+                expiration: settings.REBOUND_INITIAL_EXPIRATION,
                 headers: {
                     ...message.properties.headers,
                     end: sinon.match.number,
                     reboundReason: reboundError.message,
-                    expiration: settings.REBOUND_INITIAL_EXPIRATION,
                     reboundIteration: 1
                 }
             },
@@ -919,11 +919,11 @@ describe('AMQP', () => {
             }),
             {
                 ...message.properties,
+                expiration: 60000,
                 headers: {
                     ...message.properties.headers,
                     end: sinon.match.number,
                     reboundReason: reboundError.message,
-                    expiration: 60000,
                     reboundIteration: 3
                 }
             },

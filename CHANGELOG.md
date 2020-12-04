@@ -1,3 +1,7 @@
+## 2.6.21 (December 3, 2020)
+
+* Fixed rebound message expiry time ([#4950](https://github.com/elasticio/elasticio/issues/4950))
+
 ## 2.6.20 (December 1, 2020)
 
 * Fixed rebound message headers ([#4950](https://github.com/elasticio/elasticio/issues/4950))
