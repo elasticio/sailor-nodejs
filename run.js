@@ -2,9 +2,16 @@ const logger = require('./lib/logging.js');
 const Sailor = require('./lib/sailor.js').Sailor;
 const settings = require('./lib/settings.js');
 const co = require('co');
+const http = require('http');
 
 let sailor;
 let disconnectRequired;
+
+// miserable try to workaround issue described in https://github.com/elasticio/elasticio/issues/4874
+const { Agent } = http;
+http.globalAgent = new Agent({
+    keepAlive: true
+});
 
 async function putOutToSea(settings) {
     sailor = new Sailor(settings);
