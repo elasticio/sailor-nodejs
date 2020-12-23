@@ -1,3 +1,7 @@
+## 2.6.22 (December 23, 2020)
+
+* Enabled keep-alive for global HTTP agent ([#5012](#https://github.com/elasticio/elasticio/issues/5012))
+
 ## 2.6.21 (December 3, 2020)
 
 * Fixed rebound message expiry time ([#4950](https://github.com/elasticio/elasticio/issues/4950))
