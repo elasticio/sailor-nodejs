@@ -1,13 +1,17 @@
 'use strict';
 
 const nock = require('nock');
-const expect = require('chai').expect;
+const chai = require('chai');
+const { expect } = chai;
 const uuid = require('uuid');
 const sinonjs = require('sinon');
 const logging = require('../lib/logging.js');
 const helpers = require('./integration_helpers');
 const Encryptor = require('../lib/encryptor');
 const settings = require('../lib/settings');
+const { Sailor } = require('../lib/sailor');
+
+chai.use(require('sinon-chai'));
 
 function requireRun() {
     //@todo it would be great to use something like this https://github.com/jveski/shelltest
@@ -16,6 +20,7 @@ function requireRun() {
     delete require.cache[resolved];
     return require(path);
 }
+
 describe('Integration Test', () => {
     let encryptor;
     let env;
@@ -72,7 +77,7 @@ describe('Integration Test', () => {
             messageId = uuid.v4();
         });
 
-        for (let protocolVersion of [1,2]) {
+        for (let protocolVersion of [1, 2]) {
             describe(`for output protocolVersion ${protocolVersion}`, () => {
 
                 let encoding;
@@ -1271,6 +1276,28 @@ describe('Integration Test', () => {
             throw new Error('Error expected!');
         });
 
+    });
+
+    describe('when sailor is being invoked for start', () => {
+        describe('when error connecting to AMQP', () => {
+            it('should not send error to AMQP queue', async () => {
+                // NOTICE, don't touch this.
+                // it produces side effect, disabling exit at error
+                // see lib/logging.js
+                const fakeLogging = sinon.stub(logging, 'criticalErrorAndExit');
+
+                const sailorSettings = settings.readFrom(env);
+                const error = new Error('Error connecting to AMQP');
+                sinon.stub(Sailor.prototype, 'connect').rejects(error);
+                const reportError = sinon.spy(Sailor.prototype, 'reportError');
+
+                await runner.run(sailorSettings);
+
+                expect(fakeLogging).to.have.been.calledOnce.and.calledWith('putOutToSea.catch', error);
+                expect(reportError).to.not.have.been.called;
+
+            });
+        });
     });
 
     describe('when sailor is being invoked for shutdown', () => {
