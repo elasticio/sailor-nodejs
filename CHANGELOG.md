@@ -1,3 +1,7 @@
+## 2.6.23 (January 4, 2021)
+
+* Fix "Cannot read property 'publish' of undefined" error ([#5036](https://github.com/elasticio/elasticio/issues/5036))
+
 ## 2.6.22 (December 23, 2020)
 
 * Enabled keep-alive for global HTTP agent ([#5012](#https://github.com/elasticio/elasticio/issues/5012))

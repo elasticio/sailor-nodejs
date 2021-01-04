@@ -84,7 +84,7 @@ async function run(settings) {
     try {
         await putOutToSea(settings);
     } catch (e) {
-        if (sailor) {
+        if (sailor && !sailor.amqpConnection.closed) {
             await sailor.reportError(e);
         }
         logger.criticalErrorAndExit('putOutToSea.catch', e);
