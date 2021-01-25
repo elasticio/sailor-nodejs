@@ -15,7 +15,7 @@
     "node": ">=12.13.0"
   },
   "dependencies": {
-    "@elastic.io/object-storage-client": "0.0.4-dev1",
+    "@elastic.io/object-storage-client": "1.0.0",
     "amqplib": "0.6.0",
     "bunyan": "1.8.10",
     "co": "4.6.0",
