@@ -1,7 +1,7 @@
 {
   "name": "elasticio-sailor-nodejs",
   "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-  "version": "2.6.23",
+  "version": "2.6.24",
   "main": "run.js",
   "scripts": {
     "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
@@ -15,7 +15,7 @@
     "node": ">=12.13.0"
   },
   "dependencies": {
-    "@elastic.io/object-storage-client": "0.0.2-dev",
+    "@elastic.io/object-storage-client": "1.0.0",
     "amqplib": "0.6.0",
     "bunyan": "1.8.10",
     "co": "4.6.0",

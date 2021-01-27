@@ -1,3 +1,7 @@
+## 2.6.24 (January 27, 2021)
+
+* Fix "Big messages processing is not stable" errors ([#5051](https://github.com/elasticio/elasticio/issues/5051))
+
 ## 2.6.23 (January 4, 2021)
 
 * Fix "Cannot read property 'publish' of undefined" error ([#5036](https://github.com/elasticio/elasticio/issues/5036))
