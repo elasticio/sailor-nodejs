@@ -1039,14 +1039,21 @@ describe('AMQP', () => {
         let rejectedMessage;
         const amqp = new Amqp(settings);
         const consumerChannel = {
-            get: sandbox.stub().onFirstCall().resolves(message).resolves(),
-            prefetch: sandbox.stub(),
+            consume: sandbox.stub().callsFake((queueName, callback) => {
+                callback(message);
+                return {
+                    consumerTag: message.fields.consumerTag
+                };
+            }),
             reject: sandbox.stub().callsFake(message => {
                 rejectedMessage = message;
-            })
+            }),
+            cancel: sandbox.stub(),
+            removeAllListeners: sandbox.stub()
         };
         sandbox.stub(amqp, '_ensurePublishChannel').resolves();
-        sandbox.stub(amqp, '_ensureConsumerChannel').resolves(consumerChannel);
+        sandbox.stub(amqp, '_ensureConsumerChannel').resolves();
+        amqp.consumerChannel = consumerChannel;
         const clientFunction = sandbox.stub();
 
         await amqp.connect();
@@ -1059,6 +1066,7 @@ describe('AMQP', () => {
             })()
         ]);
         expect(rejectedMessage).to.be.undefined;
+        expect(consumerChannel.cancel).to.have.been.calledOnce.and.calledWith(message.fields.consumerTag);
         expect(clientFunction).to.have.been.calledOnce.and.calledWith(
             {
                 headers: {
@@ -1073,14 +1081,22 @@ describe('AMQP', () => {
         let rejectedMessage;
         const amqp = new Amqp(settings);
         const consumerChannel = {
-            get: sandbox.stub().onFirstCall().resolves(message).resolves(),
+            consume: sandbox.stub().callsFake((queueName, callback) => {
+                callback(message);
+                return {
+                    consumerTag: message.fields.consumerTag
+                };
+            }),
             prefetch: sandbox.stub(),
             reject: sandbox.stub().callsFake(message => {
                 rejectedMessage = message;
-            })
+            }),
+            cancel: sandbox.stub(),
+            removeAllListeners: sandbox.stub()
         };
         sandbox.stub(amqp, '_ensurePublishChannel').resolves();
-        sandbox.stub(amqp, '_ensureConsumerChannel').resolves(consumerChannel);
+        sandbox.stub(amqp, '_ensureConsumerChannel').resolves();
+        amqp.consumerChannel = consumerChannel;
         const clientFunction = sandbox.stub();
 
         await amqp.connect();
@@ -1089,6 +1105,7 @@ describe('AMQP', () => {
         await new Promise(resolve => setImmediate(resolve));
         amqp.stopConsume();
         expect(rejectedMessage).to.be.undefined;
+        expect(consumerChannel.cancel).to.have.been.calledOnce.and.calledWith(message.fields.consumerTag);
         expect(clientFunction).to.have.been.calledOnce.and.calledWith(
             {
                 headers: {

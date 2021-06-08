@@ -13,3 +13,4 @@ service.processService(serviceMethod, process.env)
     });
 
 process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'runService.uncaughtException'));
+process.on('unhandledRejection', logger.criticalErrorAndExit.bind(logger, 'process.unhandledRejection'));

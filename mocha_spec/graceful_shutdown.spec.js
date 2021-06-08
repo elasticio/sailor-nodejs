@@ -40,7 +40,7 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // let (sailor) to start consuming messages
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await sailorTester.waitForLog('Fully initialized and waiting for messages');
 
             await sailorTester.sendKill();
 
@@ -61,7 +61,7 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // let sailor to start consuming messages
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await sailorTester.waitForLog('Fully initialized and waiting for messages');
 
             await sailorTester.sendKill();
 
@@ -75,7 +75,7 @@ describe('Graceful shutdown', function test() {
             // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
             await sailorTester.getPromise();
 
-            // make sure, that the message won't be consubed by the sailor
+            // make sure, that the message won't be consumed by the sailor
             const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor(200);
             expect(messagesLeft).to.have.lengthOf(1);
         });

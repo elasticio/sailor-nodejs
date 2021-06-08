@@ -77,12 +77,14 @@ function gracefulShutdown() {
         return;
     }
 
+    // TODO: handle case when amqp connection is in progress
     sailor.scheduleShutdown().then(disconnectAndExit);
 }
 
 async function run(settings) {
     try {
         await putOutToSea(settings);
+        logger.info('Fully initialized and waiting for messages');
     } catch (e) {
         if (sailor && !sailor.amqpConnection.closed) {
             await sailor.reportError(e);
@@ -108,6 +110,7 @@ if (require.main === module || process.mainModule.filename === __filename) {
     });
 
     process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
+    process.on('unhandledRejection', logger.criticalErrorAndExit.bind(logger, 'process.unhandledRejection'));
 
     run(settings.readFrom(process.env));
 }

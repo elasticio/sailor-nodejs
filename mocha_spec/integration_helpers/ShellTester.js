@@ -38,7 +38,8 @@ class ShellTester extends EventEmitter {
 
     run() {
         const options = {
-            env: this._env
+            env: this._env,
+            stdio: ['inherit', 'pipe', 'inherit', 'ipc']
         };
 
         //// Uncomment this code in order to figure out, what's going on in the child process stdout/stderr in logs
@@ -52,14 +53,43 @@ class ShellTester extends EventEmitter {
 
         this._fork = cp.fork(this._filename, this._args, options);
 
+        this._fork.stdout.on('data', this._onStdout.bind(this)).pipe(process.stdout);
+
         this._fork.on('exit', this._onExitHandler.bind(this));
+    }
+
+    waitForLog(waitMsg) {
+        return new Promise((resolve) => {
+            const handler = (msg) => {
+                if (msg === waitMsg) {
+                    resolve();
+                    this.off('log', handler);
+                }
+            };
+            this.on('log', handler);
+        });
+    }
+
+    _onStdout(data) {
+        data.toString().split(`\n`).filter((line) => !!line).forEach((line) => {
+            try {
+                const log = JSON.parse(line);
+                this.emit('log', log.msg);
+            } catch (e) {
+                throw new Error(`${e}: ${data}`);
+            }
+        });
     }
 
     _onExitHandler(code, signal) {
         this._exitResult = { code, signal };
         this.emit('exit', { code, signal });
         this._timeoutClear();
-        this._promiseResolve(this._exitResult);
+        if (code !== 0) {
+            this._promiseReject(new Error(`Exited with an error code: ${code}`));
+        } else {
+            this._promiseResolve(this._exitResult);
+        }
     }
 
     sendKill(signal = 'SIGTERM') {
