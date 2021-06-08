@@ -1,10 +1,11 @@
 const logger = require('./lib/logging.js');
 const Sailor = require('./lib/sailor.js').Sailor;
 const settings = require('./lib/settings.js');
-const co = require('co');
+const Q = require('q');
 const http = require('http');
 
 let sailor;
+let sailorInit;
 let disconnectRequired;
 
 // miserable try to workaround issue described in https://github.com/elasticio/elasticio/issues/4874
@@ -14,6 +15,8 @@ http.globalAgent = new Agent({
 });
 
 async function putOutToSea(settings) {
+    const deferred = Q.defer();
+    sailorInit = deferred.promise;
     sailor = new Sailor(settings);
 
     //eslint-disable-next-line no-extra-boolean-cast
@@ -38,22 +41,26 @@ async function putOutToSea(settings) {
 
     await sailor.runHookInit();
     await sailor.run();
+    deferred.resolve();
 }
 
-function disconnectAndExit() {
+async function disconnectAndExit() {
     if (!disconnectRequired) {
         return;
     }
     disconnectRequired = false;
-    co(function* putIn() {
+    // we connect to amqp, create channels, start listen a queue on init and interrupting this process with 'disconnect'
+    // will lead to undefined behaviour
+    await sailorInit;
+    try {
         logger.info('Disconnecting...');
-        yield sailor.disconnect();
+        await sailor.disconnect();
         logger.info('Successfully disconnected');
         process.exit();
-    }).catch((err) => {
-        logger.error('Unable to disconnect', err.stack);
+    } catch (err) {
+        logger.error(err, 'Unable to disconnect');
         process.exit(-1);
-    });
+    }
 }
 
 function _disconnectOnly() {

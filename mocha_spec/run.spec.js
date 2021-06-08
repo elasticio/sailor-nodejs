@@ -62,7 +62,7 @@ describe('Integration Test', () => {
     afterEach(async () => {
         await runner._disconnectOnly();
         nock.cleanAll();
-        amqpHelper.cleanUp();
+        await amqpHelper.cleanUp();
         sinon.restore();
     });
 

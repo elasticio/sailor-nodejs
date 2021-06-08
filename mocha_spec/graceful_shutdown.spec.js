@@ -29,7 +29,7 @@ describe('Graceful shutdown', function test() {
     });
 
     describe('start, no messages, shutdown', () => {
-        it('should shutdown instantly', async () => {
+        it('should shutdown instantly after fully initialized', async () => {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
             const sailorTester = helpers.ShellTester.init({
@@ -47,7 +47,24 @@ describe('Graceful shutdown', function test() {
             // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
             await sailorTester.getPromise();
         });
+        it('should shutdown w/o errors in any random moment', async () => {
+            env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
+            const sailorTester = helpers.ShellTester.init({
+                timeout: 1000,
+                env
+            });
+
+            await sailorTester.run();
+
+            // wait a bit to make sailor start initialization process
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            await sailorTester.sendKill();
+
+            // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
+            await sailorTester.getPromise();
+        });
     });
     describe('start, no messages, shutdown, send more messages', () => {
         it('should not consume messages', async () => {
