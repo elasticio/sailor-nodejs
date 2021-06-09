@@ -38,8 +38,7 @@ class ShellTester extends EventEmitter {
 
     run() {
         const options = {
-            env: this._env,
-            stdio: ['inherit', 'pipe', 'inherit', 'ipc']
+            env: this._env
         };
 
         //// Uncomment this code in order to figure out, what's going on in the child process stdout/stderr in logs
@@ -53,31 +52,18 @@ class ShellTester extends EventEmitter {
 
         this._fork = cp.fork(this._filename, this._args, options);
 
-        this._fork.stdout.on('data', this._onStdout.bind(this)).pipe(process.stdout);
-
         this._fork.on('exit', this._onExitHandler.bind(this));
     }
 
-    waitForLog(waitMsg) {
+    waitForEvent(waitEvent) {
         return new Promise((resolve) => {
-            const handler = (msg) => {
-                if (msg === waitMsg) {
-                    resolve();
-                    this.off('log', handler);
+            const handler = ({ event, data }) => {
+                if (event === waitEvent) {
+                    resolve(data);
+                    this._fork.off('message', handler);
                 }
             };
-            this.on('log', handler);
-        });
-    }
-
-    _onStdout(data) {
-        data.toString().split(`\n`).filter((line) => !!line).forEach((line) => {
-            try {
-                const log = JSON.parse(line);
-                this.emit('log', log.msg);
-            } catch (e) {
-                throw new Error(`${e}: ${data}`);
-            }
+            this._fork.on('message', handler);
         });
     }
 

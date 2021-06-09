@@ -1,6 +1,7 @@
 const logger = require('./lib/logging.js');
 const Sailor = require('./lib/sailor.js').Sailor;
 const settings = require('./lib/settings.js');
+const { IPC } = require('./lib/ipc.js');
 const Q = require('q');
 const http = require('http');
 
@@ -14,7 +15,8 @@ http.globalAgent = new Agent({
     keepAlive: true
 });
 
-async function putOutToSea(settings) {
+async function putOutToSea(settings, ipc) {
+    ipc.send('init:started');
     const deferred = Q.defer();
     sailorInit = deferred.promise;
     sailor = new Sailor(settings);
@@ -42,6 +44,7 @@ async function putOutToSea(settings) {
     await sailor.runHookInit();
     await sailor.run();
     deferred.resolve();
+    ipc.send('init:ended');
 }
 
 async function disconnectAndExit() {
@@ -49,9 +52,7 @@ async function disconnectAndExit() {
         return;
     }
     disconnectRequired = false;
-    // we connect to amqp, create channels, start listen a queue on init and interrupting this process with 'disconnect'
-    // will lead to undefined behaviour
-    await sailorInit;
+
     try {
         logger.info('Disconnecting...');
         await sailor.disconnect();
@@ -63,18 +64,7 @@ async function disconnectAndExit() {
     }
 }
 
-function _disconnectOnly() {
-    if (!disconnectRequired) {
-        return Promise.resolve();
-    }
-    return sailor.disconnect();
-}
-
-function _closeConsumerChannel() {
-    return sailor.amqpConnection.consumerChannel.close();
-}
-
-function gracefulShutdown() {
+async function gracefulShutdown() {
     if (!disconnectRequired) {
         return;
     }
@@ -84,13 +74,19 @@ function gracefulShutdown() {
         return;
     }
 
-    // TODO: handle case when amqp connection is in progress
-    sailor.scheduleShutdown().then(disconnectAndExit);
+    // we connect to amqp, create channels, start listen a queue on init and interrupting this process with 'disconnect'
+    // will lead to undefined behaviour
+    logger.trace('Checking/waiting for init before graceful shutdown');
+    await sailorInit;
+    logger.trace('Waited an init before graceful shutdown');
+
+    await sailor.scheduleShutdown();
+    await disconnectAndExit();
 }
 
-async function run(settings) {
+async function run(settings, ipc) {
     try {
-        await putOutToSea(settings);
+        await putOutToSea(settings, ipc);
         logger.info('Fully initialized and waiting for messages');
     } catch (e) {
         if (sailor && !sailor.amqpConnection.closed) {
@@ -100,8 +96,17 @@ async function run(settings) {
     }
 }
 
-exports._disconnectOnly = _disconnectOnly;
-exports._closeConsumerChannel = _closeConsumerChannel;
+exports.__test__ = {
+    disconnectOnly: function disconnectOnly() {
+        if (!disconnectRequired) {
+            return Promise.resolve();
+        }
+        return sailor.disconnect();
+    },
+    closeConsumerChannel: function closeConsumerChannel() {
+        return sailor.amqpConnection.consumerChannel.close();
+    }
+};
 exports.run = run;
 exports.putOutToSea = putOutToSea;
 
@@ -119,5 +124,7 @@ if (require.main === module || process.mainModule.filename === __filename) {
     process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
     process.on('unhandledRejection', logger.criticalErrorAndExit.bind(logger, 'process.unhandledRejection'));
 
-    run(settings.readFrom(process.env));
+    const ipc = new IPC();
+
+    run(settings.readFrom(process.env), ipc);
 }

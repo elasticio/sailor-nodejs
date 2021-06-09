@@ -40,7 +40,7 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // let (sailor) to start consuming messages
-            await sailorTester.waitForLog('Fully initialized and waiting for messages');
+            await sailorTester.waitForEvent('init:ended');
 
             await sailorTester.sendKill();
 
@@ -58,7 +58,7 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // wait a bit to make sailor start initialization process
-            await new Promise(resolve => setTimeout(resolve, 400));
+            await sailorTester.waitForEvent('init:started');
 
             await sailorTester.sendKill();
 
@@ -78,7 +78,7 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // let sailor to start consuming messages
-            await sailorTester.waitForLog('Fully initialized and waiting for messages');
+            await sailorTester.waitForEvent('init:ended');
 
             await sailorTester.sendKill();
 
@@ -109,6 +109,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:ended');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             await sailorTester.sendKill();
@@ -136,6 +137,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // just to double check, that sailor is not processed the message yet
@@ -167,6 +169,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // just to double check, that sailor is not processed the message yet
@@ -202,6 +205,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // just to double check, that sailor is not processed the message yet
@@ -239,6 +243,7 @@ describe('Graceful shutdown', function test() {
 
             await sailorTester.run();
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             // make sure sailor is processed the messages

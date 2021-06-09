@@ -10,6 +10,7 @@ const helpers = require('./integration_helpers');
 const Encryptor = require('../lib/encryptor');
 const settings = require('../lib/settings');
 const { Sailor } = require('../lib/sailor');
+const { IPC } = require('../lib/ipc.js');
 
 chai.use(require('sinon-chai'));
 
@@ -25,6 +26,7 @@ describe('Integration Test', () => {
     let encryptor;
     let env;
     let amqpHelper;
+    let ipc;
     const originalEnvironment = { ...process.env };
     const customers = [
         {
@@ -57,10 +59,11 @@ describe('Integration Test', () => {
         amqpHelper = helpers.amqp(env);
         await amqpHelper.prepare();
         runner = requireRun();
+        ipc = new IPC();
     });
 
     afterEach(async () => {
-        await runner._disconnectOnly();
+        await runner.__test__.disconnectOnly();
         nock.cleanAll();
         await amqpHelper.cleanUp();
         sinon.restore();
@@ -101,7 +104,7 @@ describe('Integration Test', () => {
                         parentMessageId,
                         threadId
                     });
-                    runner.run(settings.readFrom(env));
+                    runner.run(settings.readFrom(env), ipc);
                     const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                         'data',
                         (message, queueName) => resolve({ message, queueName })
@@ -176,7 +179,7 @@ describe('Integration Test', () => {
                         parentMessageId,
                         threadId
                     });
-                    runner.run(settings.readFrom(env));
+                    runner.run(settings.readFrom(env), ipc);
                     const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                         'data',
                         (message, queueName) => resolve({ message, queueName })
@@ -258,7 +261,7 @@ describe('Integration Test', () => {
                         }
                     );
 
-                    runner.run(settings.readFrom(env));
+                    runner.run(settings.readFrom(env), ipc);
                     const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                         'data',
                         (message, queueName) => resolve({ message, queueName })
@@ -349,7 +352,7 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    runner.run(settings.readFrom(env));
+                    runner.run(settings.readFrom(env), ipc);
                     const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                         'data',
                         (message, queueName) => resolve({ message, queueName })
@@ -441,7 +444,7 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner.run(sailorSettings);
+                        runner.run(sailorSettings, ipc);
                         const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
@@ -533,7 +536,7 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    runner.run(settings.readFrom(env));
+                    runner.run(settings.readFrom(env), ipc);
                     const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                         'data',
                         (message, queueName) => resolve({ message, queueName })
@@ -611,11 +614,11 @@ describe('Integration Test', () => {
                         .reply(200, customers);
 
 
-                    runner.run(settings.readFrom(env));
+                    runner.run(settings.readFrom(env), ipc);
 
                     await new Promise(resolve => setTimeout(resolve, 100));
 
-                    await runner._closeConsumerChannel();
+                    await runner.__test__.closeConsumerChannel();
 
                     await amqpHelper.publishMessage(inputMessage, {
                         parentMessageId,
@@ -728,7 +731,7 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            runner.run(sailorSettings);
+                            runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                                 'data',
                                 (message, queueName) => resolve({ message, queueName })
@@ -848,7 +851,7 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            runner.run(sailorSettings);
+                            runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                                 'data',
                                 (message, queueName) => resolve({ message, queueName })
@@ -952,7 +955,7 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            runner.run(sailorSettings);
+                            runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                                 'data',
                                 (message, queueName) => resolve({ message, queueName })
@@ -1022,7 +1025,7 @@ describe('Integration Test', () => {
 
                             await amqpHelper.publishMessage(inputMessage, { threadId });
 
-                            runner.run(sailorSettings);
+                            runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                                 'data',
                                 (message, queueName) => resolve({ message, queueName })
@@ -1098,7 +1101,7 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner.run(settings.readFrom(env));
+                        runner.run(settings.readFrom(env), ipc);
                         const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
@@ -1166,7 +1169,7 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner.run(settings.readFrom(env));
+                        runner.run(settings.readFrom(env), ipc);
                         const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
@@ -1221,7 +1224,7 @@ describe('Integration Test', () => {
                         const sailorSettings = settings.readFrom(env);
                         sailorSettings.FUNCTION = 'fails_to_init';
 
-                        runner.run(settings.readFrom(env));
+                        runner.run(settings.readFrom(env), ipc);
                         const { message, queueName } = await new Promise(resolve => amqpHelper.on(
                             'data',
                             (message, queueName) => resolve({ message, queueName })
@@ -1269,7 +1272,7 @@ describe('Integration Test', () => {
                 ]);
             } catch (e) {
                 expect(e).to.be.ok;
-                await runner._disconnectOnly();
+                await runner.__test__.disconnectOnly();
                 return;
             }
 
@@ -1291,7 +1294,7 @@ describe('Integration Test', () => {
                 sinon.stub(Sailor.prototype, 'connect').rejects(error);
                 const reportError = sinon.spy(Sailor.prototype, 'reportError');
 
-                await runner.run(sailorSettings);
+                await runner.run(sailorSettings, ipc);
 
                 expect(fakeLogging).to.have.been.calledOnce.and.calledWith('putOutToSea.catch', error);
                 expect(reportError).to.not.have.been.called;
@@ -1334,7 +1337,7 @@ describe('Integration Test', () => {
 
                 helpers.mockApiTaskStepResponse(env);
 
-                runner.run(sailorSettings);
+                runner.run(sailorSettings, ipc);
                 await new Promise(resolve =>
                     // hooksDataDeleteNock.on('replied', () => setTimeout(() => resolve(), 50)))
                     hooksDataDeleteNock.on('replied', () => resolve()));
