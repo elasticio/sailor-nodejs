@@ -5,3 +5,4 @@ node_modules
 out.log
 err.log
 .nyc_output
+.vscode

@@ -1,3 +1,6 @@
+/**
+ * Entrypoint for starting service which will handle verifyCredentials and selectModel requests.
+ */
 const logger = require('./lib/logging');
 const service = require('./lib/service');
 const debug = require('debug')('sailor');
@@ -12,4 +15,5 @@ service.processService(serviceMethod, process.env)
         process.exit(0);
     });
 
-process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'runService.uncaughtException'));
+process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
+process.on('unhandledRejection', logger.criticalErrorAndExit.bind(logger, 'process.unhandledRejection'));

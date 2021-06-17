@@ -29,7 +29,7 @@ describe('Graceful shutdown', function test() {
     });
 
     describe('start, no messages, shutdown', () => {
-        it('should shutdown instantly', async () => {
+        it('should shutdown instantly after fully initialized', async () => {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
             const sailorTester = helpers.ShellTester.init({
@@ -40,14 +40,31 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // let (sailor) to start consuming messages
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await sailorTester.waitForEvent('init:ended');
 
             await sailorTester.sendKill();
 
             // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
             await sailorTester.getPromise();
         });
+        it('should shutdown w/o errors in any random moment', async () => {
+            env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
+            const sailorTester = helpers.ShellTester.init({
+                timeout: 1000,
+                env
+            });
+
+            await sailorTester.run();
+
+            // wait a bit to make sailor start initialization process
+            await sailorTester.waitForEvent('init:started');
+
+            await sailorTester.sendKill();
+
+            // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
+            await sailorTester.getPromise();
+        });
     });
     describe('start, no messages, shutdown, send more messages', () => {
         it('should not consume messages', async () => {
@@ -61,7 +78,7 @@ describe('Graceful shutdown', function test() {
             await sailorTester.run();
 
             // let sailor to start consuming messages
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await sailorTester.waitForEvent('init:ended');
 
             await sailorTester.sendKill();
 
@@ -75,7 +92,7 @@ describe('Graceful shutdown', function test() {
             // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
             await sailorTester.getPromise();
 
-            // make sure, that the message won't be consubed by the sailor
+            // make sure, that the message won't be consumed by the sailor
             const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor(200);
             expect(messagesLeft).to.have.lengthOf(1);
         });
@@ -92,6 +109,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:ended');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             await sailorTester.sendKill();
@@ -119,6 +137,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // just to double check, that sailor is not processed the message yet
@@ -150,6 +169,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // just to double check, that sailor is not processed the message yet
@@ -185,6 +205,7 @@ describe('Graceful shutdown', function test() {
             amqpHelper.publishMessage(inputMessage);
 
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // just to double check, that sailor is not processed the message yet
@@ -222,6 +243,7 @@ describe('Graceful shutdown', function test() {
 
             await sailorTester.run();
             // let (sailor + amqp) some time to handle all messages
+            await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             // make sure sailor is processed the messages

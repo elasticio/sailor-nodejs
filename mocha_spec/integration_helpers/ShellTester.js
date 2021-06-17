@@ -55,11 +55,27 @@ class ShellTester extends EventEmitter {
         this._fork.on('exit', this._onExitHandler.bind(this));
     }
 
+    waitForEvent(waitEvent) {
+        return new Promise((resolve) => {
+            const handler = ({ event, data }) => {
+                if (event === waitEvent) {
+                    resolve(data);
+                    this._fork.off('message', handler);
+                }
+            };
+            this._fork.on('message', handler);
+        });
+    }
+
     _onExitHandler(code, signal) {
         this._exitResult = { code, signal };
         this.emit('exit', { code, signal });
         this._timeoutClear();
-        this._promiseResolve(this._exitResult);
+        if (code !== 0) {
+            this._promiseReject(new Error(`Exited with an error code: ${code}`));
+        } else {
+            this._promiseResolve(this._exitResult);
+        }
     }
 
     sendKill(signal = 'SIGTERM') {
