@@ -1319,7 +1319,7 @@ describe('Integration Test', () => {
                 { threadId, queueName: amqpHelper.nextStepQueue },
                 { threadId: threadId2, queueName: amqpHelper.nextStepQueue }
             ]);
-        });
+        }).timeout(5000); // waiting for rabbitmq http api to finally show connections can be slow
     });
 
     describe('when sailor is being invoked for start', () => {
