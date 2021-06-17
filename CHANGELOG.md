@@ -1,3 +1,8 @@
+## 2.6.25 (June 17, 2021)
+
+* Improve consume performance by switching back to pushing instead of polling, keeping reconnections mechanism
+  ([#5432](https://github.com/elasticio/elasticio/issues/5432))
+
 ## 2.6.24 (January 27, 2021)
 
 * Fix "Big messages processing is not stable" errors ([#5051](https://github.com/elasticio/elasticio/issues/5051))
@@ -23,7 +28,7 @@
 * Separate connections for consuming and publishing
 * Consuming is done with polling instead of pushing
 * Reconnects on connection errors
-* Hadling consumer cancel notification
+* Handling consumer cancel notification
 * Lowered log levels of some developers' log messages
 * Addded env vars:
     * AMQP_RECONNECT_ATTEMPTS - number of retries on connection close
