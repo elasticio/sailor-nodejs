@@ -1,3 +1,6 @@
+/**
+ * Entrypoint for starting task step.
+ */
 const logger = require('./lib/logging.js');
 const Sailor = require('./lib/sailor.js').Sailor;
 const settings = require('./lib/settings.js');
