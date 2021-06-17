@@ -1267,7 +1267,7 @@ describe('Integration Test', () => {
             });
             try {
                 await Promise.all([
-                    runner.putOutToSea(settings.readFrom(env)),
+                    runner.putOutToSea(settings.readFrom(env), ipc),
                     amqpHelper.removeListenQueue()
                 ]);
             } catch (e) {
@@ -1278,7 +1278,48 @@ describe('Integration Test', () => {
 
             throw new Error('Error expected!');
         });
+        it('should reconnect if consumer connection closed and continue message processing', async () => {
+            let threadId2 = uuid.v4();
+            helpers.mockApiTaskStepResponse(env);
 
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .times(2)
+                .reply(200, customers);
+
+            const repliesPromise = new Promise((resolve) => {
+                const replies = [];
+                amqpHelper.on(
+                    'data',
+                    ({ properties: { headers: { threadId } } }, queueName) => {
+                        replies.push({ threadId, queueName });
+                        if (replies.length === 2) {
+                            resolve(replies);
+                        }
+                    }
+                );
+            });
+            await amqpHelper.publishMessage(inputMessage, {
+                parentMessageId,
+                threadId
+            });
+            await runner.putOutToSea(settings.readFrom(env), ipc);
+            const connection = await amqpHelper.serverConnectionWait('read');
+            await amqpHelper.serverConnectionClose(connection);
+            await amqpHelper.publishMessage(inputMessage, {
+                parentMessageId,
+                threadId: threadId2
+            });
+            const replies = await repliesPromise;
+            expect(replies).to.deep.equal([
+                { threadId, queueName: amqpHelper.nextStepQueue },
+                { threadId: threadId2, queueName: amqpHelper.nextStepQueue }
+            ]);
+        });
     });
 
     describe('when sailor is being invoked for start', () => {
@@ -1367,5 +1408,3 @@ describe('Integration Test', () => {
         });
     });
 });
-
-

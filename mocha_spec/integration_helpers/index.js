@@ -8,6 +8,7 @@ const nock = require('nock');
 const ShellTester = require('./ShellTester');
 const express = require('express');
 const Encryptor = require('../../lib/encryptor');
+const rabbitStats = require('rabbitmq-stats');
 const FAKE_API_PORT = 1244; // most likely the port won't be taken – https://www.adminsub.net/tcp-udp-port-finder/1244
 
 // @todo move AmqpHelper to dedicated file (will be done in the future refactoring)
@@ -19,6 +20,8 @@ class AmqpHelper extends EventEmitter {
         this.httpReplyQueueRoutingKey = PREFIX + 'request_reply_routing_key';
         this.nextStepQueue = PREFIX + '_next_step_queue';
         this.nextStepErrorQueue = PREFIX + '_next_step_queue_errors';
+
+        this.api = rabbitStats(env.ELASTICIO_AMQP_HTTP_URI, env.ELASTICIO_AMQP_USER, env.ELASTICIO_AMQP_PASS);
 
         this.dataMessages = [];
         this.errorMessages = [];
@@ -94,6 +97,24 @@ class AmqpHelper extends EventEmitter {
         yield publishChannel.purgeQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
 
         this.publishChannel = publishChannel;
+    }
+
+    async serverConnectionWait(name) {
+        let connection;
+        while (!connection) {
+            const connections = await this.api.getConnections();
+            // eslint-disable-next-line camelcase
+            connection = connections.find(({ user_provided_name: uname }) => uname && uname.endsWith(`-${name}`));
+            if (!connection) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+        }
+
+        return connection;
+    }
+
+    async serverConnectionClose(connection) {
+        await this.api.deleteConnection(connection.name);
     }
 
     async prepareListen() {
@@ -194,7 +215,10 @@ class AmqpHelper extends EventEmitter {
 function prepareEnv() {
     const env = {};
     env.LOG_LEVEL = process.env.LOG_LEVEL;
-    env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672';
+    env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672/';
+    env.ELASTICIO_AMQP_HTTP_URI = 'http://localhost:15672/';
+    env.ELASTICIO_AMQP_USER = 'guest';
+    env.ELASTICIO_AMQP_PASS = 'guest';
     env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '1';
     env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
     env.ELASTICIO_STEP_ID = 'step_1';
