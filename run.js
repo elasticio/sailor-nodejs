@@ -125,7 +125,7 @@ if (require.main === module || process.mainModule.filename === __filename) {
     });
 
     process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
-    process.on('unhandledRejection', logger.criticalErrorAndExit.bind(logger, 'process.unhandledRejection'));
+    process.on('unhandledRejection', (err) => logger.error(err, 'process.unhandledRejection'));
 
     const ipc = new IPC();
 
