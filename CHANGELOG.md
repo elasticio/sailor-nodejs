@@ -1,3 +1,7 @@
+## 2.6.26 (June 24, 2021)
+
+* Replaced exit on "unhandledRejection" with error logging
+
 ## 2.6.25 (June 17, 2021)
 
 * Improve consume performance by switching back to pushing instead of polling, keeping reconnections mechanism
