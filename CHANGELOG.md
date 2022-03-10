@@ -1,3 +1,7 @@
+## 2.6.26 (March 10, 2022)
+
+* Added npm audit to CI and fixed all dependencies
+
 ## 2.6.26 (June 24, 2021)
 
 * Replaced exit on "unhandledRejection" with error logging
