@@ -1,4 +1,4 @@
-## 2.6.26 (March 10, 2022)
+## 2.6.27 (March 10, 2022)
 
 * Added npm audit to CI and fixed all dependencies
 
