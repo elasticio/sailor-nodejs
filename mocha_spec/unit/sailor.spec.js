@@ -1391,46 +1391,13 @@ describe('Sailor', () => {
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
-                        sinon.assert.notCalled(fakeAMQPConnection.sendError);
-                        sinon.assert.calledOnce(fakeAMQPConnection.sendData);
-                        sinon.assert.calledWith(
-                            fakeAMQPConnection.sendData,
-                            {
-                                body: { items: [1,2,3,4,5,6] },
-                                headers: {},
-                                passthrough: {
-                                    ...payload.passthrough,
-                                    step_2: {
-                                        body: {},
-                                        headers: {
-                                            [Sailor.OBJECT_ID_HEADER]: passthroughObjectId //reuse already uploaded
-                                        }
-                                    },
-                                    step_1: {
-                                        headers: {},
-                                        body: { items: [1,2,3,4,5,6] }
-                                    }
-                                }
-                            },
+                        expect(fakeAMQPConnection.sendError).to.have.been.calledOnce.and.calledWith(
                             sinon.match({
-                                compId: '5559edd38968ec0736000456',
-                                containerId: 'dc1c8c3f-f9cb-49e1-a6b8-716af9e15948',
-                                end: sinon.match.number,
-                                execId: 'some-exec-id',
-                                function: 'data_trigger',
-                                messageId: sinon.match.string,
-                                parentMessageId: message.properties.headers.messageId,
-                                start: sinon.match.number,
-                                stepId: 'step_1',
-                                taskId: '5559edd38968ec0736000003',
-                                threadId: message.properties.headers.threadId,
-                                userId: '5559edd38968ec0736000002',
-                                workspaceId: '5559edd38968ec073600683'
-                            })
+                                message: 'Maester error: Error',
+                                stack: sinon.match.string
+                            }),
                         );
-
                         expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
-                        const [{ headers, passthrough }] = fakeAMQPConnection.sendData.getCall(0).args;
                     });
                 });
             });
