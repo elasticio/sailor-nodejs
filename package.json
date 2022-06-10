@@ -4,6 +4,7 @@
   "version": "2.6.27",
   "main": "run.js",
   "scripts": {
+    "audit": "better-npm-audit audit --level high --production",
     "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
     "pretest": "npm run lint",
     "test": "npm run test:jasmine && npm run test:mocha",
@@ -30,6 +31,7 @@
     "uuid": "3.0.1"
   },
   "devDependencies": {
+    "better-npm-audit": "^3.7.3",
     "chai": "4.2.0",
     "del": "2.2.2",
     "eslint": "4.19.1",
