@@ -1393,7 +1393,7 @@ describe('Sailor', () => {
                         sinon.assert.calledTwice(addObjectStub);
                         expect(fakeAMQPConnection.sendError).to.have.been.calledOnce.and.calledWith(
                             sinon.match({
-                                message: 'Maester error: Error',
+                                message: 'Lightweight message/passthrough body upload error',
                                 stack: sinon.match.string
                             }),
                         );
