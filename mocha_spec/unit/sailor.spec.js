@@ -1063,7 +1063,7 @@ describe('Sailor', () => {
                     beforeEach(async () => {
                         const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
                         bodyRequestStub = getObjectStub
-                            .withArgs(bodyObjectId, settings.OBJECT_STORAGE_TOKEN)
+                            .withArgs(bodyObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                             .resolves(body);
                         passthroughRequestStub = bodyRequestStub
                             .withArgs(passthroughObjectId)
@@ -1144,7 +1144,7 @@ describe('Sailor', () => {
                     beforeEach(async () => {
                         const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
                         bodyRequestStub = getObjectStub
-                            .withArgs(bodyObjectId, settings.OBJECT_STORAGE_TOKEN)
+                            .withArgs(bodyObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                             .resolves(body);
                         passthroughRequestStub = bodyRequestStub.withArgs(passthroughObjectId).rejects(new Error());
 
@@ -1195,7 +1195,7 @@ describe('Sailor', () => {
 
                     passthroughRequestStub = sandbox
                         .stub(sailor.objectStorage, 'getAsJSON')
-                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
+                        .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                         .resolves(passThroughBody);
 
                     await sailor.connect();
@@ -1310,7 +1310,7 @@ describe('Sailor', () => {
                     });
 
                     sandbox.stub(sailor.objectStorage, 'getAsJSON')
-                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
+                        .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                         .resolves({ passthrough: 'body' });
 
                     await sailor.connect();
@@ -1417,7 +1417,7 @@ describe('Sailor', () => {
                     });
 
                     sandbox.stub(sailor.objectStorage, 'getAsJSON')
-                        .withArgs(passthroughObjectId, settings.OBJECT_STORAGE_TOKEN)
+                        .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                         .resolves({ passthrough: 'body' });
 
                     await sailor.connect();
