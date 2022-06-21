@@ -1,9 +1,10 @@
 {
   "name": "elasticio-sailor-nodejs",
   "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-  "version": "2.6.27",
+  "version": "2.6.28",
   "main": "run.js",
   "scripts": {
+    "audit": "better-npm-audit audit --level high --production",
     "lint": "./node_modules/.bin/eslint lib spec mocha_spec lib run.js runService.js",
     "pretest": "npm run lint",
     "test": "npm run test:jasmine && npm run test:mocha",
@@ -15,7 +16,7 @@
     "node": ">=12.13.0"
   },
   "dependencies": {
-    "@elastic.io/object-storage-client": "1.0.1",
+    "@elastic.io/object-storage-client": "2.1.0",
     "amqplib": "0.8.0",
     "bunyan": "1.8.10",
     "co": "4.6.0",
@@ -30,18 +31,19 @@
     "uuid": "3.0.1"
   },
   "devDependencies": {
-    "rabbitmq-stats": "1.2.3",
+    "better-npm-audit": "3.7.3",
     "chai": "4.2.0",
     "del": "2.2.2",
     "eslint": "4.19.1",
     "eslint-plugin-mocha": "4.12.1",
     "express": "4.16.4",
     "gulp": "3.9.1",
-    "gulp-istanbul": "1.1.1",
+    "gulp-istanbul": "1.1.3",
     "gulp-jasmine": "0.2.0",
     "jasmine-node": "3.0.0",
     "mocha": "7.1.2",
     "nock": "12.0.3",
+    "rabbitmq-stats": "1.2.4",
     "request": "2.88.0",
     "sinon": "9.0.2",
     "sinon-chai": "3.5.0"

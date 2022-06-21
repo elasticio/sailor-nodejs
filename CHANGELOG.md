@@ -1,3 +1,7 @@
+## 2.6.28 (June 21, 2022)
+
+* Fix: "sailor-nodejs ignores errors from maester during lightweight message upload" [#6233](https://github.com/elasticio/elasticio/issues/6233))
+
 ## 2.6.27 (March 10, 2022)
 
 * Added npm audit to CI and fixed all dependencies

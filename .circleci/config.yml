@@ -22,7 +22,7 @@ jobs: # a collection of steps
             - ./node_modules
       - run:
           name: "Running audit"
-          command: npm audit --production --audit-level=high
+          command: npm run audit
       - run: # run tests
           name: test
           command: npm test
