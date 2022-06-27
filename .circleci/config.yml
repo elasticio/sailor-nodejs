@@ -33,10 +33,10 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          cron: "1 * * * *"
+          cron: "6 * * * *"
           filters:
             branches:
               only:
-                - master
+                - 6268_nightly_build
     jobs:
       - build
