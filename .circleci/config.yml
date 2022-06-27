@@ -7,9 +7,6 @@ jobs:
       - image: rabbitmq:3.8.3-management-alpine
     steps:
       - checkout
-      - run:
-          name: update-npm
-          command: 'sudo npm install -g npm@latest'
       - restore_cache:
           key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
