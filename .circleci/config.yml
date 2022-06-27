@@ -1,29 +1,45 @@
-version: 2
-jobs: # a collection of steps
-  build: # runs not using Workflows must have a `build` job as entry point
-    working_directory: ~/elasticio-rest-node # directory where steps will run
-    docker: # run the steps with Docker
-      - image: circleci/node:12 # ...with this image as the primary container; this is where all `steps` will run
+version: 2.1
+jobs:
+  build:
+    working_directory: ~/elasticio-rest-node
+    docker:
+      - image: cimg/node:12.12.1
       - image: rabbitmq:3.8.3-management-alpine
-    steps: # a collection of executable commands
-      - checkout # special step to check out source code to working directory
+    steps:
+      - checkout
       - run:
           name: update-npm
           command: 'sudo npm install -g npm@latest'
-      - restore_cache: # special step to restore the dependency cache
-          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
+      - restore_cache:
           key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
           name: install-npm-wee
           command: npm install
-      - save_cache: # special step to save the dependency cache
+      - save_cache:
           key: dependency-cache-{{ checksum "package-lock.json" }}
           paths:
             - ./node_modules
       - run:
           name: "Running audit"
           command: npm run audit
-      - run: # run tests
+      - run:
           name: test
           command: npm test
-      # See https://circleci.com/docs/2.0/deployment-integrations/ for deploy examples
+
+workflows:
+  version: 2
+
+  build:
+    jobs:
+      - build
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - build
