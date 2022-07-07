@@ -1,0 +1,6 @@
+{
+    "GHSA-wc69-rhjr-hc9g": {
+         "active": true,
+         "notes": "Bunyan library set only new Date to momentjs as parameter"
+     }
+}
