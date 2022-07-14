@@ -93,6 +93,7 @@ async function gracefulShutdown() {
 }
 
 async function run(settings, ipc) {
+    prepareSandbox();
     try {
         await putOutToSea(settings, ipc);
         logger.info('Fully initialized and waiting for messages');
@@ -134,6 +135,5 @@ if (require.main === module || process.mainModule.filename === __filename) {
 
     const ipc = new IPC();
 
-    prepareSandbox();
     run(settings.readFrom(process.env), ipc);
 }
