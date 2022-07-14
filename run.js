@@ -7,16 +7,21 @@ const settings = require('./lib/settings.js');
 const { IPC } = require('./lib/ipc.js');
 const Q = require('q');
 const http = require('http');
+const https = require('https');
 
 let sailor;
 let sailorInit;
 let disconnectRequired;
 
-// miserable try to workaround issue described in https://github.com/elasticio/elasticio/issues/4874
-const { Agent } = http;
-http.globalAgent = new Agent({
-    keepAlive: true
-});
+function prepareSandbox() {
+    // enable keep alive by default to handle issues like https://github.com/elasticio/elasticio/issues/4874
+    http.globalAgent = new http.Agent({
+        keepAlive: true
+    });
+    https.globalAgent = new https.Agent({
+        keepAlive: true
+    });
+}
 
 async function putOutToSea(settings, ipc) {
     ipc.send('init:started');
@@ -129,5 +134,6 @@ if (require.main === module || process.mainModule.filename === __filename) {
 
     const ipc = new IPC();
 
+    prepareSandbox();
     run(settings.readFrom(process.env), ipc);
 }
