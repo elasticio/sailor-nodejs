@@ -164,81 +164,6 @@ describe('Integration Test', () => {
                     });
                 });
 
-                it('should run trigger successfully', async () => {
-                    helpers.mockApiTaskStepResponse(env);
-
-                    nock('https://api.acme.com')
-                        .post('/subscribe')
-                        .reply(200, {
-                            id: 'subscription_12345'
-                        })
-                        .get('/customers')
-                        .reply(200, customers);
-
-                    await amqpHelper.publishMessage(inputMessage, {
-                        parentMessageId,
-                        threadId
-                    });
-                    runner.run(settings.readFrom(env), ipc);
-                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                        'data',
-                        (message, queueName) => resolve({ message, queueName })
-                    ));
-
-                    const { properties, content } = message;
-                    const { body } = encryptor.decryptMessageContent(content, encoding);
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
-
-                    expect(properties.headers.messageId).to.be.a('string');
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.messageId;
-
-                    expect(properties.headers).to.deep.equal({
-                        execId: env.ELASTICIO_EXEC_ID,
-                        taskId: env.ELASTICIO_FLOW_ID,
-                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
-                        containerId: env.ELASTICIO_CONTAINER_ID,
-                        userId: env.ELASTICIO_USER_ID,
-                        stepId: env.ELASTICIO_STEP_ID,
-                        compId: env.ELASTICIO_COMP_ID,
-                        function: env.ELASTICIO_FUNCTION,
-                        threadId,
-                        parentMessageId,
-                        protocolVersion: protocolVersion
-                    });
-
-                    delete properties.headers;
-
-                    expect(properties).to.deep.equal({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        deliveryMode: undefined,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
-                    });
-
-                    expect(body).to.deep.equal({
-                        originalMsg: inputMessage,
-                        customers: customers,
-                        subscription: {
-                            id: 'subscription_12345',
-                            cfg: {
-                                apiKey: 'secret'
-                            }
-                        }
-                    });
-                });
-
                 it('should run trigger successfully for input protocolVersion 2', async () => {
                     helpers.mockApiTaskStepResponse(env);
 
@@ -1249,6 +1174,70 @@ describe('Integration Test', () => {
                 });
             });
         }
+
+        it('should make all HTTP requests with keep alive agent', async () => {
+            env.ELASTICIO_STEP_ID = 'step_2';
+            env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+            env.ELASTICIO_FUNCTION = 'trigger_with_keep_alive';
+
+            helpers.mockApiTaskStepResponse(env);
+
+            nock('http://api.acme.com')
+                .get('/customers')
+                .reply(200, customers);
+
+            await amqpHelper.publishMessage(inputMessage, {
+                parentMessageId,
+                threadId
+            });
+            runner.run(settings.readFrom(env), ipc);
+            const { message } = await new Promise(resolve => amqpHelper.on(
+                'data',
+                (message, queueName) => resolve({ message, queueName })
+            ));
+
+            const { content } = message;
+            const { body } = encryptor.decryptMessageContent(content, 'base64');
+
+            expect(body).to.deep.equal({
+                originalMsg: inputMessage,
+                customers,
+                keepAlive: true
+            });
+        });
+
+        it('should make all HTTPS requests with keep alive agent', async () => {
+            env.ELASTICIO_STEP_ID = 'step_2';
+            env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+            env.ELASTICIO_FUNCTION = 'trigger_with_keep_alive';
+
+            inputMessage.body.isHttps = true;
+
+            helpers.mockApiTaskStepResponse(env);
+
+            nock('https://api.acme.com')
+                .get('/customers')
+                .reply(200, customers);
+
+            await amqpHelper.publishMessage(inputMessage, {
+                parentMessageId,
+                threadId
+            });
+            runner.run(settings.readFrom(env), ipc);
+            const { message } = await new Promise(resolve => amqpHelper.on(
+                'data',
+                (message, queueName) => resolve({ message, queueName })
+            ));
+
+            const { content } = message;
+            const { body } = encryptor.decryptMessageContent(content, 'base64');
+
+            expect(body).to.deep.equal({
+                originalMsg: inputMessage,
+                customers,
+                keepAlive: true
+            });
+        });
 
         it('should fail if queue deleted', async () => {
             helpers.mockApiTaskStepResponse(env);

@@ -16,6 +16,10 @@
       "main": "./triggers/trigger_with_no_hooks.js",
       "title": "No hooks at all. The only process function."
     },
+    "trigger_with_keep_alive": {
+      "main": "./triggers/trigger_with_keep_alive.js",
+      "title": "Returns info whether keep alive agent was used during HTTP request"
+    },
     "fails_to_init": {
       "main": "./triggers/fails_to_init.js",
       "title": "Fails to init"

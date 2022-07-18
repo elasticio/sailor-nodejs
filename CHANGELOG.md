@@ -1,3 +1,7 @@
+## 2.6.29 (July 14, 2022)
+
+* Enabled keep-alive for global HTTPS agent ([#6359](https://github.com/elasticio/elasticio/issues/6359))
+
 ## 2.6.28 (June 21, 2022)
 
 * Fix: "sailor-nodejs ignores errors from maester during lightweight message upload" [#6233](https://github.com/elasticio/elasticio/issues/6233))
