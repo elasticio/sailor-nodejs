@@ -1255,12 +1255,10 @@ describe('Integration Test', () => {
                 threadId
             });
             try {
-                await Promise.all([
-                    runner.putOutToSea(settings.readFrom(env), ipc),
-                    amqpHelper.removeListenQueue()
-                ]);
+                await amqpHelper.removeListenQueue();
+                await runner.putOutToSea(settings.readFrom(env), ipc);
             } catch (e) {
-                expect(e).to.be.ok;
+                expect(e.message).to.match(/BasicConsume; 404/);
                 await runner.__test__.disconnectOnly();
                 return;
             }
