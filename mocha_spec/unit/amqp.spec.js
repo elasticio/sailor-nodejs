@@ -143,7 +143,7 @@ describe('AMQP', () => {
     });
 
     it('Should publish with persistence', async () => {
-        const persistentSetting = { ...settings, AMQP_PERSISTENT_MESSAGES: 'true' };
+        const persistentSetting = { ...settings, AMQP_PERSISTENT_MESSAGES: true };
         const amqp = new Amqp(persistentSetting);
         amqp.publishChannel = {
             on: sandbox.stub(),
@@ -192,7 +192,7 @@ describe('AMQP', () => {
             sinon.match.func
         );
     });
-    it('Should publish without persistence', async () => {
+    it('Should publish without persistence by default', async () => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = {
             on: sandbox.stub(),
