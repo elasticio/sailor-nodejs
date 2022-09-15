@@ -76,6 +76,7 @@ describe('AMQP', () => {
                 userId: undefined,
                 appId: undefined,
                 mandatory: true,
+                persistent: false,
                 clusterId: ''
             },
             content: encryptor.encryptMessageContent({ content: 'Message content' })
@@ -131,6 +132,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -230,6 +232,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -280,6 +283,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -337,6 +341,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
@@ -403,6 +408,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: { ...headers, protocolVersion: settings.PROTOCOL_VERSION }
             },
             sinon.match.func
@@ -471,6 +477,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -531,6 +538,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
@@ -579,6 +587,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -613,6 +622,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456'
@@ -667,6 +677,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -718,6 +729,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -774,6 +786,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         messageId,
                         taskId: 'task1234567890',
@@ -794,6 +807,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         messageId,
                         'taskId': 'task1234567890',
@@ -851,6 +865,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         messageId,
                         taskId: 'task1234567890',
@@ -901,6 +916,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -948,6 +964,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     messageId,
                     taskId: 'task1234567890',
@@ -1065,6 +1082,7 @@ describe('AMQP', () => {
                 contentEncoding: 'utf8',
                 contentType: 'application/json',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     end: sinon.match.number,
                     execId: 'exec1234567890',
@@ -1127,6 +1145,7 @@ describe('AMQP', () => {
                 userId: undefined,
                 appId: undefined,
                 mandatory: true,
+                persistent: false,
                 clusterId: ''
             },
             content: encryptor.encryptMessageContent(
