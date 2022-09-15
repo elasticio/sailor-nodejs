@@ -142,6 +142,105 @@ describe('AMQP', () => {
         );
     });
 
+    it('Should publish with persistence', async () => {
+        const persistentSetting = { ...settings, AMQP_PERSISTENT_MESSAGES: 'true' };
+        const amqp = new Amqp(persistentSetting);
+        amqp.publishChannel = {
+            on: sandbox.stub(),
+            publish: sandbox.stub().callsFake((exchangeName, routingKey, payloadBuffer, options, cb) => {
+                cb(null, 'Success');
+                return true;
+            })
+        };
+        const messageId = uuid.v4();
+        const headers = {
+            taskId: 'task1234567890',
+            stepId: 'step_456',
+            messageId
+        };
+
+        await amqp.sendData({
+            headers: {
+                'some-other-header': 'headerValue'
+            },
+            body: 'Message content'
+        }, headers);
+        expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
+            settings.PUBLISH_MESSAGES_TO,
+            settings.DATA_ROUTING_KEY,
+            sinon.match(buf => {
+                const payload = encryptor.decryptMessageContent(buf, 'base64');
+                return sinon.match({
+                    headers: {
+                        'some-other-header': 'headerValue'
+                    },
+                    body: 'Message content'
+                }).test(payload);
+            }),
+            {
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                persistent: true,
+                headers: {
+                    taskId: 'task1234567890',
+                    stepId: 'step_456',
+                    protocolVersion: 1,
+                    messageId
+                }
+            },
+            sinon.match.func
+        );
+    });
+    it('Should publish without persistence', async () => {
+        const amqp = new Amqp(settings);
+        amqp.publishChannel = {
+            on: sandbox.stub(),
+            publish: sandbox.stub().callsFake((exchangeName, routingKey, payloadBuffer, options, cb) => {
+                cb(null, 'Success');
+                return true;
+            })
+        };
+        const messageId = uuid.v4();
+        const headers = {
+            taskId: 'task1234567890',
+            stepId: 'step_456',
+            messageId
+        };
+
+        await amqp.sendData({
+            headers: {
+                'some-other-header': 'headerValue'
+            },
+            body: 'Message content'
+        }, headers);
+        expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
+            settings.PUBLISH_MESSAGES_TO,
+            settings.DATA_ROUTING_KEY,
+            sinon.match(buf => {
+                const payload = encryptor.decryptMessageContent(buf, 'base64');
+                return sinon.match({
+                    headers: {
+                        'some-other-header': 'headerValue'
+                    },
+                    body: 'Message content'
+                }).test(payload);
+            }),
+            {
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                headers: {
+                    taskId: 'task1234567890',
+                    stepId: 'step_456',
+                    protocolVersion: 1,
+                    messageId
+                }
+            },
+            sinon.match.func
+        );
+    });
+
     it('Should send message to outgoing channel when process data for protocol version 1', async () => {
         const amqp = new Amqp(settings);
         delete amqp.settings.ELASTICIO_PROTOCOL_VERSION;
