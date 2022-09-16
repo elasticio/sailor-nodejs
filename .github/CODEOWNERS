@@ -1,0 +1,8 @@
+# https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# elasticio/platform-qa and @elasticio/platform will be requested for
+# review when someone opens a pull request.
+# Introduced to make QA-team's code reivew approve required https://github.com/elasticio/elasticio/issues/5139
+*       @elasticio/platform-qa
