@@ -1,3 +1,7 @@
+## 2.7.0 (September 15, 2022)
+
+* Add AMQP_PERSISTENT_MESSAGES configuration env var to enable persistent delivery mode.
+
 ## 2.6.29 (July 14, 2022)
 
 * Enabled keep-alive for global HTTPS agent ([#6359](https://github.com/elasticio/elasticio/issues/6359))

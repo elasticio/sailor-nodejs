@@ -76,6 +76,7 @@ describe('AMQP', () => {
                 userId: undefined,
                 appId: undefined,
                 mandatory: true,
+                persistent: false,
                 clusterId: ''
             },
             content: encryptor.encryptMessageContent({ content: 'Message content' })
@@ -131,6 +132,107 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
+                headers: {
+                    taskId: 'task1234567890',
+                    stepId: 'step_456',
+                    protocolVersion: 1,
+                    messageId
+                }
+            },
+            sinon.match.func
+        );
+    });
+
+    it('Should publish with persistence', async () => {
+        const persistentSetting = { ...settings, AMQP_PERSISTENT_MESSAGES: true };
+        const amqp = new Amqp(persistentSetting);
+        amqp.publishChannel = {
+            on: sandbox.stub(),
+            publish: sandbox.stub().callsFake((exchangeName, routingKey, payloadBuffer, options, cb) => {
+                cb(null, 'Success');
+                return true;
+            })
+        };
+        const messageId = uuid.v4();
+        const headers = {
+            taskId: 'task1234567890',
+            stepId: 'step_456',
+            messageId
+        };
+
+        await amqp.sendData({
+            headers: {
+                'some-other-header': 'headerValue'
+            },
+            body: 'Message content'
+        }, headers);
+        expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
+            settings.PUBLISH_MESSAGES_TO,
+            settings.DATA_ROUTING_KEY,
+            sinon.match(buf => {
+                const payload = encryptor.decryptMessageContent(buf, 'base64');
+                return sinon.match({
+                    headers: {
+                        'some-other-header': 'headerValue'
+                    },
+                    body: 'Message content'
+                }).test(payload);
+            }),
+            {
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                persistent: true,
+                headers: {
+                    taskId: 'task1234567890',
+                    stepId: 'step_456',
+                    protocolVersion: 1,
+                    messageId
+                }
+            },
+            sinon.match.func
+        );
+    });
+    it('Should publish without persistence by default', async () => {
+        const amqp = new Amqp(settings);
+        amqp.publishChannel = {
+            on: sandbox.stub(),
+            publish: sandbox.stub().callsFake((exchangeName, routingKey, payloadBuffer, options, cb) => {
+                cb(null, 'Success');
+                return true;
+            })
+        };
+        const messageId = uuid.v4();
+        const headers = {
+            taskId: 'task1234567890',
+            stepId: 'step_456',
+            messageId
+        };
+
+        await amqp.sendData({
+            headers: {
+                'some-other-header': 'headerValue'
+            },
+            body: 'Message content'
+        }, headers);
+        expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
+            settings.PUBLISH_MESSAGES_TO,
+            settings.DATA_ROUTING_KEY,
+            sinon.match(buf => {
+                const payload = encryptor.decryptMessageContent(buf, 'base64');
+                return sinon.match({
+                    headers: {
+                        'some-other-header': 'headerValue'
+                    },
+                    body: 'Message content'
+                }).test(payload);
+            }),
+            {
+                contentType: 'application/json',
+                contentEncoding: 'utf8',
+                mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -181,6 +283,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -238,6 +341,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
@@ -304,6 +408,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: { ...headers, protocolVersion: settings.PROTOCOL_VERSION }
             },
             sinon.match.func
@@ -372,6 +477,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -432,6 +538,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         taskId: 'task1234567890',
                         stepId: 'step_456',
@@ -480,6 +587,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -514,6 +622,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456'
@@ -568,6 +677,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -619,6 +729,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -675,6 +786,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         messageId,
                         taskId: 'task1234567890',
@@ -695,6 +807,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         messageId,
                         'taskId': 'task1234567890',
@@ -752,6 +865,7 @@ describe('AMQP', () => {
                     contentType: 'application/json',
                     contentEncoding: 'utf8',
                     mandatory: true,
+                    persistent: false,
                     headers: {
                         messageId,
                         taskId: 'task1234567890',
@@ -802,6 +916,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     taskId: 'task1234567890',
                     stepId: 'step_456',
@@ -849,6 +964,7 @@ describe('AMQP', () => {
                 contentType: 'application/json',
                 contentEncoding: 'utf8',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     messageId,
                     taskId: 'task1234567890',
@@ -966,6 +1082,7 @@ describe('AMQP', () => {
                 contentEncoding: 'utf8',
                 contentType: 'application/json',
                 mandatory: true,
+                persistent: false,
                 headers: {
                     end: sinon.match.number,
                     execId: 'exec1234567890',
@@ -1028,6 +1145,7 @@ describe('AMQP', () => {
                 userId: undefined,
                 appId: undefined,
                 mandatory: true,
+                persistent: false,
                 clusterId: ''
             },
             content: encryptor.encryptMessageContent(
