@@ -139,7 +139,7 @@ describe('Integration Test', () => {
                     expect(properties).to.deep.equal({
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
-                        deliveryMode: undefined,
+                        deliveryMode: 1,
                         priority: undefined,
                         correlationId: undefined,
                         replyTo: undefined,
@@ -221,7 +221,7 @@ describe('Integration Test', () => {
                     expect(properties).to.deep.equal({
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
-                        deliveryMode: undefined,
+                        deliveryMode: 1,
                         priority: undefined,
                         correlationId: undefined,
                         replyTo: undefined,
@@ -320,7 +320,7 @@ describe('Integration Test', () => {
                     expect(properties).to.deep.eql({
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
-                        deliveryMode: undefined,
+                        deliveryMode: 1,
                         priority: undefined,
                         correlationId: undefined,
                         replyTo: undefined,
@@ -416,7 +416,7 @@ describe('Integration Test', () => {
                         expect(properties).to.deep.eql({
                             contentType: 'application/json',
                             contentEncoding: 'utf8',
-                            deliveryMode: undefined,
+                            deliveryMode: 1,
                             priority: undefined,
                             correlationId: undefined,
                             replyTo: undefined,
@@ -512,7 +512,7 @@ describe('Integration Test', () => {
                     expect(properties).to.deep.eql({
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
-                        deliveryMode: undefined,
+                        deliveryMode: 1,
                         priority: undefined,
                         correlationId: undefined,
                         replyTo: undefined,
@@ -584,7 +584,7 @@ describe('Integration Test', () => {
                     expect(properties).to.deep.equal({
                         contentType: 'application/json',
                         contentEncoding: 'utf8',
-                        deliveryMode: undefined,
+                        deliveryMode: 1,
                         priority: undefined,
                         correlationId: undefined,
                         replyTo: undefined,
