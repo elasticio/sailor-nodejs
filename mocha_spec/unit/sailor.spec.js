@@ -1061,7 +1061,7 @@ describe('Sailor', () => {
                     let passthroughRequestStub;
                     let runExecSpy;
                     beforeEach(async () => {
-                        const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
+                        const getObjectStub = sandbox.stub(sailor.objectStorage, 'getOne');
                         bodyRequestStub = getObjectStub
                             .withArgs(bodyObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                             .resolves(body);
@@ -1142,7 +1142,7 @@ describe('Sailor', () => {
                     let passthroughRequestStub;
                     let runExecSpy;
                     beforeEach(async () => {
-                        const getObjectStub = sandbox.stub(sailor.objectStorage, 'getAsJSON');
+                        const getObjectStub = sandbox.stub(sailor.objectStorage, 'getOne');
                         bodyRequestStub = getObjectStub
                             .withArgs(bodyObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                             .resolves(body);
@@ -1194,7 +1194,7 @@ describe('Sailor', () => {
                     runExecSpy = sandbox.spy(sailor, 'runExec');
 
                     passthroughRequestStub = sandbox
-                        .stub(sailor.objectStorage, 'getAsJSON')
+                        .stub(sailor.objectStorage, 'getOne')
                         .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                         .resolves(passThroughBody);
 
@@ -1309,7 +1309,7 @@ describe('Sailor', () => {
                         });
                     });
 
-                    sandbox.stub(sailor.objectStorage, 'getAsJSON')
+                    sandbox.stub(sailor.objectStorage, 'getOne')
                         .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                         .resolves({ passthrough: 'body' });
 
@@ -1322,7 +1322,7 @@ describe('Sailor', () => {
                     let bodyObjectId;
                     beforeEach(async () => {
                         bodyObjectId = 'body-object-id';
-                        addObjectStub = sandbox.stub(sailor.objectStorage, 'addAsStream').resolves(bodyObjectId);
+                        addObjectStub = sandbox.stub(sailor.objectStorage, 'add').resolves(bodyObjectId);
                     });
 
                     it('should send lightweight', async () => {
@@ -1382,7 +1382,7 @@ describe('Sailor', () => {
                 describe('and objects can not be uploaded successfully', () => {
                     let addObjectStub;
                     beforeEach(async () => {
-                        addObjectStub = sandbox.stub(sailor.objectStorage, 'addAsStream').rejects(new Error());
+                        addObjectStub = sandbox.stub(sailor.objectStorage, 'add').rejects(new Error());
                     });
 
                     it('should not upload lightweight', async () => {
@@ -1416,7 +1416,7 @@ describe('Sailor', () => {
                         });
                     });
 
-                    sandbox.stub(sailor.objectStorage, 'getAsJSON')
+                    sandbox.stub(sailor.objectStorage, 'getOne')
                         .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
                         .resolves({ passthrough: 'body' });
 
@@ -1427,7 +1427,7 @@ describe('Sailor', () => {
                 describe('and all objects can be uploaded successfully', () => {
                     let addObjectSpy;
                     beforeEach(async () => {
-                        addObjectSpy = sandbox.spy(sailor.objectStorage, 'addAsStream');
+                        addObjectSpy = sandbox.spy(sailor.objectStorage, 'add');
                     });
 
                     it('should not send lightweight', async () => {
