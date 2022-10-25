@@ -2,5 +2,9 @@
     "GHSA-wc69-rhjr-hc9g": {
          "active": true,
          "notes": "Bunyan library set only new Date to momentjs as parameter"
-     }
+    },
+    "GHSA-f8q6-p94x-37v3": {
+        "active": true,
+        "notes": "braceExpand is not used in rimraf"
+    }
 }
