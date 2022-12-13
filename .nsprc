@@ -6,5 +6,9 @@
     "GHSA-f8q6-p94x-37v3": {
         "active": true,
         "notes": "braceExpand is not used in rimraf"
+    },
+    "GHSA-hrpp-h998-j3pp": {
+        "active": true,
+        "notes": "There is no query-string user input in sailor"
     }
 }
