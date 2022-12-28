@@ -10,5 +10,9 @@
     "GHSA-hrpp-h998-j3pp": {
         "active": true,
         "notes": "There is no query-string user input in sailor"
+    },
+    "GHSA-27h2-hvpr-p74q": {
+        "active": true,
+        "notes": "The vulnerability is in maester-client. Maester-client doesn't use jwt.verify function."
     }
 }
