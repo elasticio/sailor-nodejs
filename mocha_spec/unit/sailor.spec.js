@@ -1089,7 +1089,7 @@ describe('Sailor', () => {
                             sinon.match.object,
                             sinon.match
                                 .hasNested('body', body.data)
-                                .and(sinon.match.hasNested('passthrough.step_4.body', passThroughBody)),
+                                .and(sinon.match.hasNested('passthrough.step_4.body', passThroughBody.data)),
                             message,
                             sinon.match.object,
                             sinon.match.object,
