@@ -1116,7 +1116,7 @@ describe('Sailor', () => {
                                         headers: {
                                             [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
                                         },
-                                        body: passThroughBody
+                                        body: passThroughBody.data
                                     }
                                 }
                             },
