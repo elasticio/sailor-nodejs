@@ -1,3 +1,6 @@
+## 2.7.2 (October 19, 2018)
+
+* Sailor updated to 5.0.2-dev.3 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
 ## 2.7.0 (September 15, 2022)
 
 * Add AMQP_PERSISTENT_MESSAGES configuration env var to enable persistent delivery mode.
@@ -142,3 +145,4 @@
 ## 2.3.0 (October 19, 2018)
 
 * Sailor now handles RabbitMQ disconnects correctly
+
