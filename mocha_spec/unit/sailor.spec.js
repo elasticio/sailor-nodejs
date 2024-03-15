@@ -976,7 +976,9 @@ describe('Sailor', () => {
                     }
                 };
                 passThroughBody = {
-                    passThrough: 'body'
+                    data: {
+                        some: 'body'
+                    }
                 };
                 payload = {
                     headers: {
