@@ -971,7 +971,9 @@ describe('Sailor', () => {
                 bodyObjectId = 'body-object-id';
                 passthroughObjectId = 'passthrough-object-id';
                 body = {
-                    some: 'body'
+                    data: {
+                        some: 'body'
+                    }
                 };
                 passThroughBody = {
                     passThrough: 'body'
