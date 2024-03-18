@@ -1,6 +1,10 @@
 ## 2.7.2 (March 15, 2024)
 
-* Sailor updated to 5.0.2-dev.3 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
+* Sailor updated to 5.0.2 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
+
+## 2.7.1  (October 20, 2022)
+
+* Replaced `object-storage-client` with `maester-client`
 
 ## 2.7.0 (September 15, 2022)
 
