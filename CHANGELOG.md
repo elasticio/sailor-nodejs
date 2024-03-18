@@ -1,6 +1,6 @@
 ## 2.7.2 (March 15, 2024)
 
-* Sailor updated to 5.0.2 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
+* @elastic.io/maester-client updated to 5.0.2 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
 
 ## 2.7.1  (October 20, 2022)
 
