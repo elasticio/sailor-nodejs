@@ -1,3 +1,11 @@
+## 2.7.2 (March 22, 2024)
+
+* @elastic.io/maester-client updated to 5.0.2 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
+
+## 2.7.1  (October 20, 2022)
+
+* Replaced `object-storage-client` with `maester-client`
+
 ## 2.7.0 (September 15, 2022)
 
 * Add AMQP_PERSISTENT_MESSAGES configuration env var to enable persistent delivery mode.
@@ -142,3 +150,4 @@
 ## 2.3.0 (October 19, 2018)
 
 * Sailor now handles RabbitMQ disconnects correctly
+

@@ -971,10 +971,14 @@ describe('Sailor', () => {
                 bodyObjectId = 'body-object-id';
                 passthroughObjectId = 'passthrough-object-id';
                 body = {
-                    some: 'body'
+                    data: {
+                        some: 'body'
+                    }
                 };
                 passThroughBody = {
-                    passThrough: 'body'
+                    data: {
+                        some: 'body'
+                    }
                 };
                 payload = {
                     headers: {
@@ -1084,8 +1088,8 @@ describe('Sailor', () => {
                             runExecSpy,
                             sinon.match.object,
                             sinon.match
-                                .hasNested('body', body)
-                                .and(sinon.match.hasNested('passthrough.step_4.body', passThroughBody)),
+                                .hasNested('body', body.data)
+                                .and(sinon.match.hasNested('passthrough.step_4.body', passThroughBody.data)),
                             message,
                             sinon.match.object,
                             sinon.match.object,
@@ -1112,7 +1116,7 @@ describe('Sailor', () => {
                                         headers: {
                                             [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
                                         },
-                                        body: passThroughBody
+                                        body: passThroughBody.data
                                     }
                                 }
                             },
@@ -1239,7 +1243,7 @@ describe('Sailor', () => {
                                     headers: {
                                         [Sailor.OBJECT_ID_HEADER]: passthroughObjectId
                                     },
-                                    body: passThroughBody
+                                    body: passThroughBody.data
                                 }
                             }
                         },
@@ -1311,7 +1315,7 @@ describe('Sailor', () => {
 
                     sandbox.stub(sailor.objectStorage, 'getOne')
                         .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
-                        .resolves({ passthrough: 'body' });
+                        .resolves({ data: { passthrough: 'body' } });
 
                     await sailor.connect();
                     await sailor.prepare();
@@ -1418,7 +1422,7 @@ describe('Sailor', () => {
 
                     sandbox.stub(sailor.objectStorage, 'getOne')
                         .withArgs(passthroughObjectId, { jwtPayloadOrToken: settings.OBJECT_STORAGE_TOKEN })
-                        .resolves({ passthrough: 'body' });
+                        .resolves({ data: { passthrough: 'body' } });
 
                     await sailor.connect();
                     await sailor.prepare();
