@@ -1,3 +1,7 @@
+## 2.7.3 (September 12, 2024)
+
+* @elastic.io/maester-client updated to 5.0.3 to get rid of the vulnerability
+
 ## 2.7.2 (March 22, 2024)
 
 * @elastic.io/maester-client updated to 5.0.2 ([#206](https://github.com/elasticio/sailor-nodejs/issues/206))
