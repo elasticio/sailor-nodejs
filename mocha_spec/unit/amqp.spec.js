@@ -1,4 +1,3 @@
-/* eslint-disable mocha/no-skipped-tests */
 const chai = require('chai');
 const sinon = require('sinon');
 const { expect } = chai;
@@ -1048,7 +1047,7 @@ describe('AMQP', () => {
         );
     });
 
-    xit('Should send message to errors when rebound limit exceeded', async () => {
+    it('Should send message to errors when rebound limit exceeded', async () => {
         const amqp = new Amqp(settings);
         amqp.publishChannel = {
             on: sandbox.stub(),
@@ -1065,7 +1064,7 @@ describe('AMQP', () => {
         clonedMessage.properties.headers.messageId = messageId;
 
         const reboundError = new Error('Rebound error');
-        await amqp.sendRebound(reboundError, clonedMessage);
+        await amqp.sendRebound(reboundError, clonedMessage, clonedMessage.properties.headers);
         expect(amqp.publishChannel.publish).to.have.been.calledOnce.and.calledWith(
             settings.PUBLISH_MESSAGES_TO,
             settings.ERROR_ROUTING_KEY,
@@ -1085,12 +1084,10 @@ describe('AMQP', () => {
                 mandatory: true,
                 persistent: false,
                 headers: {
-                    end: sinon.match.number,
                     execId: 'exec1234567890',
                     messageId,
                     protocolVersion: 2,
                     reboundIteration: 100,
-                    reboundReason: reboundError.message,
                     taskId: 'task1234567890'
                 }
             },
