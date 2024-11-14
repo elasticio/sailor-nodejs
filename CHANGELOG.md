@@ -1,3 +1,7 @@
+## 2.7.4 (November 14, 2024)
+
+* Fixed error location if component use `Rebound` functionality
+
 ## 2.7.3 (September 12, 2024)
 
 * @elastic.io/maester-client updated to 5.0.3 to get rid of the vulnerability
