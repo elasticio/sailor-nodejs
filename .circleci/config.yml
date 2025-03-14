@@ -3,19 +3,19 @@ jobs:
   build:
     working_directory: ~/elasticio-rest-node
     docker:
-      - image: cimg/node:12.13.0
+      - image: cimg/node:18.13.0
       - image: rabbitmq:3.8.3-management-alpine
     steps:
       - checkout
-      # - restore_cache:
-      #     key: dependency-cache-{{ checksum "package-lock.json" }}
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package-lock.json" }}
       - run:
           name: install-npm-wee
           command: npm install
-      # - save_cache:
-      #     key: dependency-cache-{{ checksum "package-lock.json" }}
-      #     paths:
-      #       - ./node_modules
+      - save_cache:
+          key: dependency-cache-{{ checksum "package-lock.json" }}
+          paths:
+            - ./node_modules
       - run:
           name: "Running audit"
           command: npm run audit

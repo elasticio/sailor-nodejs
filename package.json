@@ -13,7 +13,7 @@
     "postpublish": "./postpublish.js"
   },
   "engines": {
-    "node": ">=12.13.0"
+    "node": "18.x"
   },
   "dependencies": {
     "@elastic.io/maester-client": "6.0.0-dev.1",
