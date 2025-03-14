@@ -3,8 +3,8 @@ jobs:
   build:
     working_directory: ~/elasticio-rest-node
     docker:
-      - image: cimg/node:12.13.0
-      - image: rabbitmq:3.8.3-management-alpine
+      - image: cimg/node:18.13.0
+      - image: rabbitmq:4.0.7-management-alpine
     steps:
       - checkout
       - restore_cache:

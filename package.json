@@ -1,7 +1,7 @@
 {
   "name": "elasticio-sailor-nodejs",
   "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-  "version": "2.7.4",
+  "version": "2.7.5-dev.1",
   "main": "run.js",
   "scripts": {
     "audit": "better-npm-audit audit --level high --production",
@@ -13,10 +13,10 @@
     "postpublish": "./postpublish.js"
   },
   "engines": {
-    "node": ">=12.13.0"
+    "node": "18.x"
   },
   "dependencies": {
-    "@elastic.io/maester-client": "5.0.3",
+    "@elastic.io/maester-client": "6.0.0-dev.1",
     "amqplib": "0.8.0",
     "bunyan": "1.8.10",
     "co": "4.6.0",
