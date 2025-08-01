@@ -101,6 +101,7 @@ describe('Integration Test', () => {
                         .reply(200, customers);
 
                     await amqpHelper.publishMessage(inputMessage, {
+                        messageId,
                         parentMessageId,
                         threadId
                     });
@@ -130,7 +131,7 @@ describe('Integration Test', () => {
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
                         threadId,
-                        parentMessageId,
+                        parentMessageId: messageId,
                         protocolVersion: protocolVersion
                     });
 
@@ -178,6 +179,7 @@ describe('Integration Test', () => {
                     await amqpHelper.publishMessage(
                         inputMessage,
                         {
+                            messageId,
                             parentMessageId,
                             threadId
                         },
@@ -212,7 +214,7 @@ describe('Integration Test', () => {
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
                         threadId,
-                        parentMessageId,
+                        parentMessageId: messageId,
                         protocolVersion: protocolVersion
                     });
 
@@ -273,6 +275,7 @@ describe('Integration Test', () => {
                     };
 
                     await amqpHelper.publishMessage(psMsg, {
+                        messageId,
                         parentMessageId,
                         threadId
                     });
@@ -303,7 +306,7 @@ describe('Integration Test', () => {
                         stepId: env.ELASTICIO_STEP_ID,
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
-                        parentMessageId,
+                        parentMessageId: messageId,
                         protocolVersion: protocolVersion
                     });
 
@@ -365,6 +368,7 @@ describe('Integration Test', () => {
                         };
 
                         await amqpHelper.publishMessage(psMsg, {
+                            messageId,
                             parentMessageId,
                             threadId
                         });
@@ -407,7 +411,7 @@ describe('Integration Test', () => {
                             stepId: env.ELASTICIO_STEP_ID,
                             compId: env.ELASTICIO_COMP_ID,
                             function: env.ELASTICIO_FUNCTION,
-                            parentMessageId,
+                            parentMessageId: messageId,
                             protocolVersion: protocolVersion
                         });
 
@@ -457,6 +461,7 @@ describe('Integration Test', () => {
                     });
 
                     await amqpHelper.publishMessage(psMsg, {
+                        messageId,
                         parentMessageId,
                         threadId
                     });
@@ -503,7 +508,7 @@ describe('Integration Test', () => {
                         stepId: env.ELASTICIO_STEP_ID,
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
-                        parentMessageId,
+                        parentMessageId: messageId,
                         protocolVersion
                     });
 
@@ -546,6 +551,7 @@ describe('Integration Test', () => {
                     await runner.__test__.closeConsumerChannel();
 
                     await amqpHelper.publishMessage(inputMessage, {
+                        messageId,
                         parentMessageId,
                         threadId
                     });
@@ -575,7 +581,7 @@ describe('Integration Test', () => {
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
                         threadId,
-                        parentMessageId,
+                        parentMessageId: messageId,
                         protocolVersion: protocolVersion
                     });
 
@@ -654,7 +660,7 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { threadId });
+                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
 
                             runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
@@ -774,7 +780,7 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { threadId });
+                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
 
                             runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
@@ -878,7 +884,7 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { threadId });
+                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
 
                             runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
@@ -915,6 +921,7 @@ describe('Integration Test', () => {
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: sailorSettings.FUNCTION,
                                 protocolVersion: protocolVersion,
+                                parentMessageId: messageId,
                                 threadId
                             });
 
@@ -948,7 +955,7 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { threadId });
+                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
 
                             runner.run(sailorSettings, ipc);
                             const { message, queueName } = await new Promise(resolve => amqpHelper.on(
@@ -977,6 +984,7 @@ describe('Integration Test', () => {
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: sailorSettings.FUNCTION,
                                 protocolVersion: protocolVersion,
+                                parentMessageId: messageId,
                                 threadId
                             });
 
@@ -1022,6 +1030,7 @@ describe('Integration Test', () => {
                             .reply(200, customers);
 
                         await amqpHelper.publishMessage(inputMessage, {
+                            messageId,
                             parentMessageId,
                             threadId
                         });
@@ -1056,7 +1065,7 @@ describe('Integration Test', () => {
                             compId: env.ELASTICIO_COMP_ID,
                             function: env.ELASTICIO_FUNCTION,
                             threadId,
-                            parentMessageId,
+                            parentMessageId: messageId,
                             protocolVersion
                         });
 
@@ -1091,6 +1100,7 @@ describe('Integration Test', () => {
 
                         await amqpHelper.publishMessage(inputMessage, {}, {
                             reply_to: amqpHelper.httpReplyQueueRoutingKey,
+                            messageId,
                             threadId
                         });
 
@@ -1122,6 +1132,7 @@ describe('Integration Test', () => {
                             function: env.ELASTICIO_FUNCTION,
                             reply_to: amqpHelper.httpReplyQueueRoutingKey,
                             protocolVersion: 1,
+                            parentMessageId: messageId,
                             threadId
                         });
 
@@ -1187,6 +1198,7 @@ describe('Integration Test', () => {
                 .reply(200, customers);
 
             await amqpHelper.publishMessage(inputMessage, {
+                messageId,
                 parentMessageId,
                 threadId
             });
@@ -1220,6 +1232,7 @@ describe('Integration Test', () => {
                 .reply(200, customers);
 
             await amqpHelper.publishMessage(inputMessage, {
+                messageId,
                 parentMessageId,
                 threadId
             });
@@ -1251,6 +1264,7 @@ describe('Integration Test', () => {
                 .reply(200, customers);
 
             await amqpHelper.publishMessage(inputMessage, {
+                messageId,
                 parentMessageId,
                 threadId
             });
@@ -1265,6 +1279,7 @@ describe('Integration Test', () => {
 
             throw new Error('Error expected!');
         });
+
         it('should reconnect if consumer connection closed and continue message processing', async () => {
             let threadId2 = uuid.v4();
             helpers.mockApiTaskStepResponse(env);
@@ -1291,13 +1306,16 @@ describe('Integration Test', () => {
                 );
             });
             await amqpHelper.publishMessage(inputMessage, {
+                messageId,
                 parentMessageId,
                 threadId
             });
             await runner.putOutToSea(settings.readFrom(env), ipc);
             const connection = await amqpHelper.serverConnectionWait('read');
             await amqpHelper.serverConnectionClose(connection);
+            const messageId2 = uuid.v4();
             await amqpHelper.publishMessage(inputMessage, {
+                messageId: messageId2,
                 parentMessageId,
                 threadId: threadId2
             });
@@ -1307,6 +1325,58 @@ describe('Integration Test', () => {
                 { threadId: threadId2, queueName: amqpHelper.nextStepQueue }
             ]);
         }).timeout(5000); // waiting for rabbitmq http api to finally show connections can be slow
+
+        // TODO add test with a lot of messages and quick component executions
+
+        it('should not fail if message is acknowledged while read connection is closed', async () => {
+            env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
+
+            let threadId2 = uuid.v4();
+            helpers.mockApiTaskStepResponse(env);
+
+            nock('https://api.acme.com')
+                .post('/subscribe')
+                .reply(200, {
+                    id: 'subscription_12345'
+                })
+                .get('/customers')
+                .times(2)
+                .reply(200, customers);
+
+            const repliesPromise = new Promise((resolve) => {
+                const replies = [];
+                amqpHelper.on(
+                    'data',
+                    ({ properties: { headers: { threadId } } }, queueName) => {
+                        replies.push({ threadId, queueName });
+                        if (replies.length === 2) {
+                            resolve(replies);
+                        }
+                    }
+                );
+            });
+            await runner.putOutToSea(settings.readFrom(env), ipc);
+            const connection = await amqpHelper.serverConnectionWait('read');
+            await amqpHelper.publishMessage(inputMessage, {
+                messageId,
+                parentMessageId,
+                threadId
+            });
+            await amqpHelper.serverConnectionClose(connection);
+            const connection2 = await amqpHelper.serverConnectionWait('read');
+            const messageId2 = uuid.v4();
+            await amqpHelper.publishMessage(inputMessage, {
+                messageId: messageId2,
+                parentMessageId,
+                threadId: threadId2
+            });
+            await amqpHelper.serverConnectionClose(connection2);
+            const replies = await repliesPromise;
+            expect(replies).to.deep.equal([
+                { threadId, queueName: amqpHelper.nextStepQueue },
+                { threadId: threadId2, queueName: amqpHelper.nextStepQueue }
+            ]);
+        }).timeout(20000); // waiting for rabbitmq http api to finally show connections can be slow
     });
 
     describe('when sailor is being invoked for start', () => {
