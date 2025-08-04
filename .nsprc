@@ -1,18 +1,6 @@
 {
-    "GHSA-wc69-rhjr-hc9g": {
-         "active": true,
-         "notes": "Bunyan library set only new Date to momentjs as parameter"
-    },
     "GHSA-f8q6-p94x-37v3": {
         "active": true,
         "notes": "braceExpand is not used in rimraf"
-    },
-    "GHSA-hrpp-h998-j3pp": {
-        "active": true,
-        "notes": "There is no query-string user input in sailor"
-    },
-    "GHSA-27h2-hvpr-p74q": {
-        "active": true,
-        "notes": "The vulnerability is in maester-client. Maester-client doesn't use jwt.verify function."
     }
 }
