@@ -11,6 +11,7 @@ const Encryptor = require('../lib/encryptor');
 const settings = require('../lib/settings');
 const { Sailor } = require('../lib/sailor');
 const { IPC } = require('../lib/ipc.js');
+const messagesDB = require('../lib/messagesDB.js');
 
 chai.use(require('sinon-chai'));
 
@@ -67,6 +68,7 @@ describe('Integration Test', () => {
         nock.cleanAll();
         await amqpHelper.cleanUp();
         sinon.restore();
+        messagesDB.__reset__();
     });
 
     describe('when sailor is being invoked for message processing', () => {
@@ -701,6 +703,7 @@ describe('Integration Test', () => {
                                 stepId: env.ELASTICIO_STEP_ID,
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: env.ELASTICIO_FUNCTION,
+                                parentMessageId: messageId,
                                 protocolVersion,
                                 threadId
                             });
@@ -829,6 +832,7 @@ describe('Integration Test', () => {
                                 stepId: env.ELASTICIO_STEP_ID,
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: env.ELASTICIO_FUNCTION,
+                                parentMessageId: messageId,
                                 protocolVersion: protocolVersion,
                                 threadId
                             });

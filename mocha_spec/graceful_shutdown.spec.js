@@ -1,4 +1,5 @@
 const expect = require('chai').expect;
+const messagesDB = require('../lib/messagesDB');
 const helpers = require('./integration_helpers');
 
 describe('Graceful shutdown', function test() {
@@ -26,6 +27,7 @@ describe('Graceful shutdown', function test() {
     afterEach(async () => {
         await helpers.fakeApiServerStop();
         await amqpHelper.cleanUp();
+        messagesDB.__reset__();
     });
 
     describe('start, no messages, shutdown', () => {
@@ -84,7 +86,7 @@ describe('Graceful shutdown', function test() {
 
             // let sailor to schedule shutdown
             await new Promise(resolve => setTimeout(resolve, 200));
-            amqpHelper.publishMessage(inputMessage);
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
 
             // let amqp to take the messages
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -106,7 +108,7 @@ describe('Graceful shutdown', function test() {
             const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage);
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
 
             // let (sailor + amqp) some time to handle all messages
             await sailorTester.waitForEvent('init:ended');
@@ -134,7 +136,7 @@ describe('Graceful shutdown', function test() {
             const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage);
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
 
             // let (sailor + amqp) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
@@ -166,7 +168,7 @@ describe('Graceful shutdown', function test() {
             const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage);
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
 
             // let (sailor + amqp) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
@@ -201,8 +203,8 @@ describe('Graceful shutdown', function test() {
             const sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage);
-            amqpHelper.publishMessage(inputMessage);
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_2' });
 
             // let (sailor + amqp) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
@@ -238,8 +240,8 @@ describe('Graceful shutdown', function test() {
 
             const sailorTester = helpers.ShellTester.init({ env });
 
-            amqpHelper.publishMessage(inputMessage);
-            amqpHelper.publishMessage(inputMessage);
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
+            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_2' });
 
             await sailorTester.run();
             // let (sailor + amqp) some time to handle all messages
