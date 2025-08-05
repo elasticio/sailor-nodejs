@@ -1330,9 +1330,7 @@ describe('Integration Test', () => {
             ]);
         }).timeout(5000); // waiting for rabbitmq http api to finally show connections can be slow
 
-        // TODO add test with a lot of messages and quick component executions
-
-        it('should not fail if message is acknowledged while read connection is closed', async () => {
+        it('should not fail if message is acknowledged while read connection is closed and processing is slow', async () => {
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
             let threadId2 = uuid.v4();
