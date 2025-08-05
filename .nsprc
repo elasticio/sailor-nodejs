@@ -1,6 +1,6 @@
 {
     "GHSA-f8q6-p94x-37v3": {
         "active": true,
-        "notes": "braceExpand is not used in rimraf"
+       "notes": "braceExpand is not used in rimraf"
     }
 }
