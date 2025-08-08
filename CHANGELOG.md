@@ -1,3 +1,8 @@
+## 2.7.6 (August 1, 2025)
+
+* Updated `elasticio-rest-node` to version 2.0.0 to address a vulnerability
+* Removed `request` related libraries from main dependencies
+
 ## 2.7.5 (March 21, 2025)
 
 * @elastic.io/maester-client updated to 6.0.0 to get rid of the vulnerability

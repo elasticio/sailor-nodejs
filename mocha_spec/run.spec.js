@@ -541,7 +541,7 @@ describe('Integration Test', () => {
 
                     runner.run(settings.readFrom(env), ipc);
 
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
 
                     await runner.__test__.closeConsumerChannel();
 
