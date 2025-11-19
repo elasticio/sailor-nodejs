@@ -1,3 +1,8 @@
+## 2.7.7 (November 19, 2025)
+
+* Improve handling of cases when connection to RabbitMQ is re-established.
+[#7855](https://github.com/elasticio/elasticio/issues/7855)
+
 ## 2.7.6 (August 1, 2025)
 
 * Updated `elasticio-rest-node` to version 2.0.0 to address a vulnerability

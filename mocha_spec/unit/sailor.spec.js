@@ -11,6 +11,7 @@ const { Sailor } = require('../../lib/sailor');
 const Settings = require('../../lib/settings');
 const amqp = require('../../lib/amqp.js');
 const Encryptor = require('../../lib/encryptor.js');
+const messagesDB = require('../../lib/messagesDB.js');
 
 describe('Sailor', () => {
     let settings;
@@ -59,6 +60,7 @@ describe('Sailor', () => {
     });
     afterEach(() => {
         sandbox.restore();
+        messagesDB.__reset__();
     });
     describe('readIncomingMessageHeaders', () => {
         let sailor;
@@ -168,6 +170,7 @@ describe('Sailor', () => {
     });
     describe('processMessage', () => {
         let fakeAMQPConnection;
+        let messageId;
         let message;
         let payload;
 
@@ -185,6 +188,7 @@ describe('Sailor', () => {
             sandbox.stub(amqp, 'Amqp').returns(fakeAMQPConnection);
 
             payload = { param1: 'Value1' };
+            messageId = uuid.v4();
             message = {
                 fields: {
                     consumerTag: 'abcde',
@@ -201,7 +205,7 @@ describe('Sailor', () => {
                         userId: '5559edd38968ec0736000002',
                         workspaceId: '5559edd38968ec073600683',
                         threadId: uuid.v4(),
-                        messageId: uuid.v4(),
+                        messageId,
                         parentMessageId: uuid.v4()
                     },
                     deliveryMode: undefined,
@@ -256,7 +260,10 @@ describe('Sailor', () => {
                 })
             );
 
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should call sendData() with extended headers', async () => {
@@ -383,7 +390,10 @@ describe('Sailor', () => {
                 })
             );
 
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it(
@@ -446,7 +456,10 @@ describe('Sailor', () => {
                     })
                 );
 
-                expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                    messageId
+                );
+                expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
             }
         );
 
@@ -507,7 +520,10 @@ describe('Sailor', () => {
                     })
                 );
 
-                expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                    messageId
+                );
+                expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
             }
         );
 
@@ -568,7 +584,10 @@ describe('Sailor', () => {
             expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
             expect(sailor.apiClient.accounts.update).to.have.been.calledOnce;
             expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should emit error if failed to update keys', async () => {
@@ -602,7 +621,10 @@ describe('Sailor', () => {
             expect(fakeAMQPConnection.sendError).to.have.been.calledOnce.and.calledWith(sinon.match({
                 message: 'Update keys error'
             }));
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should call sendRebound() and ack()', async () => {
@@ -623,7 +645,10 @@ describe('Sailor', () => {
             expect(fakeAMQPConnection.sendRebound).to.have.been.calledOnce.and.calledWith(sinon.match({
                 message: 'Rebound reason'
             }));
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should call sendSnapshot() and ack() after a `snapshot` event', async () => {
@@ -664,7 +689,10 @@ describe('Sailor', () => {
                 })
             );
             expect(sailor.snapshot).to.deep.equal(expectedSnapshot);
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should call sendSnapshot() and ack() after an `updateSnapshot` event', async () => {
@@ -709,7 +737,10 @@ describe('Sailor', () => {
             );
 
             expect(sailor.snapshot).to.deep.equal(expectedSnapshot);
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should send error if error happened', async () => {
@@ -738,7 +769,10 @@ describe('Sailor', () => {
                 message
             );
 
-            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should send error and reject only once()', async () => {
@@ -793,7 +827,10 @@ describe('Sailor', () => {
                 message
             );
 
-            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should not process message if taskId in header is not equal to task._id', async () => {
@@ -841,7 +878,10 @@ describe('Sailor', () => {
             expect(fakeAMQPConnection.sendError).to.have.been.callCount(2);
 
             // ack
-            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should handle errors in httpReply properly', async () => {
@@ -902,7 +942,10 @@ describe('Sailor', () => {
                     threadId: message.properties.headers.threadId
                 })
             );
-            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         it('should handle errors in httpReply properly', async () => {
@@ -956,10 +999,14 @@ describe('Sailor', () => {
             }));
 
             // ack
-            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+            expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(
+                messageId
+            );
+            expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
         });
 
         describe('for incoming lightweight message', () => {
+            let messageId;
             let message;
             let payload;
             let bodyObjectId;
@@ -1005,6 +1052,7 @@ describe('Sailor', () => {
                         }
                     }
                 };
+                messageId = uuid.v4();
                 message = {
                     fields: {
                         consumerTag: 'abcde',
@@ -1021,7 +1069,7 @@ describe('Sailor', () => {
                             userId: '5559edd38968ec0736000002',
                             workspaceId: '5559edd38968ec073600683',
                             threadId: uuid.v4(),
-                            messageId: uuid.v4(),
+                            messageId,
                             parentMessageId: uuid.v4()
                         },
                         deliveryMode: undefined,
@@ -1137,7 +1185,10 @@ describe('Sailor', () => {
                             })
                         );
 
-                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                            messageId
+                        );
+                        expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
                     });
                 });
 
@@ -1172,7 +1223,10 @@ describe('Sailor', () => {
                             message
                         );
 
-                        expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(message);
+                        expect(fakeAMQPConnection.reject).to.have.been.calledOnce.and.calledWith(
+                            messageId
+                        );
+                        expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
                     });
                 });
             });
@@ -1264,7 +1318,10 @@ describe('Sailor', () => {
                         })
                     );
 
-                    expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                    expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                        messageId
+                    );
+                    expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
                 });
             });
         });
@@ -1379,7 +1436,10 @@ describe('Sailor', () => {
                             })
                         );
 
-                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                            messageId
+                        );
+                        expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
                     });
                 });
 
@@ -1401,7 +1461,10 @@ describe('Sailor', () => {
                                 stack: sinon.match.string
                             }),
                         );
-                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                            messageId
+                        );
+                        expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
                     });
                 });
             });
@@ -1462,7 +1525,7 @@ describe('Sailor', () => {
                                 execId: 'some-exec-id',
                                 function: 'data_trigger',
                                 messageId: sinon.match.string,
-                                parentMessageId: message.properties.headers.messageId,
+                                parentMessageId: messageId,
                                 start: sinon.match.number,
                                 stepId: 'step_1',
                                 taskId: '5559edd38968ec0736000003',
@@ -1472,7 +1535,10 @@ describe('Sailor', () => {
                             })
                         );
 
-                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
+                        expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(
+                            messageId
+                        );
+                        expect(messagesDB.getMessageById(messageId)).to.deep.equal(message);
                     });
                 });
             });

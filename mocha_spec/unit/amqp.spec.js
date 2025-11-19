@@ -9,6 +9,7 @@ const pThrottle = require('p-throttle');
 
 const Settings = require('../../lib/settings');
 const Encryptor = require('../../lib/encryptor.js');
+const messagesDB = require('../../lib/messagesDB.js');
 const Amqp = require('../../lib/amqp.js').Amqp;
 
 describe('AMQP', () => {
@@ -16,6 +17,7 @@ describe('AMQP', () => {
     let sandbox;
     let encryptor;
     let message;
+    let messageId;
     let settings;
     beforeEach(() => {
         envVars = {};
@@ -49,6 +51,7 @@ describe('AMQP', () => {
         settings = Settings.readFrom(envVars);
         encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
 
+        messageId = uuid.v4();
         message = {
             fields: {
                 consumerTag: 'abcde',
@@ -70,7 +73,7 @@ describe('AMQP', () => {
                 correlationId: undefined,
                 replyTo: undefined,
                 expiration: undefined,
-                messageId: undefined,
+                messageId,
                 timestamp: undefined,
                 type: undefined,
                 userId: undefined,
@@ -86,6 +89,7 @@ describe('AMQP', () => {
 
     afterEach(() => {
         sandbox.restore();
+        messagesDB.__reset__();
     });
 
     it('Should send message to outgoing channel when process data', async () => {
@@ -1095,23 +1099,97 @@ describe('AMQP', () => {
         );
     });
 
-    it('Should ack message when confirmed', () => {
+    it('Should ack message when confirmed', async () => {
         const amqp = new Amqp(settings);
         amqp.consumerChannel = {
             ack: sandbox.stub()
         };
+        sandbox.stub(messagesDB, 'getMessageById').withArgs(messageId).returns(message);
+        sandbox.spy(messagesDB, 'deleteMessage');
 
-        amqp.ack(message);
+        await amqp.ack(messageId);
 
         expect(amqp.consumerChannel.ack).to.have.been.calledOnce.and.calledWith(message);
+        expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
     });
 
-    it('Should reject message when ack is called with false', () => {
+    it('Should wait for new message to ack after re-establishing connection', async () => {
+        const oldMessage = {
+            ...message,
+            fields: {
+                consumerTag: 'oldConsumerTag'
+            }
+        };
+        messagesDB.addMessage(messageId, oldMessage);
+        const amqp = new Amqp(settings);
+        amqp.consumerChannel = {
+            ack: sandbox.stub()
+        };
+        amqp.consume = {
+            consumerTag: message.fields.consumerTag
+        };
+        sandbox.spy(messagesDB, 'deleteMessage');
+
+        await Promise.all([
+            new Promise(resolve => setTimeout(() => {
+                messagesDB.addMessage(messageId, message);
+                resolve();
+            }, 1000)),
+            amqp.ack(messageId)
+        ]);
+
+        expect(amqp.consumerChannel.ack).to.have.been.calledOnce.and.calledWith(message);
+        expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
+    });
+
+    it('Should reject message when ack is called with false', async () => {
         const amqp = new Amqp(settings);
         amqp.consumerChannel = {
             reject: sandbox.stub()
         };
-        amqp.reject(message);
+        sandbox.stub(messagesDB, 'getMessageById').withArgs(messageId).returns(message);
+        sandbox.spy(messagesDB, 'deleteMessage');
+        await amqp.reject(messageId);
+
+        expect(amqp.consumerChannel.reject).to.have.been.calledOnce.and.calledWith(message, false);
+        expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
+    });
+
+    it('Should wait for new message to reject after re-establishing connection', async () => {
+        const oldMessage = {
+            ...message,
+            fields: {
+                consumerTag: 'oldConsumerTag'
+            }
+        };
+        messagesDB.addMessage(messageId, oldMessage);
+        const amqp = new Amqp(settings);
+        amqp.consumerChannel = {
+            reject: sandbox.stub()
+        };
+        amqp.consume = {
+            consumerTag: message.fields.consumerTag
+        };
+        sandbox.spy(messagesDB, 'deleteMessage');
+
+        await Promise.all([
+            new Promise(resolve => setTimeout(() => {
+                messagesDB.addMessage(messageId, message);
+                resolve();
+            }, 1000)),
+            amqp.reject(messageId)
+        ]);
+
+        expect(amqp.consumerChannel.reject).to.have.been.calledOnce.and.calledWith(message);
+        expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
+    });
+
+    it('Should reject original message when ack is called with false', () => {
+        const amqp = new Amqp(settings);
+        amqp.consumerChannel = {
+            reject: sandbox.stub()
+        };
+        amqp.rejectOriginal(message);
 
         expect(amqp.consumerChannel.reject).to.have.been.calledOnce.and.calledWith(message, false);
     });
