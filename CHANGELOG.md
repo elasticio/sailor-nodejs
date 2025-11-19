@@ -1,4 +1,4 @@
-## 2.7.7 (August 5, 2025)
+## 2.7.7 (November 19, 2025)
 
 * Improve handling of cases when connection to RabbitMQ is re-established.
 [#7855](https://github.com/elasticio/elasticio/issues/7855)
