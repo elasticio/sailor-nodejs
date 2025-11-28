@@ -98,7 +98,7 @@ async function run(settings, ipc) {
         await putOutToSea(settings, ipc);
         logger.info('Fully initialized and waiting for messages');
     } catch (e) {
-        if (sailor && !sailor.amqpConnection.closed) {
+        if (sailor && !sailor.isConnected()) {
             await sailor.reportError(e);
         }
         logger.criticalErrorAndExit('putOutToSea.catch', e);
