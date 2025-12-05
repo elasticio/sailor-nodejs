@@ -1,3 +1,8 @@
+## 2.7.8 (December 12, 2025)
+
+* Minor release fixing a dependency vulnerability discovered
+
+
 ## 2.7.7 (November 19, 2025)
 
 * Improve handling of cases when connection to RabbitMQ is re-established.
