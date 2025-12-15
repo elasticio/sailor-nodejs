@@ -38,11 +38,11 @@ if (require.main === module) {
         headers: {
             messageHeader1: "headerValue1",
             messageHeader2: "headerValue2",
-            "x-ipaas-object-storage-id": "2ad7b3b7-4e6b-4772-9f38-8327d71fde7e"
+            //"x-ipaas-object-storage-id": "2ad7b3b7-4e6b-4772-9f38-8327d71fde7e"
         },
         body: {
-            //dataField1: "dataValue1",
-            //dataField2: "dataValue2"
+            dataField1: "dataValue1",
+            dataField2: "dataValue2"
         }
     };
 
