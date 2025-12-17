@@ -7,7 +7,7 @@
     "ELASTICIO_WORKSPACE_ID": "workspace_xyz",
     "ELASTICIO_USER_ID": "user_1122",
     "ELASTICIO_COMP_ID": "component_3344",
-    "ELASTICIO_FUNCTION": "http_reply",
+    "ELASTICIO_FUNCTION": "data_trigger",
     "ELASTICIO_API_URI": "http://localhost:9000",
     "ELASTICIO_API_USERNAME": "task-692ee23d4ab5d34bb7321559",
     "ELASTICIO_API_KEY": "976ffec8-455b-494e-9478-2d66761f4040",
