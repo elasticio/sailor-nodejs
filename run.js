@@ -24,6 +24,7 @@ function prepareSandbox() {
 }
 
 async function putOutToSea(settings, ipc) {
+    logger.trace({ settings }, 'putOutToSea called');
     ipc.send('init:started');
     const deferred = Q.defer();
     sailorInit = deferred.promise;
@@ -31,6 +32,7 @@ async function putOutToSea(settings, ipc) {
 
     //eslint-disable-next-line no-extra-boolean-cast
     if (!!settings.HOOK_SHUTDOWN) {
+        logger.trace('Running hook shutdown');
         disconnectRequired = false;
         //eslint-disable-next-line no-empty-function
         sailor.reportError = () => {
