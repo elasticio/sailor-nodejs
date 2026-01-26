@@ -1184,7 +1184,7 @@ describe('AMQP', () => {
         expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
     });
 
-    it.only('Should ack message after connection close, reconnect and receiving message with new consumerTag', async () => {
+    it('Should ack message after connection close, reconnect and receiving message with new consumerTag', async () => {
         const oldMessage = {
             ...message,
             fields: {
