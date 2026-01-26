@@ -6,5 +6,9 @@
     "GHSA-4hjh-wcwx-xvwj": {
         "active": true,
         "notes": "should be removed when maester-client is fixed: https://github.com/elasticio/maester-client/issues/47"
+    },
+    "GHSA-869p-cjfg-cm3x": {
+        "active": true,
+        "notes": "we don't use HMAC signature"
     }
 }
