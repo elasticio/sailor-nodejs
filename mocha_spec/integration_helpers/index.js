@@ -35,7 +35,7 @@ class AmqpHelper extends EventEmitter {
         );
     }
 
-    publishMessage(message, { messageId, parentMessageId, threadId } = {}, headers = {}) {
+    publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
         let msgHeaders = Object.assign({
             execId: this.env.ELASTICIO_EXEC_ID,
             taskId: this.env.ELASTICIO_FLOW_ID,
@@ -43,8 +43,7 @@ class AmqpHelper extends EventEmitter {
             userId: this.env.ELASTICIO_USER_ID,
             threadId,
             stepId: message.headers.stepId,
-            messageId,
-            parentMessageId
+            messageId: parentMessageId
         }, headers);
         const protocolVersion = Number(msgHeaders.protocolVersion || 1);
         return this.subscriptionChannel.publish(

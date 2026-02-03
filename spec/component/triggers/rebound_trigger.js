@@ -1,7 +1,7 @@
 exports.process = processTrigger;
 
-function processTrigger(msg, cfg) {
+async function processTrigger(msg, cfg) {
     var that = this;
-    that.emit('rebound', new Error('Rebound reason'));
-    that.emit('end');
+    await that.emit('error', new Error('Rebound reason'));
+    await that.emit('end');
 }

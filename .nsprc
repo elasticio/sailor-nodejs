@@ -2,9 +2,5 @@
     "GHSA-f8q6-p94x-37v3": {
         "active": true,
         "notes": "braceExpand is not used in rimraf"
-    },
-    "GHSA-4hjh-wcwx-xvwj": {
-        "active": true,
-        "notes": "should be removed when maester-client is fixed: https://github.com/elasticio/maester-client/issues/47"
     }
 }
