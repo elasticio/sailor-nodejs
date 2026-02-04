@@ -1184,6 +1184,63 @@ describe('AMQP', () => {
         expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
     });
 
+    it('Should ack message after connection close, reconnect and receiving message with new consumerTag', async () => {
+        const oldMessage = {
+            ...message,
+            fields: {
+                ...message.fields,
+                consumerTag: 'oldConsumerTag'
+            }
+        };
+        const newMessage = {
+            ...message,
+            fields: {
+                ...message.fields,
+                consumerTag: 'newConsumerTag'
+            }
+        };
+
+        messagesDB.addMessage(messageId, oldMessage);
+        const amqp = new Amqp(settings);
+
+        // Mock the _ensureConsumerChannel to simulate reconnection logic
+        let channelCreationCount = 0;
+        sandbox.stub(amqp, '_ensureConsumerChannel').callsFake(async () => {
+            channelCreationCount++;
+            if (channelCreationCount === 1) {
+                // First call: no consumer channel (connection was closed)
+                amqp.consumerChannel = undefined;
+                return undefined;
+            }
+            // Second call: new consumer channel after reconnect
+            amqp.consumerChannel = {
+                ack: sandbox.stub()
+            };
+            return amqp.consumerChannel;
+        });
+
+        // Set up consume object with new consumer tag after reconnect
+        amqp.consume = {
+            consumerTag: 'newConsumerTag'
+        };
+
+        sandbox.spy(messagesDB, 'deleteMessage');
+
+        // Simulate the ack flow with reconnection
+        await Promise.all([
+            new Promise(resolve => setTimeout(() => {
+                // Update the message with new consumerTag after reconnection
+                messagesDB.addMessage(messageId, newMessage);
+                resolve();
+            }, 100)),
+            amqp.ack(messageId)
+        ]);
+
+        expect(amqp._ensureConsumerChannel).to.have.been.calledTwice;
+        expect(amqp.consumerChannel.ack).to.have.been.calledOnce.and.calledWith(newMessage);
+        expect(messagesDB.deleteMessage).to.have.been.calledOnce.and.calledWith(messageId);
+    });
+
     it('Should reject original message when ack is called with false', () => {
         const amqp = new Amqp(settings);
         amqp.consumerChannel = {
