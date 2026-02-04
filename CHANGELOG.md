@@ -1,3 +1,8 @@
+## 2.7.8 (February 4, 2026)
+
+* Ensure connection before ack/nack of the message 
+[#7855](https://github.com/elasticio/elasticio/issues/7855)
+
 ## 2.7.7 (November 19, 2025)
 
 * Improve handling of cases when connection to RabbitMQ is re-established.
