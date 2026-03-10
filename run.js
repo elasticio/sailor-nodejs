@@ -57,23 +57,6 @@ async function putOutToSea(settings, ipc) {
     ipc.send('init:ended');
 }
 
-async function disconnectAndExit() {
-    if (!disconnectRequired) {
-        return;
-    }
-    disconnectRequired = false;
-
-    try {
-        logger.info('Disconnecting...');
-        await sailor.disconnect();
-        logger.info('Successfully disconnected');
-        process.exit();
-    } catch (err) {
-        logger.error(err, 'Unable to disconnect');
-        process.exit(-1);
-    }
-}
-
 async function gracefulShutdown() {
     if (!disconnectRequired) {
         return;
@@ -90,8 +73,15 @@ async function gracefulShutdown() {
     await sailorInit;
     logger.trace('Waited an init before graceful shutdown');
 
-    await sailor.scheduleShutdown();
-    await disconnectAndExit();
+    try {
+        logger.info('Disconnecting...');
+        await sailor.scheduleShutdown();
+        logger.info('Successfully disconnected');
+        process.exit();
+    } catch (err) {
+        logger.error(err, 'Unable to disconnect');
+        process.exit(-1);
+    }
 }
 
 async function run(settings, ipc) {
