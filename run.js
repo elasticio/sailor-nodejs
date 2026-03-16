@@ -52,9 +52,10 @@ async function putOutToSea(settings, ipc) {
     }
 
     await sailor.runHookInit();
-    await sailor.run();
     deferred.resolve();
     ipc.send('init:ended');
+
+    await sailor.run();
 }
 
 async function gracefulShutdown() {
@@ -67,8 +68,7 @@ async function gracefulShutdown() {
         return;
     }
 
-    // we connect to amqp, create channels, start listen a queue on init and interrupting this process with 'disconnect'
-    // will lead to undefined behaviour
+    // Wait for init to complete before disconnecting
     logger.trace('Checking/waiting for init before graceful shutdown');
     await sailorInit;
     logger.trace('Waited an init before graceful shutdown');
