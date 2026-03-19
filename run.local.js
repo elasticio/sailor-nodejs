@@ -8,7 +8,9 @@ function setEnvVars() {
 setEnvVars();
 
 const { IPC } = require('./lib/ipc');
-const { run } = require('./run');
+const { addProcessListeners, run } = require('./run');
 const settings = require('./lib/settings.js');
 const ipc = new IPC();
+
+addProcessListeners();
 run(settings.readFrom(process.env), ipc);

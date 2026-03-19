@@ -74,8 +74,10 @@ async function gracefulShutdown() {
     logger.trace('Waited an init before graceful shutdown');
 
     try {
-        logger.info('Disconnecting...');
+        logger.info('Scheduling shutdown...');
         await sailor.scheduleShutdown();
+        logger.info('Finished shutdown. Disconnecting...');
+        await sailor.disconnect();
         logger.info('Successfully disconnected');
         process.exit();
     } catch (err) {
@@ -88,13 +90,27 @@ async function run(settings, ipc) {
     prepareSandbox();
     try {
         await putOutToSea(settings, ipc);
-        logger.info('Fully initialized and waiting for messages');
     } catch (e) {
         if (sailor && !sailor.isConnected()) {
             await sailor.reportError(e);
         }
         logger.criticalErrorAndExit('putOutToSea.catch', e);
     }
+}
+
+function addProcessListeners() {
+    process.on('SIGTERM', function onSigterm() {
+        logger.info('Received SIGTERM');
+        gracefulShutdown();
+    });
+
+    process.on('SIGINT', function onSigint() {
+        logger.info('Received SIGINT');
+        gracefulShutdown();
+    });
+
+    process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
+    process.on('unhandledRejection', (err) => logger.error(err, 'process.unhandledRejection'));
 }
 
 exports.__test__ = {
@@ -110,22 +126,10 @@ exports.__test__ = {
 };
 exports.run = run;
 exports.putOutToSea = putOutToSea;
+exports.addProcessListeners = addProcessListeners;
 
 if (require.main === module || process.mainModule.filename === __filename) {
-    process.on('SIGTERM', function onSigterm() {
-        logger.info('Received SIGTERM');
-        gracefulShutdown();
-    });
-
-    process.on('SIGINT', function onSigint() {
-        logger.info('Received SIGINT');
-        gracefulShutdown();
-    });
-
-    process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
-    process.on('unhandledRejection', (err) => logger.error(err, 'process.unhandledRejection'));
-
+    addProcessListeners();
     const ipc = new IPC();
-
     run(settings.readFrom(process.env), ipc);
 }
