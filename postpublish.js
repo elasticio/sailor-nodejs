@@ -7,6 +7,9 @@ var version = require('./package.json').version;
 if (!version) {
     console.error('Can not determine current version');
     process.exit(0);
+} else if (version.indexOf('dev') > -1) {
+    console.info('Current version is a development version, skipping tag creation');
+    process.exit(0);
 }
 
 var tag = 'v' + version;
