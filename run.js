@@ -30,11 +30,11 @@ async function putOutToSea(settings, ipc) {
     sailorInit = deferred.promise;
     sailor = new Sailor(settings);
 
-    //eslint-disable-next-line no-extra-boolean-cast
+    // eslint-disable-next-line no-extra-boolean-cast
     if (!!settings.HOOK_SHUTDOWN) {
         logger.trace('Running hook shutdown');
         disconnectRequired = false;
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         sailor.reportError = () => {
         };
         await sailor.prepare();
@@ -46,7 +46,7 @@ async function putOutToSea(settings, ipc) {
     await sailor.connect();
     await sailor.prepare();
 
-    //eslint-disable-next-line no-extra-boolean-cast
+    // eslint-disable-next-line no-extra-boolean-cast
     if (!!settings.STARTUP_REQUIRED) {
         await sailor.startup();
     }

@@ -15,7 +15,7 @@ const { IPC } = require('../lib/ipc.js');
 chai.use(require('sinon-chai'));
 
 function requireRun() {
-    //@todo it would be great to use something like this https://github.com/jveski/shelltest
+    // @todo it would be great to use something like this https://github.com/jveski/shelltest
     const path = '../run.js';
     const resolved = require.resolve(path);
     delete require.cache[resolved];
@@ -80,9 +80,8 @@ describe('Integration Test', () => {
             messageId = uuid.v4();
         });
 
-        for (let protocolVersion of [1, 2]) {
+        for (const protocolVersion of [1, 2]) {
             describe(`for output protocolVersion ${protocolVersion}`, () => {
-
                 let encoding;
                 beforeEach(() => {
                     env.ELASTICIO_PROTOCOL_VERSION = protocolVersion;
@@ -335,8 +334,8 @@ describe('Integration Test', () => {
                 });
 
                 it(
-                    'should paste data from incoming message into passthrough '
-                    + 'and not copy own data if NO_SELF_PASSTRHOUGH',
+                    'should paste data from incoming message into passthrough ' +
+                    'and not copy own data if NO_SELF_PASSTRHOUGH',
                     async () => {
                         env.ELASTICIO_STEP_ID = 'step_2';
                         env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
@@ -452,7 +451,7 @@ describe('Integration Test', () => {
                         },
                         headers: {
                             'x-custom-component-header': '123_abc',
-                            'stepId': 'step_1'
+                            stepId: 'step_1'
                         }
                     });
 
@@ -526,7 +525,6 @@ describe('Integration Test', () => {
                     });
                 });
 
-
                 it('should reopen if consumer channel closed', async () => {
                     helpers.mockApiTaskStepResponse(env);
 
@@ -537,7 +535,6 @@ describe('Integration Test', () => {
                         })
                         .get('/customers')
                         .reply(200, customers);
-
 
                     runner.run(settings.readFrom(env), ipc);
 
@@ -607,7 +604,6 @@ describe('Integration Test', () => {
                             }
                         }
                     });
-
                 });
 
                 describe('when env ELASTICIO_STARTUP_REQUIRED is set', () => {
@@ -991,10 +987,9 @@ describe('Integration Test', () => {
                 });
 
                 describe('when env ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS is set', () => {
-
                     beforeEach(() => {
-                        env.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS = 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV ,'
-                            + 'ELASTICIO_NOT_PRESENT';
+                        env.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS = 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV ,' +
+                            'ELASTICIO_NOT_PRESENT';
 
                         env.ELASTICIO_RANDOM = 'random';
                         env.ELASTICIO_FIRST = 'first';
@@ -1009,8 +1004,6 @@ describe('Integration Test', () => {
                     });
 
                     it('should run trigger successfully and pass additional vars to headers', async () => {
-
-
                         helpers.mockApiTaskStepResponse(env);
 
                         nock('https://api.acme.com')
@@ -1031,7 +1024,6 @@ describe('Integration Test', () => {
                             'data',
                             (message, queueName) => resolve({ message, queueName })
                         ));
-
 
                         const { properties, content } = message;
                         const { body } = encryptor.decryptMessageContent(content, encoding);
@@ -1071,12 +1063,10 @@ describe('Integration Test', () => {
                             }
                         });
                     });
-
                 });
 
                 describe('when reply_to header is set', () => {
                     it('should send http reply successfully', async () => {
-
                         env.ELASTICIO_FUNCTION = 'http_reply_action';
 
                         helpers.mockApiTaskStepResponse(env);
@@ -1266,7 +1256,7 @@ describe('Integration Test', () => {
             throw new Error('Error expected!');
         });
         it('should reconnect if consumer connection closed and continue message processing', async () => {
-            let threadId2 = uuid.v4();
+            const threadId2 = uuid.v4();
             helpers.mockApiTaskStepResponse(env);
 
             nock('https://api.acme.com')
@@ -1326,7 +1316,6 @@ describe('Integration Test', () => {
 
                 expect(fakeLogging).to.have.been.calledOnce.and.calledWith('putOutToSea.catch', error);
                 expect(reportError).to.not.have.been.called;
-
             });
         });
     });

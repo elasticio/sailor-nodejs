@@ -41,8 +41,8 @@ class ShellTester extends EventEmitter {
             env: this._env
         };
 
-        //// Uncomment this code in order to figure out, what's going on in the child process stdout/stderr in logs
-        //// this._fork.stdout won't stops working after sendKill(), so the only way to debug  –  it's log files
+        /// / Uncomment this code in order to figure out, what's going on in the child process stdout/stderr in logs
+        /// / this._fork.stdout won't stops working after sendKill(), so the only way to debug  –  it's log files
         // const fs = require('fs');
         // fs.writeFileSync('./out.log', '');
         // fs.writeFileSync('./err.log', '');

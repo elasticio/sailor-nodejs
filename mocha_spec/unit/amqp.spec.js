@@ -315,7 +315,7 @@ describe('AMQP', () => {
         const result = await amqp.sendData({
             headers: {
                 'some-other-header': 'headerValue',
-                'protocolVersion': 2
+                protocolVersion: 2
             },
             body: 'Message content'
         }, headers);
@@ -332,7 +332,7 @@ describe('AMQP', () => {
                     return sinon.match({
                         headers: {
                             'some-other-header': 'headerValue',
-                            'protocolVersion': 2
+                            protocolVersion: 2
                         },
                         body: 'Message content'
                     }).test(payload);
@@ -810,11 +810,11 @@ describe('AMQP', () => {
                     persistent: false,
                     headers: {
                         messageId,
-                        'taskId': 'task1234567890',
-                        'stepId': 'step_456',
-                        'reply_to': 'my-special-routing-key',
+                        taskId: 'task1234567890',
+                        stepId: 'step_456',
+                        reply_to: 'my-special-routing-key',
                         'x-eio-error-response': true,
-                        'protocolVersion': 1
+                        protocolVersion: 1
                     }
                 }
             );
@@ -876,7 +876,6 @@ describe('AMQP', () => {
                 }
             );
     });
-
 
     it('Should not provide errorInput if errorInput was empty', async () => {
         const amqp = new Amqp(settings);

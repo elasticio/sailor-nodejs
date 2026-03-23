@@ -260,10 +260,9 @@ describe('Sailor', () => {
         });
 
         it('should call sendData() with extended headers', async () => {
-
             const customVars = {
-                ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS: 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV,'
-                    + 'ELASTICIO_NOT_PRESENT',
+                ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS: 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV,' +
+                    'ELASTICIO_NOT_PRESENT',
                 ELASTICIO_RANDOM: 'random',
                 ELASTICIO_FIRST: 'first',
                 ELASTICIO_SECOND_ELASTICIO_ENV: 'second',
@@ -387,8 +386,8 @@ describe('Sailor', () => {
         });
 
         it(
-            'should augment emitted message with passthrough with data from incoming message '
-            + 'if NO_SELF_PASSTRHOUGH set', async () => {
+            'should augment emitted message with passthrough with data from incoming message ' +
+            'if NO_SELF_PASSTRHOUGH set', async () => {
                 message.properties.headers.stepId = 'step_0';
                 settings.FUNCTION = 'passthrough';
                 settings.NO_SELF_PASSTRHOUGH = true;
@@ -451,8 +450,8 @@ describe('Sailor', () => {
         );
 
         it(
-            'should not augment emitted message with passthrough with data from incoming message '
-            + 'if NO_SELF_PASSTRHOUGH set without stepId header',
+            'should not augment emitted message with passthrough with data from incoming message ' +
+            'if NO_SELF_PASSTRHOUGH set without stepId header',
             async () => {
                 settings.FUNCTION = 'passthrough';
                 settings.NO_SELF_PASSTRHOUGH = true;
@@ -1331,7 +1330,7 @@ describe('Sailor', () => {
 
                     it('should send lightweight', async () => {
                         await sailor.processMessage(payload, message);
-                        await new Promise(resolve => setTimeout(resolve, 10)); //wait for upload
+                        await new Promise(resolve => setTimeout(resolve, 10)); // wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
@@ -1391,7 +1390,7 @@ describe('Sailor', () => {
 
                     it('should not upload lightweight', async () => {
                         await sailor.processMessage(payload, message);
-                        await new Promise(resolve => setTimeout(resolve, 100)); //wait for upload
+                        await new Promise(resolve => setTimeout(resolve, 100)); // wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.calledTwice(addObjectStub);
@@ -1399,7 +1398,7 @@ describe('Sailor', () => {
                             sinon.match({
                                 message: 'Lightweight message/passthrough body upload error',
                                 stack: sinon.match.string
-                            }),
+                            })
                         );
                         expect(fakeAMQPConnection.ack).to.have.been.calledOnce.and.calledWith(message);
                     });
@@ -1436,7 +1435,7 @@ describe('Sailor', () => {
 
                     it('should not send lightweight', async () => {
                         await sailor.processMessage(payload, message);
-                        await new Promise(resolve => setTimeout(resolve, 10)); //wait for upload
+                        await new Promise(resolve => setTimeout(resolve, 10)); // wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(fakeAMQPConnection.connect).to.have.been.calledOnce;
                         sinon.assert.notCalled(addObjectSpy);

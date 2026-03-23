@@ -7,7 +7,7 @@ const request = require('request');
 exports.process = processTrigger;
 
 function processTrigger(msg, cfg) {
-    return co(function* gen() {
+    return co(function * gen() {
         const options = {
             uri: 'http://promise_target_url:80/foo/bar',
             json: true

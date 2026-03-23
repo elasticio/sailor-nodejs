@@ -3,7 +3,6 @@ describe('Service', () => {
     var nock = require('nock');
 
     describe('execService', () => {
-
         beforeEach(() => {
             process.env.ELASTICIO_API_URI = 'http://apihost.com';
         });
@@ -23,7 +22,6 @@ describe('Service', () => {
         }
 
         describe('error cases', () => {
-
             beforeEach(() => {
                 nock('http://test.com:80')
                     .post('/123/456')
@@ -31,7 +29,6 @@ describe('Service', () => {
             });
 
             it('should fail if no ELASTICIO_POST_RESULT_URL provided', done => {
-
                 service.processService('verifyCredentials', {})
                     .catch(checkError)
                     .done(done, done);
@@ -42,7 +39,6 @@ describe('Service', () => {
             });
 
             it('should throw an error when there is no such service method', done => {
-
                 service.processService('unknownMethod', makeEnv({}))
                     .then(checkResult)
                     .done(done, done);
@@ -54,7 +50,6 @@ describe('Service', () => {
             });
 
             it('should send error response if no ELASTICIO_CFG provided', done => {
-
                 service.processService('verifyCredentials', { ELASTICIO_POST_RESULT_URL: 'http://test.com/123/456' })
                     .then(checkResult)
                     .done(done, done);
@@ -66,7 +61,6 @@ describe('Service', () => {
             });
 
             it('should send error response if failed to parse ELASTICIO_CFG', done => {
-
                 service.processService('verifyCredentials', makeEnv({
                     ELASTICIO_POST_RESULT_URL: 'http://test.com/123/456',
                     ELASTICIO_CFG: 'test'
@@ -82,7 +76,6 @@ describe('Service', () => {
             });
 
             it('should send error response if component is not found', done => {
-
                 service.processService('verifyCredentials', {
                     ELASTICIO_POST_RESULT_URL: 'http://test.com/123/456',
                     ELASTICIO_CFG: '{"param1":"param2"}',
@@ -100,7 +93,6 @@ describe('Service', () => {
             });
 
             it('should throw an error when ELASTICIO_ACTION_OR_TRIGGER is not provided', done => {
-
                 service.processService('getMetaModel', makeEnv({}))
                     .then(checkResult)
                     .done(done, done);
@@ -112,7 +104,6 @@ describe('Service', () => {
             });
 
             it('should throw an error when ELASTICIO_ACTION_OR_TRIGGER is not found', done => {
-
                 service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'unknown' }))
                     .then(checkResult)
                     .done(done, done);
@@ -124,7 +115,6 @@ describe('Service', () => {
             });
 
             it('should throw an error when ELASTICIO_GET_MODEL_METHOD is not provided', done => {
-
                 service.processService('selectModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update' }))
                     .then(checkResult)
                     .done(done, done);
@@ -136,8 +126,7 @@ describe('Service', () => {
             });
 
             it('should throw an error when ELASTICIO_GET_MODEL_METHOD is not found', done => {
-
-                //eslint-disable-next-line max-len
+                // eslint-disable-next-line max-len
                 service.processService('selectModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update', ELASTICIO_GET_MODEL_METHOD: 'unknown' }))
                     .then(checkResult)
                     .done(done, done);
@@ -147,11 +136,9 @@ describe('Service', () => {
                     expect(result.data.message).toEqual('Method "unknown" is not found in "update" action or trigger');
                 }
             });
-
         });
 
         describe('success cases', () => {
-
             beforeEach(() => {
                 nock('http://test.com:80')
                     .post('/123/456')
@@ -159,9 +146,7 @@ describe('Service', () => {
             });
 
             describe('verifyCredentials', () => {
-
                 it('should verify successfully when verifyCredentials.js is not available', done => {
-
                     service.processService('verifyCredentials', makeEnv({}))
                         .then(checkResult)
                         .done(done, done);
@@ -173,8 +158,7 @@ describe('Service', () => {
                 });
 
                 it('should verify successfully when callback verified', done => {
-
-                    //eslint-disable-next-line max-len
+                    // eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component2' }))
                         .then(checkResult)
                         .done(done, done);
@@ -186,8 +170,7 @@ describe('Service', () => {
                 });
 
                 it('should NOT verify successfully when callback did not verify', done => {
-
-                    //eslint-disable-next-line max-len
+                    // eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component3' }))
                         .then(checkResult)
                         .done(done, done);
@@ -199,8 +182,7 @@ describe('Service', () => {
                 });
 
                 it('should verify successfully when promise resolves', done => {
-
-                    //eslint-disable-next-line max-len
+                    // eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component4' }))
                         .then(checkResult)
                         .done(done, done);
@@ -212,8 +194,7 @@ describe('Service', () => {
                 });
 
                 it('should NOT verify successfully when promise rejects', done => {
-
-                    //eslint-disable-next-line max-len
+                    // eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component5' }))
                         .then(checkResult)
                         .done(done, done);
@@ -228,8 +209,7 @@ describe('Service', () => {
                 });
 
                 it('should NOT verify successfully when error thrown synchronously', done => {
-
-                    //eslint-disable-next-line max-len
+                    // eslint-disable-next-line max-len
                     service.processService('verifyCredentials', makeEnv({ ELASTICIO_COMPONENT_PATH: '/spec/component6' }))
                         .then(checkResult)
                         .done(done, done);
@@ -242,12 +222,10 @@ describe('Service', () => {
                         });
                     }
                 });
-
             });
 
             describe('getMetaModel', () => {
                 it('should return callback based model successfully', done => {
-
                     service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update' }))
                         .then(checkResult)
                         .done(done, done);
@@ -268,7 +246,6 @@ describe('Service', () => {
                     }
                 });
                 it('should return promise based model successfully', done => {
-
                     service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update1' }))
                         .then(checkResult)
                         .done(done, done);
@@ -289,7 +266,6 @@ describe('Service', () => {
                     }
                 });
                 it('should return error when promise rejects', done => {
-
                     service.processService('getMetaModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update2' }))
                         .then(checkResult)
                         .done(done, done);
@@ -304,10 +280,8 @@ describe('Service', () => {
             });
 
             describe('selectModel', () => {
-
                 it('selectModel', done => {
-
-                    //eslint-disable-next-line max-len
+                    // eslint-disable-next-line max-len
                     service.processService('selectModel', makeEnv({ ELASTICIO_ACTION_OR_TRIGGER: 'update', ELASTICIO_GET_MODEL_METHOD: 'getModel' }))
                         .then(checkResult)
                         .done(done, done);
@@ -323,7 +297,6 @@ describe('Service', () => {
                 });
 
                 it('selectModel with updateKeys event', done => {
-
                     var env = makeEnv({
                         ELASTICIO_ACTION_OR_TRIGGER: 'update',
                         ELASTICIO_GET_MODEL_METHOD: 'getModelWithKeysUpdate',
@@ -353,7 +326,6 @@ describe('Service', () => {
                 });
 
                 it('selectModel with failed updateKeys event should return result anyway', done => {
-
                     var env = makeEnv({
                         ELASTICIO_ACTION_OR_TRIGGER: 'update',
                         ELASTICIO_GET_MODEL_METHOD: 'getModelWithKeysUpdate',
@@ -383,7 +355,6 @@ describe('Service', () => {
                 });
 
                 it('selectModel returns a promise that resolves successfully', done => {
-
                     var env = makeEnv({
                         ELASTICIO_ACTION_OR_TRIGGER: 'update',
                         ELASTICIO_GET_MODEL_METHOD: 'promiseSelectModel',
@@ -407,7 +378,6 @@ describe('Service', () => {
                 });
 
                 it('selectModel returns a promise that sends a request', done => {
-
                     var env = makeEnv({
                         ELASTICIO_ACTION_OR_TRIGGER: 'update',
                         ELASTICIO_GET_MODEL_METHOD: 'promiseRequestSelectModel',
@@ -439,7 +409,6 @@ describe('Service', () => {
                 });
 
                 it('selectModel returns a promise that rejects', done => {
-
                     var env = makeEnv({
                         ELASTICIO_ACTION_OR_TRIGGER: 'update',
                         ELASTICIO_GET_MODEL_METHOD: 'promiseSelectModelRejected',
@@ -459,11 +428,9 @@ describe('Service', () => {
                     }
                 });
             });
-
         });
 
         describe('sending error', () => {
-
             beforeEach(() => {
                 nock('http://test.com:80')
                     .post('/111/222')
@@ -471,8 +438,7 @@ describe('Service', () => {
             });
 
             it('verifyCredentials', done => {
-
-                //eslint-disable-next-line max-len
+                // eslint-disable-next-line max-len
                 service.processService('verifyCredentials', makeEnv({ ELASTICIO_POST_RESULT_URL: 'http://test.com/111/222' }))
                     .catch(checkError)
                     .done(done, done);
@@ -481,7 +447,6 @@ describe('Service', () => {
                     expect(err.message).toEqual('Failed to POST data to http://test.com/111/222 (404, Page not found)');
                 }
             });
-
         });
     });
 });

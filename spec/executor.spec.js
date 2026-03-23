@@ -1,5 +1,4 @@
 describe('Executor', () => {
-
     const nock = require('nock');
 
     var TaskExec = require('../lib/executor.js').TaskExec;
@@ -23,7 +22,7 @@ describe('Executor', () => {
     it('Should execute passthrough trigger and emit all events - data, end', () => {
         var taskexec = new TaskExec(defaultTaskExecArgs);
 
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         spyOn(taskexec, 'emit').andCallThrough();
 
@@ -44,7 +43,7 @@ describe('Executor', () => {
 
     it('Should reject if module is missing', () => {
         var taskexec = new TaskExec(defaultTaskExecArgs);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         spyOn(taskexec, 'emit').andCallThrough();
 
@@ -64,7 +63,7 @@ describe('Executor', () => {
 
     it('Should execute rebound_trigger and emit all events - rebound, end', () => {
         var taskexec = new TaskExec(defaultTaskExecArgs);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         spyOn(taskexec, 'emit').andCallThrough();
 
@@ -85,7 +84,7 @@ describe('Executor', () => {
 
     it('Should execute complex trigger, and emit all 6 events', () => {
         var taskexec = new TaskExec(defaultTaskExecArgs);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         spyOn(taskexec, 'emit').andCallThrough();
 
@@ -116,7 +115,7 @@ describe('Executor', () => {
 
     it('Should execute test_trigger and emit all events - 3 data events, 3 errors, 3 rebounds, 1 end', () => {
         var taskexec = new TaskExec(defaultTaskExecArgs);
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         taskexec.on('error', () => {});
         spyOn(taskexec, 'emit').andCallThrough();
 
@@ -126,7 +125,6 @@ describe('Executor', () => {
         waitsFor(() => taskexec.emit.callCount >= 9, 5000);
 
         runs(() => {
-
             expect(taskexec.emit).toHaveBeenCalled();
 
             var calls = taskexec.emit.calls;
@@ -147,13 +145,11 @@ describe('Executor', () => {
         });
     });
 
-
     describe('Promises', () => {
-
         it('Should execute a Promise trigger and emit all events - data, end', () => {
             var taskexec = new TaskExec(defaultTaskExecArgs);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             spyOn(taskexec, 'emit').andCallThrough();
 
@@ -179,7 +175,7 @@ describe('Executor', () => {
         it('Should execute a Promise.resolve() trigger and emit end', () => {
             var taskexec = new TaskExec(defaultTaskExecArgs);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             spyOn(taskexec, 'emit').andCallThrough();
 
@@ -199,9 +195,7 @@ describe('Executor', () => {
         });
     });
 
-
     describe('Request Promise', () => {
-
         beforeEach(() => {
             nock('http://promise_target_url:80')
                 .get('/foo/bar')
@@ -211,11 +205,9 @@ describe('Executor', () => {
         });
 
         it('Should execute a Promise trigger and emit all events - data, end', () => {
-
-
             var taskexec = new TaskExec(defaultTaskExecArgs);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             spyOn(taskexec, 'emit').andCallThrough();
 
@@ -242,19 +234,16 @@ describe('Executor', () => {
     });
 
     describe('Request Generators', () => {
-
         it('Should execute a Promise trigger and emit all events - data, end', () => {
-
             nock('http://promise_target_url:80')
                 .get('/foo/bar')
                 .reply(200, {
                     message: 'Life is good with generators'
                 });
 
-
             var taskexec = new TaskExec(defaultTaskExecArgs);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             spyOn(taskexec, 'emit').andCallThrough();
 
@@ -280,7 +269,6 @@ describe('Executor', () => {
         });
 
         it('Should execute a Promise trigger and emit all events - data, end', () => {
-
             nock('https://login.acme')
                 .post('/oauth2/v2.0/token', {
                     client_id: 'admin',
@@ -301,10 +289,9 @@ describe('Executor', () => {
                     ]
                 });
 
-
             var taskexec = new TaskExec(defaultTaskExecArgs);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             spyOn(taskexec, 'emit').andCallThrough();
 
@@ -347,7 +334,7 @@ describe('Executor', () => {
         it('should work', () => {
             const taskexec = new TaskExec(defaultTaskExecArgs);
 
-            //eslint-disable-next-line no-empty-function
+            // eslint-disable-next-line no-empty-function
             taskexec.on('error', () => {});
             spyOn(taskexec, 'emit').andCallThrough();
 

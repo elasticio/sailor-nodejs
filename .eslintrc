@@ -1,0 +1,73 @@
+{
+    "root": true,
+    "parserOptions": {
+        "ecmaVersion": 2018,
+        "sourceType": "script",
+        "ecmaFeatures": {
+            "impliedStrict": true
+        }
+    },
+    "plugins": [
+        "eslint-plugin-mocha",
+        "security",
+        "node"
+    ],
+    "extends": [
+        "standard",
+        "plugin:security/recommended"
+    ],
+    "globals": {
+        "BigInt": true
+    },
+    "rules": {
+        "array-bracket-spacing": ["warn", "never"],
+        "no-prototype-builtins": "warn",
+        "object-curly-newline": ["warn", { "multiline": true, "consistent": true }],
+        "quote-props": ["warn", "as-needed"],
+        "lines-between-class-members": 0,
+        "dot-notation": ["warn", { "allowKeywords": true }],
+        "quotes": ["error", "single", { "avoidEscape": true, "allowTemplateLiterals": true }],
+        "mocha/no-exclusive-tests": "error",
+        "mocha/no-skipped-tests": "error",
+        "mocha/no-identical-title": "error",
+        "node/no-deprecated-api": "warn",
+        "semi": [
+            "error",
+            "always"
+        ],
+        "indent": [
+            "error",
+            4,
+            { "SwitchCase": 1 }
+        ],
+        "max-len": [
+            "warn",
+            120,
+            4,
+            {
+                "ignoreUrls": true,
+                "ignoreTemplateLiterals": true
+            }
+        ],
+        "space-before-function-paren": [
+            "warn",
+            {
+                "anonymous": "always",
+                "named": "never",
+                "asyncArrow": "always"
+            }
+        ],
+        "curly": [
+            2,
+            "all"
+        ],
+        "brace-style": [
+            "error",
+            "1tbs",
+            {
+                "allowSingleLine": false
+            }
+        ]
+    }
+}
+

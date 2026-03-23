@@ -1,9 +1,9 @@
 const config = require('./config/local.json');
 
 function setEnvVars() {
-  for (const [key, value] of Object.entries(config)) {
-    process.env[key] = value;
-  }
+    for (const [key, value] of Object.entries(config)) {
+        process.env[key] = value;
+    }
 }
 setEnvVars();
 

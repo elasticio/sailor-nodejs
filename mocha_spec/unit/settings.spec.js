@@ -71,8 +71,8 @@ describe('Settings', () => {
     });
 
     it('should pass additional vars to settings that are listed in ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS', () => {
-        envVars.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS = 'ELASTICIO_FIRST, ELASTICIO_SECOND ,'
-            + 'ELASTICIO_THIRD_ELASTICIO_ENV,ELASTICIO_NOT_PRESENT';
+        envVars.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS = 'ELASTICIO_FIRST, ELASTICIO_SECOND ,' +
+            'ELASTICIO_THIRD_ELASTICIO_ENV,ELASTICIO_NOT_PRESENT';
 
         envVars.ELASTICIO_RANDOM = 'random';
         envVars.ELASTICIO_FIRST = 'first';

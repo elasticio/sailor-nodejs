@@ -36,7 +36,7 @@ class AmqpHelper extends EventEmitter {
     }
 
     publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
-        let msgHeaders = Object.assign({
+        const msgHeaders = Object.assign({
             execId: this.env.ELASTICIO_EXEC_ID,
             taskId: this.env.ELASTICIO_FLOW_ID,
             workspaceId: this.env.ELASTICIO_WORKSPACE_ID,
@@ -59,7 +59,7 @@ class AmqpHelper extends EventEmitter {
         );
     }
 
-    *prepareQueues() {
+    * prepareQueues() {
         const amqp = yield amqplib.connect(this.env.ELASTICIO_AMQP_URI);
         this._amqp = amqp;
         const publishChannel = yield amqp.createChannel();
@@ -136,7 +136,7 @@ class AmqpHelper extends EventEmitter {
     }
 
     cleanUp() {
-        return co(function* gen() {
+        return co(function * gen() {
             this.removeAllListeners();
             this.dataMessages = [];
             yield Promise.all([
@@ -179,7 +179,7 @@ class AmqpHelper extends EventEmitter {
     }
 
     retrieveAllMessagesNotConsumedBySailor(timeout = 1000) {
-        return co(function* gen() {
+        return co(function * gen() {
             const consumerTag = 'tmp_consumer';
             const data = [];
 
