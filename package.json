@@ -1,7 +1,7 @@
 {
   "name": "elasticio-sailor-nodejs",
   "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-  "version": "3.0.0-sailor-proxy-dev4",
+  "version": "3.0.0-sailor-proxy-dev5",
   "main": "run.js",
   "scripts": {
     "build": "tsc",
