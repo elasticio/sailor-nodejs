@@ -20,6 +20,7 @@
         "BigInt": true
     },
     "rules": {
+        "no-undef": "error",
         "array-bracket-spacing": ["warn", "never"],
         "no-prototype-builtins": "warn",
         "object-curly-newline": ["warn", { "multiline": true, "consistent": true }],
