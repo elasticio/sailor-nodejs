@@ -3,13 +3,10 @@ const config = require('../config/local.json');
 
 function generateEncodedMessage(
     body,
-    settings = {
-        MESSAGE_CRYPTO_PASSWORD: config.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
-        MESSAGE_CRYPTO_IV: config.ELASTICIO_MESSAGE_CRYPTO_IV
-    },
     protocolVersion = 2
 ) {
-    const encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
+    // console.log({ config, protocolVersion }, 'Generating encoded message with config and protocol version');
+    const encryptor = new Encryptor(config.ELASTICIO_MESSAGE_CRYPTO_PASSWORD, config.ELASTICIO_MESSAGE_CRYPTO_IV);
     return encryptor.encryptMessageContent(
         body,
         protocolVersion < 2
@@ -18,11 +15,9 @@ function generateEncodedMessage(
     );
 }
 
-function decodeMessage(encodedMessageBuffer, settings = {
-    MESSAGE_CRYPTO_PASSWORD: config.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
-    MESSAGE_CRYPTO_IV: config.ELASTICIO_MESSAGE_CRYPTO_IV
-}, protocolVersion = 2) {
-    const encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
+function decodeMessage(encodedMessageBuffer, protocolVersion = 2) {
+    // console.log({ config, protocolVersion }, 'Decoding message with config and protocol version');
+    const encryptor = new Encryptor(config.ELASTICIO_MESSAGE_CRYPTO_PASSWORD, config.ELASTICIO_MESSAGE_CRYPTO_IV);
     return encryptor.decryptMessageContent(
         encodedMessageBuffer,
         protocolVersion < 2
@@ -46,9 +41,8 @@ if (require.main === module) {
         }
     };
 
-    const encodedMessage = generateEncodedMessage(sampleMessage);
+    const encodedMessage = generateEncodedMessage(sampleMessage, 2);
     console.log('Encoded Message:', encodedMessage.toString('base64'));
-
     // const message = 'SmVGMloxRGtyOFFjNm9oSU5DUXpkMVBIYktURlNvNU92VkVQdnBUK1hlRmlhYUtDQVJxSEZScHpnMTl2NmFUaXpFWTZiRDArTDZZSVNPQ0ZjZS85SlhrMFVUcmdraTJiTUNrUjQ3OHYrOGlXUUN4TXJOMWFiV2VCcC9ZZVpvUW1KOUNFZmpzTjFPV1YraXQ2MXVnS1UxMDBXY0c0TDZzaGpZWWFlak9kczU2em5uU0cvcVBtRHV0SkRFdDRuZjR4';
     // const decodedMessage = decodeMessage(Buffer.from(message, 'base64'));
     // console.log("Decoded Message:", decodedMessage);
