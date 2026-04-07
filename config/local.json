@@ -15,5 +15,7 @@
     "ELASTICIO_MESSAGE_CRYPTO_PASSWORD": "password",
     "ELASTICIO_SAILOR_PROXY_URI": "http://localhost:4001",
     "ELASTICIO_COMPONENT_PATH": "./spec/component",
-    "ELASTICIO_EMIT_LIGHTWEIGHT_MESSAGE": "true"
+    "ELASTICIO_EMIT_LIGHTWEIGHT_MESSAGE": "true",
+    "ELASTICIO_PROXY_JWT_SECRET": "super-secret-proxy"
+
 }
