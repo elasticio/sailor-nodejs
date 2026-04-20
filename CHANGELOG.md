@@ -1,3 +1,9 @@
+## 2.7.9 (March 18, 2026)
+
+* Updated `lodash` to `4.17.23` to address prototype pollution vulnerability (CVE-2025-13465)
+* Updated `@elastic.io/maester-client` to `6.0.1-dev.2.1`
+* Added more informative logging for lightweight errors
+
 ## 2.7.8 (February 4, 2026)
 
 * Ensure connection before ack/nack of the message 
