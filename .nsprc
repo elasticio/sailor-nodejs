@@ -10,5 +10,141 @@
     "GHSA-869p-cjfg-cm3x": {
         "active": true,
         "notes": "we don't use HMAC signature"
+    },
+    "GHSA-3ppc-4f35-3m26": {
+        "active": true,
+        "notes": "transitive via bunyan>mv>rimraf>glob>minimatch, bunyan is unmaintained"
+    },
+    "GHSA-7r86-cg39-jmmj": {
+        "active": true,
+        "notes": "transitive via bunyan>mv>rimraf>glob>minimatch, bunyan is unmaintained"
+    },
+    "GHSA-23c5-xmqv-rm74": {
+        "active": true,
+        "notes": "transitive via bunyan>mv>rimraf>glob>minimatch, bunyan is unmaintained"
+    },
+    "GHSA-5v7r-6r5c-r473": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>stream-mime-type>file-type"
+    },
+    "GHSA-f886-m6hf-6m8v": {
+        "active": true,
+        "notes": "transitive via bunyan>mv>rimraf>glob>minimatch>brace-expansion, bunyan is unmaintained"
+    },
+    "GHSA-r5fr-rjxr-66jc": {
+        "active": true,
+        "notes": "lodash 4.17.21 is latest 4.x, no fix available"
+    },
+    "GHSA-f23m-r3pf-42rh": {
+        "active": true,
+        "notes": "lodash 4.17.21 is latest 4.x, no fix available"
+    },
+    "GHSA-r4q5-vmmm-2653": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios>follow-redirects"
+    },
+    "GHSA-3p68-rc4w-qgx5": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-w9j2-pvgh-6h63": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-pmwg-cvhr-8vh7": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-3w6x-2g7m-8v23": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-xhjh-pmcv-23jw": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-445q-vr5w-6q77": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-m7pr-hjqh-92cm": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-5c9x-8gcm-mpgx": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-vf2m-468p-8v99": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-pf86-5x62-jrwf": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-6chq-wfr3-2hj9": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-xx6v-rp6x-q39c": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-43fc-jf86-j433": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-q8qp-cvcw-x6jj": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-fvcv-3m26-pcqx": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-w5hq-g745-h8pq": {
+        "active": true,
+        "notes": "only uuid.v4() is used without buffer argument, not affected"
+    },
+    "GHSA-pjwm-pj3p-43mv": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-62hf-57xw-28j9": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-xxjr-mmjv-4gpg": {
+        "active": true,
+        "notes": "lodash 4.17.21 is latest 4.x, no fix available"
+    },
+    "GHSA-hfxv-24rg-xrqf": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-777c-7fjr-54vf": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-p92q-9vqr-4j8v": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-j5f8-grm9-p9fc": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-3g43-6gmg-66jw": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-35jp-ww65-95wh": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
+    },
+    "GHSA-898c-q2cr-xwhg": {
+        "active": true,
+        "notes": "transitive via @elastic.io/maester-client>axios"
     }
 }
