@@ -1,3 +1,6 @@
+## 3.0.0
+// TODO: write changelog
+
 ## 2.7.6 (August 1, 2025)
 
 * Updated `elasticio-rest-node` to version 2.0.0 to address a vulnerability
