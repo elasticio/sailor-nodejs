@@ -13,7 +13,7 @@ function processTrigger(msg, cfg) {
             json: true
         };
 
-        const [response, body] = yield Q.ninvoke(request, 'get', options);
+        const [, body] = yield Q.ninvoke(request, 'get', options);
 
         return {
             body

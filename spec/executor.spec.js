@@ -268,7 +268,7 @@ describe('Executor', () => {
             });
         });
 
-        it('Should execute a Promise trigger and emit all events - data, end', () => {
+        it('Should execute a Promise trigger and emit all events - data, end 1', () => {
             nock('https://login.acme')
                 .post('/oauth2/v2.0/token', {
                     client_id: 'admin',

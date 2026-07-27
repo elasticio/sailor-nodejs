@@ -91,7 +91,7 @@ async function run(settings, ipc) {
     try {
         await putOutToSea(settings, ipc);
     } catch (e) {
-        if (sailor && !sailor.isConnected()) {
+        if (sailor && sailor.isConnected()) {
             await sailor.reportError(e);
         }
         logger.criticalErrorAndExit('putOutToSea.catch', e);
@@ -119,9 +119,6 @@ exports.__test__ = {
             return Promise.resolve();
         }
         return sailor.disconnect();
-    },
-    closeConsumerChannel: function closeConsumerChannel() {
-        return sailor.amqpConnection.consumerChannel.close();
     }
 };
 exports.run = run;

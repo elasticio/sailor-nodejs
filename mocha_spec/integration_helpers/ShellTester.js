@@ -10,9 +10,10 @@ class ShellTester extends EventEmitter {
         this._filename = filename;
         this._args = args;
 
+        this._settled = false;
         this._promise = new Promise((resolve, reject) => {
-            this._promiseResolve = resolve;
-            this._promiseReject = reject;
+            this._promiseResolve = (v) => { if (!this._settled) { this._settled = true; resolve(v); } };
+            this._promiseReject = (e) => { if (!this._settled) { this._settled = true; reject(e); } };
         });
 
         this._env = env;

@@ -21,6 +21,7 @@
     },
     "rules": {
         "no-undef": "error",
+        "no-unused-expressions": ["error", { "allowShortCircuit": true, "allowTernary": true }],
         "array-bracket-spacing": ["warn", "never"],
         "no-prototype-builtins": "warn",
         "object-curly-newline": ["warn", { "multiline": true, "consistent": true }],

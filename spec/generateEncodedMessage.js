@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 const Encryptor = require('../lib/encryptor');
 const config = require('../config/local.json');
 

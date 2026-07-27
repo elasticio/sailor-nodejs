@@ -4,6 +4,7 @@ const rp = require('request-promise-native');
 
 exports.init = initTrigger;
 exports.startup = startup;
+exports.shutdown = shutdown;
 exports.process = processTrigger;
 
 const subscription = {};

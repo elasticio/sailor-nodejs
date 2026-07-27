@@ -1,225 +1,18 @@
 'use strict';
 
-const co = require('co');
-const amqplib = require('amqplib');
-const { EventEmitter } = require('events');
 const PREFIX = 'sailor_nodejs_integration_test';
 const nock = require('nock');
 const ShellTester = require('./ShellTester');
-const express = require('express');
+const FakeSailorProxy = require('./FakeSailorProxy');
 const Encryptor = require('../../lib/encryptor');
-const rabbitStats = require('rabbitmq-stats');
+const express = require('express');
 const FAKE_API_PORT = 1244; // most likely the port won't be taken – https://www.adminsub.net/tcp-udp-port-finder/1244
-
-// @todo move AmqpHelper to dedicated file (will be done in the future refactoring)
-class AmqpHelper extends EventEmitter {
-    constructor(env) {
-        super();
-        this.env = env;
-        this.httpReplyQueueName = PREFIX + 'request_reply_queue';
-        this.httpReplyQueueRoutingKey = PREFIX + 'request_reply_routing_key';
-        this.nextStepQueue = PREFIX + '_next_step_queue';
-        this.nextStepErrorQueue = PREFIX + '_next_step_queue_errors';
-
-        this.api = rabbitStats(env.ELASTICIO_AMQP_HTTP_URI, env.ELASTICIO_AMQP_USER, env.ELASTICIO_AMQP_PASS);
-
-        this.dataMessages = [];
-        this.errorMessages = [];
-
-        this._amqp = null;
-
-        this.counterData = 0;
-        this._encryptor = new Encryptor(
-            this.env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
-            this.env.ELASTICIO_MESSAGE_CRYPTO_IV
-        );
-    }
-
-    publishMessage(message, { parentMessageId, threadId } = {}, headers = {}) {
-        const msgHeaders = Object.assign({
-            execId: this.env.ELASTICIO_EXEC_ID,
-            taskId: this.env.ELASTICIO_FLOW_ID,
-            workspaceId: this.env.ELASTICIO_WORKSPACE_ID,
-            userId: this.env.ELASTICIO_USER_ID,
-            threadId,
-            stepId: message.headers.stepId,
-            messageId: parentMessageId
-        }, headers);
-        const protocolVersion = Number(msgHeaders.protocolVersion || 1);
-        return this.subscriptionChannel.publish(
-            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
-            this.env.ELASTICIO_DATA_ROUTING_KEY,
-            this._encryptor.encryptMessageContent(
-                message,
-                protocolVersion < 2 ? 'base64' : undefined
-            ),
-            {
-                headers: msgHeaders
-            }
-        );
-    }
-
-    * prepareQueues() {
-        const amqp = yield amqplib.connect(this.env.ELASTICIO_AMQP_URI);
-        this._amqp = amqp;
-        const publishChannel = yield amqp.createChannel();
-
-        yield this.prepareListen();
-        yield publishChannel.assertQueue(this.nextStepQueue);
-        yield publishChannel.assertQueue(this.nextStepErrorQueue);
-
-        const exchangeOptions = {
-            durable: true,
-            autoDelete: false
-        };
-
-        yield publishChannel.assertExchange(this.env.ELASTICIO_PUBLISH_MESSAGES_TO, 'direct', exchangeOptions);
-
-        yield publishChannel.bindQueue(
-            this.nextStepQueue,
-            this.env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            this.env.ELASTICIO_DATA_ROUTING_KEY);
-
-        yield publishChannel.bindQueue(
-            this.nextStepErrorQueue,
-            this.env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            this.env.ELASTICIO_ERROR_ROUTING_KEY);
-
-        yield publishChannel.assertQueue(this.httpReplyQueueName);
-        yield publishChannel.bindQueue(
-            this.httpReplyQueueName,
-            this.env.ELASTICIO_PUBLISH_MESSAGES_TO,
-            this.httpReplyQueueRoutingKey);
-
-        yield publishChannel.purgeQueue(this.nextStepQueue);
-        yield publishChannel.purgeQueue(this.nextStepErrorQueue);
-        yield publishChannel.purgeQueue(this.httpReplyQueueName);
-        yield publishChannel.purgeQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
-
-        this.publishChannel = publishChannel;
-    }
-
-    async serverConnectionWait(name) {
-        let connection;
-        while (!connection) {
-            const connections = await this.api.getConnections();
-            // eslint-disable-next-line camelcase
-            connection = connections.find(({ user_provided_name: uname }) => uname && uname.endsWith(`-${name}`));
-            if (!connection) {
-                await new Promise((resolve) => setTimeout(resolve, 100));
-            }
-        }
-
-        return connection;
-    }
-
-    async serverConnectionClose(connection) {
-        await this.api.deleteConnection(connection.name);
-    }
-
-    async prepareListen() {
-        const subscriptionChannel = await this._amqp.createChannel();
-        subscriptionChannel.assertQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
-        await subscriptionChannel.assertExchange(this.env.ELASTICIO_LISTEN_MESSAGES_ON, 'direct', {
-            durable: true,
-            autoDelete: false
-        });
-        await subscriptionChannel.bindQueue(
-            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
-            this.env.ELASTICIO_LISTEN_MESSAGES_ON,
-            this.env.ELASTICIO_DATA_ROUTING_KEY);
-        this.subscriptionChannel = subscriptionChannel;
-    }
-
-    removeListenQueue() {
-        return this.subscriptionChannel.deleteQueue(this.env.ELASTICIO_LISTEN_MESSAGES_ON);
-    }
-
-    cleanUp() {
-        return co(function * gen() {
-            this.removeAllListeners();
-            this.dataMessages = [];
-            yield Promise.all([
-                this.publishChannel.cancel('sailor_nodejs_1'),
-                this.publishChannel.cancel('sailor_nodejs_2'),
-                this.publishChannel.cancel('sailor_nodejs_3')
-            ]);
-            yield this._amqp.close();
-        }.bind(this));
-    }
-
-    prepare() {
-        const that = this;
-        return co(function * gen() {
-            yield that.prepareQueues();
-
-            yield that.publishChannel.consume(
-                that.nextStepQueue,
-                that.consumer.bind(that, that.nextStepQueue),
-                { consumerTag: 'sailor_nodejs_1' }
-            );
-
-            yield that.publishChannel.consume(
-                that.nextStepErrorQueue,
-                that.consumer.bind(that, that.nextStepErrorQueue),
-                { consumerTag: 'sailor_nodejs_2' }
-            );
-
-            yield that.publishChannel.consume(
-                that.httpReplyQueueName,
-                that.consumer.bind(that, that.httpReplyQueueName),
-                { consumerTag: 'sailor_nodejs_3' }
-            );
-        });
-    }
-
-    consumer(queue, message) {
-        this.dataMessages.push(message);
-        this.emit('data', message, queue);
-    }
-
-    retrieveAllMessagesNotConsumedBySailor(timeout = 1000) {
-        return co(function * gen() {
-            const consumerTag = 'tmp_consumer';
-            const data = [];
-
-            yield this.subscriptionChannel.consume(
-                this.env.ELASTICIO_LISTEN_MESSAGES_ON,
-                (message) => {
-                    this.subscriptionChannel.ack(message);
-                    const protocolVersion = Number(message.properties.headers.protocolVersion || 1);
-
-                    const emittedMessage = this._encryptor.decryptMessageContent(
-                        message.content,
-                        protocolVersion < 2 ? 'base64' : undefined
-                    );
-
-                    const entry = {
-                        properties: message.properties,
-                        body: emittedMessage.body,
-                        emittedMessage
-                    };
-                    data.push(entry);
-                },
-                { consumerTag }
-            );
-            yield new Promise(resolve => setTimeout(resolve, timeout));
-
-            yield this.subscriptionChannel.cancel(consumerTag);
-
-            return data;
-        }.bind(this));
-    }
-}
+const FAKE_PROXY_PORT = 1245;
 
 function prepareEnv() {
     const env = {};
     env.LOG_LEVEL = process.env.LOG_LEVEL;
-    env.ELASTICIO_AMQP_URI = 'amqp://guest:guest@localhost:5672/';
-    env.ELASTICIO_AMQP_HTTP_URI = 'http://localhost:15672/';
-    env.ELASTICIO_AMQP_USER = 'guest';
-    env.ELASTICIO_AMQP_PASS = 'guest';
-    env.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '1';
+    env.ELASTICIO_PROXY_PREFETCH_SAILOR = '1';
     env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
     env.ELASTICIO_STEP_ID = 'step_1';
     env.ELASTICIO_EXEC_ID = 'some-exec-id';
@@ -233,24 +26,30 @@ function prepareEnv() {
     env.ELASTICIO_COMPONENT_PATH = '/mocha_spec/integration_component';
 
     env.ELASTICIO_API_URI = `http://localhost:${FAKE_API_PORT}`;
+    env.ELASTICIO_SAILOR_PROXY_URI = `http://localhost:${FAKE_PROXY_PORT}`;
 
     env.ELASTICIO_API_USERNAME = 'test@test.com';
     env.ELASTICIO_API_KEY = '5559edd';
+    env.ELASTICIO_SAILOR_PROXY_JWT_SECRET = 'testSailorProxyJwtSecret';
     env.ELASTICIO_FLOW_WEBHOOK_URI = 'https://in.elastic.io/hooks/' + env.ELASTICIO_FLOW_ID;
 
     env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'testCryptoPassword';
     env.ELASTICIO_MESSAGE_CRYPTO_IV = 'iv=any16_symbols';
 
     env.DEBUG = 'sailor:debug';
-    env.ELASTICIO_LISTEN_MESSAGES_ON = PREFIX + ':messages';
-    env.ELASTICIO_PUBLISH_MESSAGES_TO = PREFIX + ':exchange';
-    env.ELASTICIO_DATA_ROUTING_KEY = PREFIX + ':routing_key:message';
-    env.ELASTICIO_ERROR_ROUTING_KEY = PREFIX + ':routing_key:error';
-    env.ELASTICIO_REBOUND_ROUTING_KEY = PREFIX + ':routing_key:rebound';
-    env.ELASTICIO_SNAPSHOT_ROUTING_KEY = PREFIX + ':routing_key:snapshot';
-    env.ELASTICIO_AMQP_PUBLISH_RETRY_ATTEMPTS = 3;
-    env.ELASTICIO_AMQP_PUBLISH_MAX_RETRY_DELAY = 60 * 1000;
     return env;
+}
+
+/**
+ * Create a FakeSailorProxy for integration tests.
+ * Call `await proxyHelper.start()` in beforeEach and `await proxyHelper.stop()` in afterEach.
+ */
+function proxy(env) {
+    const encryptor = new Encryptor(
+        env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD,
+        env.ELASTICIO_MESSAGE_CRYPTO_IV
+    );
+    return new FakeSailorProxy(encryptor, FAKE_PROXY_PORT);
 }
 
 function mockApiTaskStepResponse(env, response) {
@@ -289,9 +88,7 @@ async function fakeApiServerStart(env, response, { responseCode = 200, logger = 
             url: req.url // @todo pick certain properties, not the entire res
         });
 
-        res
-            .json(Object.assign(defaultResponse, response))
-            .end(responseCode);
+        res.status(responseCode).json(Object.assign(defaultResponse, response));
     });
     let server;
     await new Promise(resolve => {
@@ -313,11 +110,9 @@ async function fakeApiServerStop() {
 
 exports.PREFIX = PREFIX;
 
-exports.amqp = function amqp(env) {
-    return new AmqpHelper(env);
-};
-
 exports.prepareEnv = prepareEnv;
+exports.proxy = proxy;
+exports.FAKE_PROXY_PORT = FAKE_PROXY_PORT;
 exports.mockApiTaskStepResponse = mockApiTaskStepResponse;
 exports.fakeApiServerStart = fakeApiServerStart;
 exports.fakeApiServerStop = fakeApiServerStop;
