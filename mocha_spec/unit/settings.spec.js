@@ -6,7 +6,6 @@ describe('Settings', () => {
     beforeEach(() => {
         envVars = {};
 
-        envVars.ELASTICIO_AMQP_URI = 'amqp://test2/test2';
         envVars.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
         envVars.ELASTICIO_EXEC_ID = 'some-exec-id';
         envVars.ELASTICIO_STEP_ID = 'step_1';
@@ -17,16 +16,12 @@ describe('Settings', () => {
         envVars.ELASTICIO_COMP_ID = '5559edd38968ec0736000456';
         envVars.ELASTICIO_FUNCTION = 'list';
 
-        envVars.ELASTICIO_LISTEN_MESSAGES_ON = '5559edd38968ec0736000003:step_1:1432205514864:messages';
-        envVars.ELASTICIO_PUBLISH_MESSAGES_TO = 'userexchange:5527f0ea43238e5d5f000001';
-        envVars.ELASTICIO_DATA_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:message';
-        envVars.ELASTICIO_ERROR_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:error';
-        envVars.ELASTICIO_REBOUND_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:rebound';
-        envVars.ELASTICIO_SNAPSHOT_ROUTING_KEY = '5559edd38968ec0736000003:step_1:1432205514864:snapshot';
-
         envVars.ELASTICIO_API_URI = 'http://apihost.com';
         envVars.ELASTICIO_API_USERNAME = 'test@test.com';
         envVars.ELASTICIO_API_KEY = '5559edd';
+
+        envVars.ELASTICIO_SAILOR_PROXY_URI = 'http://proxy:1245';
+        envVars.ELASTICIO_SAILOR_PROXY_JWT_SECRET = 'testProxySecret';
 
         envVars.ELASTICIO_MESSAGE_CRYPTO_IV = 'initiailization vector';
         envVars.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'this is password';
@@ -41,33 +36,31 @@ describe('Settings', () => {
     it('should not throw error if all important settings provided', () => {
         const result = settings.readFrom(envVars);
 
-        expect(result.LISTEN_MESSAGES_ON).to.equal('5559edd38968ec0736000003:step_1:1432205514864:messages');
+        expect(result.FLOW_ID).to.equal('5559edd38968ec0736000003');
+        expect(result.SAILOR_PROXY_URI).to.equal('http://proxy:1245');
     });
 
     it('should support also numbers as a settings parameter', () => {
-        envVars.ELASTICIO_RABBITMQ_PREFETCH_SAILOR = '20';
+        envVars.ELASTICIO_PROXY_PREFETCH_SAILOR = '20';
 
         const result = settings.readFrom(envVars);
 
-        expect(result.LISTEN_MESSAGES_ON).to.equal('5559edd38968ec0736000003:step_1:1432205514864:messages');
-        expect(result.RABBITMQ_PREFETCH_SAILOR).to.equal(20);
+        expect(result.FLOW_ID).to.equal('5559edd38968ec0736000003');
+        expect(result.PROXY_PREFETCH_SAILOR).to.equal(20);
     });
+
     it('should support also booleans as a settings parameter', () => {
-        envVars.ELASTICIO_NO_ERROR_REPLIES = '';
+        envVars.ELASTICIO_NO_SELF_PASSTRHOUGH = '';
         let result = settings.readFrom(envVars);
-        expect(result.NO_ERROR_REPLIES).to.equal(false);
+        expect(result.NO_SELF_PASSTRHOUGH).to.equal(false);
 
-        envVars.ELASTICIO_NO_ERROR_REPLIES = 'false';
+        envVars.ELASTICIO_NO_SELF_PASSTRHOUGH = 'false';
         result = settings.readFrom(envVars);
-        expect(result.NO_ERROR_REPLIES).to.equal(false);
+        expect(result.NO_SELF_PASSTRHOUGH).to.equal(false);
 
-        envVars.ELASTICIO_NO_ERROR_REPLIES = 'true';
+        envVars.ELASTICIO_NO_SELF_PASSTRHOUGH = 'true';
         result = settings.readFrom(envVars);
-        expect(result.NO_ERROR_REPLIES).to.equal(true);
-
-        envVars.ELASTICIO_NO_ERROR_REPLIES = '0';
-        result = settings.readFrom(envVars);
-        expect(result.NO_ERROR_REPLIES).to.equal(true);
+        expect(result.NO_SELF_PASSTRHOUGH).to.equal(true);
     });
 
     it('should pass additional vars to settings that are listed in ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS', () => {

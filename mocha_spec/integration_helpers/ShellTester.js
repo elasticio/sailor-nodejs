@@ -12,8 +12,16 @@ class ShellTester extends EventEmitter {
 
         this._settled = false;
         this._promise = new Promise((resolve, reject) => {
-            this._promiseResolve = (v) => { if (!this._settled) { this._settled = true; resolve(v); } };
-            this._promiseReject = (e) => { if (!this._settled) { this._settled = true; reject(e); } };
+            this._promiseResolve = (v) => {
+                if (!this._settled) {
+                    this._settled = true; resolve(v);
+                }
+            };
+            this._promiseReject = (e) => {
+                if (!this._settled) {
+                    this._settled = true; reject(e);
+                }
+            };
         });
 
         this._env = env;

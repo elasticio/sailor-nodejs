@@ -40,7 +40,7 @@ class FakeSailorProxy extends EventEmitter {
         this.messageQueue = []; // { metadata, body } – waiting to be fetched by sailor
         this.pendingRequests = []; // { stream } – waiting for a queued message
         this.objects = new Map(); // objectId → Buffer, for lightweight-message tests
-        this.dataMessages = [];     // messages received from the sailor with type='data'
+        this.dataMessages = []; // messages received from the sailor with type='data'
     }
 
     start() {
@@ -233,7 +233,9 @@ class FakeSailorProxy extends EventEmitter {
             stream.respond({ [HTTP2_HEADER_STATUS]: 200 });
             stream.end();
             const body = Buffer.concat(chunks);
-            if (type === 'data') this.dataMessages.push({ metadata, body });
+            if (type === 'data') {
+                this.dataMessages.push({ metadata, body });
+            }
             this.emit('message', { metadata, body }, type);
         });
     }

@@ -7,7 +7,6 @@ const TaskExec = require('../../lib/executor.js').TaskExec;
 
 describe('Executor', () => {
     const apiClientStub = {};
-    const amqpConnStub = {};
     const configStub = {};
     const loggerOptions = {};
     const taskVars = {};
@@ -16,8 +15,7 @@ describe('Executor', () => {
         variables: taskVars,
         services: {
             apiClient: apiClientStub,
-            config: configStub,
-            amqp: amqpConnStub
+            config: configStub
         }
     };
 
@@ -55,12 +53,6 @@ describe('Executor', () => {
         it('should return config', () => {
             const taskExec = new TaskExec(defaultTaskExecArgs);
             expect(taskExec.getConfig()).to.equal(defaultTaskExecArgs.services.config);
-        });
-    });
-    describe('__getAmqp', () => {
-        it('should return config', () => {
-            const taskExec = new TaskExec(defaultTaskExecArgs);
-            expect(taskExec.__getAmqp()).to.equal(defaultTaskExecArgs.services.amqp);
         });
     });
     describe('Return Promise interface', () => {
