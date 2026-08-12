@@ -16,6 +16,6 @@
     "ELASTICIO_SAILOR_PROXY_URI": "http://localhost:4001",
     "ELASTICIO_COMPONENT_PATH": "./spec/component",
     "ELASTICIO_EMIT_LIGHTWEIGHT_MESSAGE": "true",
-    "ELASTICIO_SAILOR_PROXY_JWT_SECRET": "super-secret-proxy"
-
+    "ELASTICIO_SAILOR_PROXY_JWT_SECRET": "super-secret-proxy",
+    "ELASTICIO_OUTGOING_MESSAGE_SIZE_LIMIT": "10485760"
 }
