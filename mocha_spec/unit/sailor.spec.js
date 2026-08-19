@@ -1543,5 +1543,114 @@ describe('Sailor', () => {
                 });
             });
         });
+
+        describe('when outgoing lightweight is enabled with string body', () => {
+            let payload;
+            let sailor;
+            const ndjsonBody = '{"id":1,"name":"Entity 1"}\n{"id":2,"name":"Entity 2"}\n{"id":3,"name":"Entity 3"}';
+            beforeEach(async () => {
+                payload = {
+                    headers: {},
+                    body: {
+                        some: 'body'
+                    },
+                    passthrough: {}
+                };
+                settings.FUNCTION = 'string_data_trigger';
+                settings.EMIT_LIGHTWEIGHT_MESSAGE = true;
+            });
+
+            describe('when string message is above OBJECT_STORAGE_SIZE_THRESHOLD', () => {
+                let addObjectStub;
+                let bodyObjectId;
+
+                beforeEach(async () => {
+                    settings.OBJECT_STORAGE_SIZE_THRESHOLD = 1;
+                    sailor = new Sailor(settings);
+                    bodyObjectId = 'string-body-object-id';
+
+                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
+                        expect(taskId).to.deep.equal('5559edd38968ec0736000003');
+                        expect(stepId).to.deep.equal('step_1');
+
+                        return Promise.resolve({
+                            is_passthrough: false
+                        });
+                    });
+
+                    addObjectStub = sandbox.stub(sailor.objectStorage, 'add').resolves(bodyObjectId);
+
+                    await sailor.connect();
+                    await sailor.prepare();
+                });
+
+                it('should upload string body without double-stringifying', async () => {
+                    await sailor.processMessage(payload, message);
+                    await new Promise(resolve => setTimeout(resolve, 10));
+
+                    sinon.assert.calledOnce(addObjectStub);
+
+                    // Verify the stream factory passed to objectStorage.add
+                    const streamFactory = addObjectStub.firstCall.args[0];
+                    expect(streamFactory).to.be.a('function');
+
+                    // Read the stream to verify contents are not double-stringified
+                    const stream = streamFactory();
+                    const chunks = [];
+                    for await (const chunk of stream) {
+                        chunks.push(chunk);
+                    }
+                    const uploadedContent = Buffer.concat(chunks).toString('utf-8');
+
+                    // Should be the raw NDJSON string, NOT a JSON-stringified version of it
+                    expect(uploadedContent).to.equal(ndjsonBody);
+                    // Must NOT start with a double-quote (which would indicate double-stringify)
+                    expect(uploadedContent).to.not.match(/^"/);
+
+                    expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
+                        sinon.match({
+                            body: {},
+                            headers: { [Sailor.OBJECT_ID_HEADER]: bodyObjectId }
+                        }),
+                        sinon.match({
+                            function: 'string_data_trigger',
+                            stepId: 'step_1',
+                            taskId: '5559edd38968ec0736000003'
+                        })
+                    );
+                });
+            });
+
+            describe('when string message is below OBJECT_STORAGE_SIZE_THRESHOLD', () => {
+                beforeEach(async () => {
+                    settings.OBJECT_STORAGE_SIZE_THRESHOLD = 1048576;
+                    sailor = new Sailor(settings);
+
+                    sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake(() => Promise.resolve({
+                        is_passthrough: false
+                    }));
+
+                    await sailor.connect();
+                    await sailor.prepare();
+                });
+
+                it('should send string body directly without uploading', async () => {
+                    const addObjectSpy = sandbox.spy(sailor.objectStorage, 'add');
+
+                    await sailor.processMessage(payload, message);
+                    await new Promise(resolve => setTimeout(resolve, 10));
+
+                    sinon.assert.notCalled(addObjectSpy);
+                    sinon.assert.calledOnce(fakeAMQPConnection.sendData);
+                    sinon.assert.calledWith(
+                        fakeAMQPConnection.sendData,
+                        sinon.match({
+                            body: ndjsonBody
+                        }),
+                        sinon.match.any
+                    );
+                });
+            });
+        });
     });
 });
