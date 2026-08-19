@@ -12,7 +12,9 @@
         "test:jasmine": "NODE_ENV=test jasmine-node spec",
         "test:mocha": "NODE_ENV=test node_modules/.bin/mocha --recursive mocha_spec --exit",
         "postpublish": "./postpublish.js",
-        "dev:local": "node run.local.js | bunyan"
+        "dev:local": "node run.local.js | bunyan",
+        "encode": "node local-dev-helpers.js encode",
+        "decode": "node local-dev-helpers.js decode"
     },
     "engines": {
         "node": ">=12.13.0"
