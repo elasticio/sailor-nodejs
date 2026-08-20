@@ -38,5 +38,9 @@
     "GHSA-rgw5-rvv9-x895": {
         "active": true,
         "notes": "log rotation is not used"
+    },
+    "GHSA-w5hq-g745-h8pq": {
+        "active": true,
+        "notes": "uuid v3/v5/v6 buf parameter not used — upgrade blocked by Node 12 support requirement"
     }
 }
