@@ -985,4 +985,101 @@ describe('ProxyClient', () => {
             expect(MESSAGE_PROCESSING_STATUS.ERROR).to.equal('error');
         });
     });
+
+    // ── Ping keepalive ───────────────────────────────────────────────────────
+
+    describe('_startPingInterval() / _stopPingInterval()', () => {
+        let clock;
+
+        beforeEach(() => {
+            clock = sinon.useFakeTimers();
+        });
+
+        afterEach(() => {
+            clock.restore();
+        });
+
+        it('should send a ping on every interval tick', () => {
+            const client = new ProxyClient(settings);
+            const mockSession = makeMockSession();
+            mockSession.ping = sinon.stub().yields(null, 5, Buffer.alloc(8));
+            client.clientSession = mockSession;
+
+            client._startPingInterval();
+            clock.tick(settings.PROXY_PING_INTERVAL_MS);
+
+            expect(mockSession.ping).to.have.been.calledOnce;
+        });
+
+        it('should not start a second interval if already running', () => {
+            const client = new ProxyClient(settings);
+            const mockSession = makeMockSession();
+            mockSession.ping = sinon.stub().yields(null, 5, Buffer.alloc(8));
+            client.clientSession = mockSession;
+
+            client._startPingInterval();
+            const first = client._pingInterval;
+            client._startPingInterval();
+
+            expect(client._pingInterval).to.equal(first);
+        });
+
+        it('should call _handleDisconnection if ping errors', () => {
+            const client = new ProxyClient(settings);
+            const mockSession = makeMockSession();
+            const pingErr = new Error('ping timeout');
+            mockSession.ping = sinon.stub().yields(pingErr, 0, Buffer.alloc(8));
+            client.clientSession = mockSession;
+            client.closed = false;
+            client._handleDisconnection = sinon.stub();
+
+            client._startPingInterval();
+            clock.tick(settings.PROXY_PING_INTERVAL_MS);
+
+            expect(client._handleDisconnection).to.have.been.calledOnce;
+            expect(client._handleDisconnection.firstCall.args[0]).to.equal('ping_timeout');
+        });
+
+        it('should not call _handleDisconnection on ping error if closed', () => {
+            const client = new ProxyClient(settings);
+            const mockSession = makeMockSession();
+            mockSession.ping = sinon.stub().yields(new Error('x'), 0, Buffer.alloc(8));
+            client.clientSession = mockSession;
+            client.closed = true;
+            client._handleDisconnection = sinon.stub();
+
+            client._startPingInterval();
+            clock.tick(settings.PROXY_PING_INTERVAL_MS);
+
+            expect(client._handleDisconnection).not.to.have.been.called;
+        });
+
+        it('_stopPingInterval should clear the interval', () => {
+            const client = new ProxyClient(settings);
+            const mockSession = makeMockSession();
+            mockSession.ping = sinon.stub().yields(null, 5, Buffer.alloc(8));
+            client.clientSession = mockSession;
+
+            client._startPingInterval();
+            expect(client._pingInterval).to.not.be.null;
+            client._stopPingInterval();
+            expect(client._pingInterval).to.be.null;
+
+            clock.tick(settings.PROXY_PING_INTERVAL_MS * 2);
+            expect(mockSession.ping).not.to.have.been.called;
+        });
+
+        it('should skip ping if session is destroyed', () => {
+            const client = new ProxyClient(settings);
+            const mockSession = makeMockSession();
+            mockSession.ping = sinon.stub();
+            mockSession.destroyed = true;
+            client.clientSession = mockSession;
+
+            client._startPingInterval();
+            clock.tick(settings.PROXY_PING_INTERVAL_MS);
+
+            expect(mockSession.ping).not.to.have.been.called;
+        });
+    });
 });
