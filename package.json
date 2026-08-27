@@ -16,7 +16,7 @@
     "node": ">=12.13.0"
   },
   "dependencies": {
-    "@elastic.io/maester-client": "6.0.3-dev.1",
+    "@elastic.io/maester-client": "6.0.3",
     "amqplib": "0.8.0",
     "bunyan": "1.8.10",
     "co": "4.6.0",
