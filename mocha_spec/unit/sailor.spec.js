@@ -43,6 +43,8 @@ describe('Sailor', () => {
         envVars.ELASTICIO_SAILOR_PROXY_URI = 'http://test-proxy:1245';
         envVars.ELASTICIO_SAILOR_PROXY_JWT_SECRET = 'testProxySecret';
 
+        envVars.ELASTICIO_OUTGOING_MESSAGE_SIZE_LIMIT = '1000000';
+
         settings = Settings.readFrom(envVars);
     });
 
@@ -50,7 +52,7 @@ describe('Sailor', () => {
         sandbox.restore();
     });
 
-    describe('processMessage', () => {
+    describe('processMessage', function () {
         let metadata;
         let payload;
 
@@ -63,9 +65,6 @@ describe('Sailor', () => {
             sandbox.stub(ProxyClient.prototype, 'sendRebound').resolves();
             sandbox.stub(ProxyClient.prototype, 'sendSnapshot').resolves();
             sandbox.stub(ProxyClient.prototype, 'finishProcessing').resolves();
-            // Default: return body as-is (no lightweight resolution)
-            sandbox.stub(ProxyClient.prototype, 'fetchMessageBody').callsFake(async (msg) => msg.body);
-            sandbox.stub(ProxyClient.prototype, 'uploadMessageBody').resolves('uploaded-object-id');
 
             payload = { param1: 'Value1' };
             metadata = {
@@ -789,6 +788,7 @@ describe('Sailor', () => {
                 beforeEach(async () => {
                     settings.FUNCTION = 'data_trigger';
                     sailor = new Sailor(settings);
+                    sandbox.stub(sailor, 'fetchMessageBody').callsFake(async (msg) => msg.body);
 
                     sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
                         expect(taskId).to.deep.equal('5559edd38968ec0736000003');
@@ -804,7 +804,7 @@ describe('Sailor', () => {
                     let runExecSpy;
                     beforeEach(async () => {
                         // Override fetchMessageBody: return body.data for known object IDs
-                        sailor.proxyClient.fetchMessageBody.callsFake(async (msg) => {
+                        sailor.fetchMessageBody.callsFake(async (msg) => {
                             const objectId = msg.headers && msg.headers[Sailor.OBJECT_ID_HEADER];
                             if (objectId === bodyObjectId) {
                                 return body.data;
@@ -880,7 +880,7 @@ describe('Sailor', () => {
                 describe('and one object can not be downloaded successfully', () => {
                     let runExecSpy;
                     beforeEach(async () => {
-                        sailor.proxyClient.fetchMessageBody.callsFake(async (msg) => {
+                        sailor.fetchMessageBody.callsFake(async (msg) => {
                             const objectId = msg.headers && msg.headers[Sailor.OBJECT_ID_HEADER];
                             if (objectId === bodyObjectId) {
                                 return body.data;
@@ -924,6 +924,7 @@ describe('Sailor', () => {
                     settings.FUNCTION = 'data_trigger';
                     settings.COMPONENT_PATH = '/spec/component-auto-resolve-object-refs-false';
                     sailor = new Sailor(settings);
+                    sandbox.stub(sailor, 'fetchMessageBody').callsFake(async (msg) => msg.body);
 
                     sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
                         expect(taskId).to.deep.equal('5559edd38968ec0736000003');
@@ -932,7 +933,7 @@ describe('Sailor', () => {
                     });
 
                     // Only step_4 (lightweight passthrough) gets downloaded in onData
-                    sailor.proxyClient.fetchMessageBody.callsFake(async (msg) => {
+                    sailor.fetchMessageBody.callsFake(async (msg) => {
                         const objectId = msg.headers && msg.headers[Sailor.OBJECT_ID_HEADER];
                         if (objectId === passthroughObjectId) {
                             return passThroughBody.data;
@@ -1033,6 +1034,8 @@ describe('Sailor', () => {
                 beforeEach(async () => {
                     settings.OBJECT_STORAGE_SIZE_THRESHOLD = 1;
                     sailor = new Sailor(settings);
+                    sandbox.stub(sailor, 'fetchMessageBody').callsFake(async (msg) => msg.body);
+                    sandbox.stub(sailor, 'uploadMessageBody').resolves('uploaded-object-id');
 
                     sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
                         expect(taskId).to.deep.equal('5559edd38968ec0736000003');
@@ -1041,7 +1044,7 @@ describe('Sailor', () => {
                     });
 
                     // step_2 has a lightweight passthrough body (objectId header)
-                    sailor.proxyClient.fetchMessageBody.callsFake(async (msg) => {
+                    sailor.fetchMessageBody.callsFake(async (msg) => {
                         const objectId = msg.headers && msg.headers[Sailor.OBJECT_ID_HEADER];
                         if (objectId === passthroughObjectId) {
                             return { passthrough: 'body' };
@@ -1057,7 +1060,7 @@ describe('Sailor', () => {
                     let bodyObjectId;
                     beforeEach(async () => {
                         bodyObjectId = 'body-object-id';
-                        sailor.proxyClient.uploadMessageBody.resolves(bodyObjectId);
+                        sailor.uploadMessageBody.resolves(bodyObjectId);
                     });
 
                     it('should send lightweight outgoing message', async () => {
@@ -1065,7 +1068,7 @@ describe('Sailor', () => {
                         await new Promise(resolve => setTimeout(resolve, 10)); // wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(sailor.proxyClient.connect).to.have.been.calledOnce;
-                        expect(sailor.proxyClient.uploadMessageBody).to.have.been.calledTwice;
+                        expect(sailor.uploadMessageBody).to.have.been.calledTwice;
                         expect(sailor.proxyClient.sendError).not.to.have.been.called;
                         expect(sailor.proxyClient.sendMessage).to.have.been.calledOnce.and.calledWith(
                             sinon.match({
@@ -1114,7 +1117,7 @@ describe('Sailor', () => {
 
                 describe('and objects can not be uploaded successfully', () => {
                     beforeEach(async () => {
-                        sailor.proxyClient.uploadMessageBody.rejects(new Error('Upload failed'));
+                        sailor.uploadMessageBody.rejects(new Error('Upload failed'));
                     });
 
                     it('should send error and not upload lightweight', async () => {
@@ -1122,7 +1125,7 @@ describe('Sailor', () => {
                         await new Promise(resolve => setTimeout(resolve, 100)); // wait for upload attempt
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(sailor.proxyClient.connect).to.have.been.calledOnce;
-                        expect(sailor.proxyClient.uploadMessageBody).to.have.been.calledTwice;
+                        expect(sailor.uploadMessageBody).to.have.been.calledTwice;
                         expect(sailor.proxyClient.sendError).to.have.been.calledOnce.and.calledWith(
                             sinon.match({
                                 message: 'Lightweight message/passthrough body upload error',
@@ -1140,6 +1143,8 @@ describe('Sailor', () => {
                 beforeEach(async () => {
                     settings.OBJECT_STORAGE_SIZE_THRESHOLD = 61;
                     sailor = new Sailor(settings);
+                    sandbox.stub(sailor, 'fetchMessageBody').callsFake(async (msg) => msg.body);
+                    sandbox.stub(sailor, 'uploadMessageBody').resolves('uploaded-object-id');
 
                     sandbox.stub(sailor.apiClient.tasks, 'retrieveStep').callsFake((taskId, stepId) => {
                         expect(taskId).to.deep.equal('5559edd38968ec0736000003');
@@ -1147,7 +1152,7 @@ describe('Sailor', () => {
                         return Promise.resolve({ is_passthrough: true });
                     });
 
-                    sailor.proxyClient.fetchMessageBody.callsFake(async (msg) => {
+                    sailor.fetchMessageBody.callsFake(async (msg) => {
                         const objectId = msg.headers && msg.headers[Sailor.OBJECT_ID_HEADER];
                         if (objectId === passthroughObjectId) {
                             return { passthrough: 'body' };
@@ -1165,7 +1170,7 @@ describe('Sailor', () => {
                         await new Promise(resolve => setTimeout(resolve, 10)); // wait for upload
                         expect(sailor.apiClient.tasks.retrieveStep).to.have.been.calledOnce;
                         expect(sailor.proxyClient.connect).to.have.been.calledOnce;
-                        expect(sailor.proxyClient.uploadMessageBody).not.to.have.been.called;
+                        expect(sailor.uploadMessageBody).not.to.have.been.called;
                         expect(sailor.proxyClient.sendError).not.to.have.been.called;
                         expect(sailor.proxyClient.sendMessage).to.have.been.calledOnce.and.calledWith(
                             sinon.match({

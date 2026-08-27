@@ -28,6 +28,8 @@ function prepareEnv() {
     env.ELASTICIO_API_URI = `http://localhost:${FAKE_API_PORT}`;
     env.ELASTICIO_SAILOR_PROXY_URI = `http://localhost:${FAKE_PROXY_PORT}`;
 
+    env.ELASTICIO_OUTGOING_MESSAGE_SIZE_LIMIT = '1000000';
+
     env.ELASTICIO_API_USERNAME = 'test@test.com';
     env.ELASTICIO_API_KEY = '5559edd';
     env.ELASTICIO_SAILOR_PROXY_JWT_SECRET = 'testSailorProxyJwtSecret';

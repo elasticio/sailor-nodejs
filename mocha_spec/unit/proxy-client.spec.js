@@ -12,945 +12,343 @@ const { ProxyClient, MESSAGE_PROCESSING_STATUS } = require('../../lib/proxy-clie
 const Encryptor = require('../../lib/encryptor');
 
 const {
+    HTTP2_HEADER_PATH,
+    HTTP2_HEADER_METHOD,
+    HTTP2_HEADER_AUTHORIZATION,
     HTTP2_HEADER_STATUS,
+    HTTP2_HEADER_CONTENT_LENGTH,
     NGHTTP2_NO_ERROR
 } = http2.constants;
 
 const MESSAGE_METADATA_HEADER = 'message-metadata';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function makeSettings(overrides = {}) {
     return {
         PROXY_CLIENT_ID: 'test-client-id',
         API_USERNAME: 'user@test.com',
-        API_KEY: 'testapikey',
-        SAILOR_PROXY_JWT_SECRET: 'testsecret',
+        API_KEY: 'test-api-key',
+        SAILOR_PROXY_JWT_SECRET: 'test-secret',
         SAILOR_PROXY_URI: 'http://localhost:9999',
         MESSAGE_CRYPTO_PASSWORD: 'testCryptoPassword',
         MESSAGE_CRYPTO_IV: 'iv=any16_symbols',
-        STEP_ID: 'step_1',
+        STEP_ID: 'step-1',
         EXEC_ID: 'exec-1',
         CONTAINER_ID: 'container-1',
         WORKSPACE_ID: 'workspace-1',
         USER_ID: 'user-1',
         COMP_ID: 'comp-1',
         FLOW_ID: 'flow-1',
-        FUNCTION: 'test_fn',
+        FUNCTION: 'test-function',
         PROTOCOL_VERSION: 1,
         INPUT_FORMAT: 'default',
         PROXY_PREFETCH_SAILOR: 1,
+        PROXY_PING_INTERVAL_MS: 1000,
+        OUTGOING_MESSAGE_SIZE_LIMIT: 1024 * 1024,
         DATA_RATE_LIMIT: 100,
         ERROR_RATE_LIMIT: 100,
         SNAPSHOT_RATE_LIMIT: 100,
         RATE_INTERVAL: 100,
-        PROXY_RECONNECT_MAX_RETRIES: Infinity,
+        PROXY_RECONNECT_MAX_RETRIES: 3,
         PROXY_RECONNECT_INITIAL_DELAY: 1000,
         PROXY_RECONNECT_MAX_DELAY: 30000,
         PROXY_RECONNECT_BACKOFF_MULTIPLIER: 2,
         PROXY_RECONNECT_JITTER_FACTOR: 0,
         PROXY_OBJECT_REQUEST_RETRY_ATTEMPTS: 0,
-        PROXY_OBJECT_REQUEST_RETRY_DELAY: 0,
-        PROXY_OBJECT_REQUEST_MAX_RETRY_DELAY: 0,
+        PROXY_OBJECT_REQUEST_RETRY_DELAY: 1,
+        PROXY_OBJECT_REQUEST_MAX_RETRY_DELAY: 10,
         ...overrides
     };
 }
 
-/**
- * Build a mock HTTP/2 stream with event-emitter behaviour.
- * Calling respond() / end() / write() is recorded for assertions.
- */
 function makeMockStream() {
     const stream = new EventEmitter();
     stream.respond = sinon.stub();
     stream.write = sinon.stub();
     stream.end = sinon.stub();
-    stream.close = sinon.stub().callsFake((code, cb) => {
-        if (cb) {
-            cb();
+    stream.close = sinon.stub().callsFake((code, callback) => {
+        stream.closed = true;
+        if (callback) {
+            callback();
         }
     });
-    stream.destroy = sinon.stub();
+    stream.destroy = sinon.stub().callsFake(() => {
+        stream.destroyed = true;
+    });
     stream.closed = false;
     stream.destroyed = false;
     stream.rstCode = NGHTTP2_NO_ERROR;
     return stream;
 }
 
-/**
- * Build a mock HTTP/2 client session.
- * `request()` returns the provided stream (or a fresh one each call).
- */
-function makeMockSession(stream) {
+function makeMockSession(requestImpl) {
     const session = new EventEmitter();
-    session.request = sinon.stub().returns(stream || makeMockStream());
-    session.close = sinon.stub().callsFake((cb) => {
-        if (cb) {
-            cb();
+    session.request = requestImpl
+        ? sinon.stub().callsFake(requestImpl)
+        : sinon.stub().returns(makeMockStream());
+    session.close = sinon.stub().callsFake((callback) => {
+        session.destroyed = true;
+        if (callback) {
+            callback();
         }
     });
-    session.destroy = sinon.stub();
+    session.destroy = sinon.stub().callsFake(() => {
+        session.destroyed = true;
+    });
     session.destroyed = false;
+    session.ping = sinon.stub().yields(null, 1, Buffer.alloc(8));
     return session;
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
+async function expectRejected(promise, assertError) {
+    try {
+        await promise;
+        expect.fail('Expected promise to reject');
+    } catch (error) {
+        assertError(error);
+    }
+}
 
 describe('ProxyClient', () => {
-    let settings;
     let sandbox;
+    let settings;
     let encryptor;
+    let clock;
 
     beforeEach(() => {
         sandbox = sinon.createSandbox();
         settings = makeSettings();
         encryptor = new Encryptor(settings.MESSAGE_CRYPTO_PASSWORD, settings.MESSAGE_CRYPTO_IV);
+        clock = null;
     });
 
     afterEach(() => {
+        if (clock) {
+            clock.restore();
+        }
         sandbox.restore();
     });
 
-    // ── constructor ──────────────────────────────────────────────────────────
-
     describe('constructor', () => {
-        it('should throw if PROXY_CLIENT_ID is missing', () => {
+        it('throws when PROXY_CLIENT_ID is missing', () => {
             expect(() => new ProxyClient(makeSettings({ PROXY_CLIENT_ID: '' }))).to.throw(
                 'PROXY_CLIENT_ID must be set to connect to Sailor Proxy'
             );
         });
 
-        it('should throw if API_USERNAME is missing', () => {
+        it('throws when API_USERNAME is missing', () => {
             expect(() => new ProxyClient(makeSettings({ API_USERNAME: '' }))).to.throw(
                 'API_USERNAME and API_KEY must be set to connect to Sailor Proxy'
             );
         });
 
-        it('should throw if API_KEY is missing', () => {
+        it('throws when API_KEY is missing', () => {
             expect(() => new ProxyClient(makeSettings({ API_KEY: '' }))).to.throw(
                 'API_USERNAME and API_KEY must be set to connect to Sailor Proxy'
             );
         });
 
-        it('should throw if SAILOR_PROXY_JWT_SECRET is missing', () => {
+        it('throws when SAILOR_PROXY_JWT_SECRET is missing', () => {
             expect(() => new ProxyClient(makeSettings({ SAILOR_PROXY_JWT_SECRET: '' }))).to.throw(
                 'SAILOR_PROXY_JWT_SECRET must be set to connect to Sailor Proxy'
             );
         });
 
-        it('should construct and start in closed state', () => {
+        it('initialises connection state and throttles', () => {
             const client = new ProxyClient(settings);
-            expect(client.closed).to.be.true;
-            expect(client.clientSession).to.be.null;
-        });
 
-        it('should set authHeader starting with Bearer', () => {
-            const client = new ProxyClient(settings);
-            expect(client.authHeader).to.match(/^Bearer /);
+            expect(client.closed).to.be.true;
+            expect(client.listeningForMessages).to.be.true;
+            expect(client.clientSession).to.equal(null);
+            expect(client.reconnecting).to.be.false;
+            expect(client.reconnectAttempts).to.equal(0);
+            expect(client.getMessageStreams.size).to.equal(0);
+            expect(client.processingMessagesMetadata.size).to.equal(0);
+            expect(client.authHeader).to.be.a('string');
+            expect(client.throttles).to.have.keys(['data', 'error', 'snapshot']);
         });
     });
 
-    // ── isConnected ──────────────────────────────────────────────────────────
-
     describe('isConnected()', () => {
-        it('should return false when closed', () => {
+        it('returns false when closed', () => {
             const client = new ProxyClient(settings);
-            expect(client.isConnected()).to.be.false;
+            client.clientSession = { destroyed: false };
+
+            expect(client.isConnected()).to.equal(false);
         });
 
-        it('should return true when session is open and not destroyed', () => {
+        it('returns a falsey value when session is missing', () => {
             const client = new ProxyClient(settings);
             client.closed = false;
-            client.clientSession = { destroyed: false };
-            expect(client.isConnected()).to.be.true;
+
+            expect(client.isConnected()).to.equal(null);
         });
 
-        it('should return false when session is destroyed', () => {
+        it('returns false when session is destroyed', () => {
             const client = new ProxyClient(settings);
             client.closed = false;
             client.clientSession = { destroyed: true };
-            expect(client.isConnected()).to.be.false;
+
+            expect(client.isConnected()).to.equal(false);
         });
 
-        it('should return true while reconnecting (not closed)', () => {
+        it('returns true only when not closed and session is active', () => {
+            const client = new ProxyClient(settings);
+            client.closed = false;
+            client.clientSession = { destroyed: false };
+            client.reconnecting = true;
+
+            expect(client.isConnected()).to.equal(true);
+        });
+    });
+
+    describe('isHealthy()', () => {
+        it('returns true while reconnecting if client is not closed', () => {
             const client = new ProxyClient(settings);
             client.closed = false;
             client.reconnecting = true;
             client.clientSession = null;
-            expect(client.isConnected()).to.be.true;
+
+            expect(client.isHealthy()).to.equal(true);
+        });
+
+        it('otherwise delegates to isConnected', () => {
+            const client = new ProxyClient(settings);
+            client.closed = false;
+            client.clientSession = { destroyed: false };
+
+            expect(client.isHealthy()).to.equal(true);
+
+            client.clientSession.destroyed = true;
+            expect(client.isHealthy()).to.equal(false);
         });
     });
 
-    // ── connect / disconnect ─────────────────────────────────────────────────
-
     describe('connect()', () => {
-        it('should create a session and set closed=false on success', async () => {
-            const mockSession = makeMockSession();
-            sandbox.stub(http2, 'connect').returns(mockSession);
-
+        it('creates a session, waits for connect, and starts ping interval', async () => {
+            const session = makeMockSession();
+            sandbox.stub(http2, 'connect').returns(session);
             const client = new ProxyClient(settings);
-            const connectPromise = client.connect();
-            mockSession.emit('connect');
-            await connectPromise;
+            const startPingInterval = sandbox.stub(client, '_startPingInterval');
 
-            expect(http2.connect).to.have.been.calledOnceWith(settings.SAILOR_PROXY_URI);
-            expect(client.closed).to.be.false;
-            expect(client.clientSession).to.equal(mockSession);
+            const promise = client.connect();
+            session.emit('connect');
+            await promise;
+
+            expect(http2.connect).to.have.been.calledOnceWith(
+                settings.SAILOR_PROXY_URI,
+                { maxSessionMemory: 10 }
+            );
+            expect(client.closed).to.equal(false);
+            expect(client.reconnectAttempts).to.equal(0);
+            expect(client.clientSession).to.equal(session);
+            expect(startPingInterval).to.have.been.calledOnce;
         });
 
-        it('should throw and remain unusable if connect event never fires (simulated error)', async () => {
-            const mockSession = makeMockSession();
-            sandbox.stub(http2, 'connect').returns(mockSession);
-
+        it('rejects when session emits an error before connect', async () => {
+            const session = makeMockSession();
+            sandbox.stub(http2, 'connect').returns(session);
             const client = new ProxyClient(settings);
-            const connectPromise = client.connect();
-            // Emit error instead of connect — event-to-promise rejects on 'error'
-            const err = new Error('connection refused');
-            mockSession.emit('error', err);
+            sandbox.stub(client, '_handleDisconnection');
+            sandbox.stub(client, '_startPingInterval');
 
-            try {
-                await connectPromise;
-                expect.fail('Should have thrown');
-            } catch (e) {
-                expect(e.message).to.include('connection refused');
-            }
+            const promise = client.connect();
+            session.emit('error', new Error('connection refused'));
+
+            await expectRejected(promise, (error) => {
+                expect(error.message).to.equal('connection refused');
+            });
         });
     });
 
     describe('disconnect()', () => {
-        it('should set closed=true and call session.close()', async () => {
-            const mockSession = makeMockSession();
-            sandbox.stub(http2, 'connect').returns(mockSession);
-
+        it('stops pinging, aborts throttles, clears reconnect timer, and closes the session', async () => {
             const client = new ProxyClient(settings);
-            const connectP = client.connect();
-            mockSession.emit('connect');
-            await connectP;
-
-            await client.disconnect();
-
-            expect(client.closed).to.be.true;
-            expect(mockSession.close).to.have.been.calledOnce;
-        });
-
-        it('should resolve immediately if session is already destroyed', async () => {
-            const client = new ProxyClient(settings);
-            client.clientSession = { destroyed: true };
-            const result = await client.disconnect();
-            expect(result).to.be.undefined;
-            expect(client.closed).to.be.true;
-        });
-
-        it('should resolve immediately if session is null', async () => {
-            const client = new ProxyClient(settings);
-            client.clientSession = null;
-            const result = await client.disconnect();
-            expect(result).to.be.undefined;
-        });
-
-        it('should clear a pending reconnect timer', async () => {
-            const client = new ProxyClient(settings);
-            client.clientSession = null;
-            const clearSpy = sandbox.spy(global, 'clearTimeout');
+            const session = makeMockSession();
+            client.closed = false;
+            client.clientSession = session;
+            client.reconnecting = true;
+            const stopPingInterval = sandbox.stub(client, '_stopPingInterval');
+            const clearTimeoutSpy = sandbox.spy(global, 'clearTimeout');
             const timer = setTimeout(() => {}, 60000);
             client.reconnectTimer = timer;
+            client.throttles.data.abort = sandbox.stub();
+            client.throttles.error.abort = sandbox.stub();
+            client.throttles.snapshot.abort = sandbox.stub();
+
             await client.disconnect();
-            expect(clearSpy).to.have.been.calledWith(timer);
-            expect(client.reconnectTimer).to.be.null;
+
+            expect(client.closed).to.equal(true);
+            expect(client.reconnecting).to.equal(false);
+            expect(stopPingInterval).to.have.been.calledOnce;
+            expect(client.throttles.data.abort).to.have.been.calledOnce;
+            expect(client.throttles.error.abort).to.have.been.calledOnce;
+            expect(client.throttles.snapshot.abort).to.have.been.calledOnce;
+            expect(clearTimeoutSpy).to.have.been.calledWith(timer);
+            expect(client.reconnectTimer).to.equal(null);
+            expect(session.close).to.have.been.calledOnce;
+        });
+
+        it('resolves immediately when session is missing or already destroyed', async () => {
+            const client = new ProxyClient(settings);
+            sandbox.stub(client, '_stopPingInterval');
+
+            await client.disconnect();
+            client.clientSession = { destroyed: true };
+            await client.disconnect();
         });
     });
-
-    // ── _prepareData ─────────────────────────────────────────────────────────
-
-    describe('_prepareData()', () => {
-        let client;
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-        });
-
-        it('should encrypt data and set protocolVersion for type=data', () => {
-            const data = { body: { foo: 'bar' }, headers: {} };
-            const meta = { taskId: 'task-1' };
-            const { preparedData, preparedMetadata } = client._prepareData(data, meta, 'data');
-            expect(Buffer.isBuffer(preparedData)).to.be.true;
-            expect(preparedMetadata.protocolVersion).to.equal(settings.PROTOCOL_VERSION);
-            const decrypted = encryptor.decryptMessageContent(preparedData, 'base64');
-            expect(decrypted).to.deep.equal(data);
-        });
-
-        it('should always use protocolVersion=1 for type=http-reply', () => {
-            const data = { statusCode: 200, body: 'Ok', headers: {} };
-            const meta = {};
-            const { preparedMetadata } = client._prepareData(data, meta, 'http-reply');
-            expect(preparedMetadata.protocolVersion).to.equal(1);
-        });
-
-        it('should strip x-eio-routing-key from data.headers', () => {
-            const data = {
-                body: {},
-                headers: {
-                    'x-eio-routing-key': 'custom.key',
-                    'x-other': 'keep'
-                }
-            };
-            const { preparedData } = client._prepareData(data, {}, 'data');
-            const decrypted = encryptor.decryptMessageContent(preparedData, 'base64');
-            expect(decrypted.headers).to.not.have.property('x-eio-routing-key');
-            expect(decrypted.headers).to.have.property('x-other', 'keep');
-        });
-
-        it('should use forceProtocolVersion when provided', () => {
-            const data = { body: {} };
-            const { preparedMetadata } = client._prepareData(data, {}, 'data', 2);
-            expect(preparedMetadata.protocolVersion).to.equal(2);
-        });
-
-        it('should not encrypt and delete protocolVersion for type=snapshot (no protocolVersion)', () => {
-            const data = 'raw snapshot payload';
-            const meta = { protocolVersion: 3 };
-            const { preparedData, preparedMetadata } = client._prepareData(data, meta, 'snapshot');
-            expect(preparedData).to.equal(data);
-            expect(preparedMetadata).to.not.have.property('protocolVersion');
-        });
-    });
-
-    // ── encryptMessageContent ────────────────────────────────────────────────
-
-    describe('encryptMessageContent()', () => {
-        let client;
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-        });
-
-        it('should encrypt with base64 for protocolVersion < 2', () => {
-            const payload = { test: 1 };
-            const result = client.encryptMessageContent(payload, 1);
-            expect(Buffer.isBuffer(result)).to.be.true;
-            const decoded = encryptor.decryptMessageContent(result, 'base64');
-            expect(decoded).to.deep.equal(payload);
-        });
-
-        it('should encrypt without base64 for protocolVersion >= 2', () => {
-            const payload = { test: 2 };
-            const result = client.encryptMessageContent(payload, 2);
-            expect(Buffer.isBuffer(result)).to.be.true;
-            const decoded = encryptor.decryptMessageContent(result);
-            expect(decoded).to.deep.equal(payload);
-        });
-
-        it('should default to protocolVersion 1', () => {
-            const payload = { defaultVersion: true };
-            const result = client.encryptMessageContent(payload);
-            const decoded = encryptor.decryptMessageContent(result, 'base64');
-            expect(decoded).to.deep.equal(payload);
-        });
-    });
-
-    // ── _decodeMessage / _decodeDefaultMessage / _decodeErrorMessage ─────────
-
-    describe('_decodeMessage()', () => {
-        let client;
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-        });
-
-        it('should decode a default (data) message with protocolVersion 1', () => {
-            const payload = { body: { hello: 'world' }, headers: {} };
-            const encrypted = encryptor.encryptMessageContent(payload, 'base64');
-            const metadata = { protocolVersion: 1 };
-            const result = client._decodeMessage(encrypted, metadata);
-            expect(result.body).to.deep.equal(payload.body);
-        });
-
-        it('should decode a default (data) message with protocolVersion 2', () => {
-            const payload = { body: { hello: 'v2' }, headers: {} };
-            const encrypted = encryptor.encryptMessageContent(payload);
-            const metadata = { protocolVersion: 2 };
-            const result = client._decodeMessage(encrypted, metadata);
-            expect(result.body).to.deep.equal(payload.body);
-        });
-
-        it('should add reply_to from metadata to message headers', () => {
-            const payload = { body: {}, headers: {} };
-            const encrypted = encryptor.encryptMessageContent(payload, 'base64');
-            const metadata = { protocolVersion: 1, reply_to: 'my-reply-queue' };
-            const result = client._decodeMessage(encrypted, metadata);
-            expect(result.headers.reply_to).to.equal('my-reply-queue');
-        });
-
-        it('should decode an error message when INPUT_FORMAT=error', () => {
-            const clientErr = new ProxyClient(makeSettings({ INPUT_FORMAT: 'error' }));
-            const errorContent = encryptor.encryptMessageContent({ message: 'err!', name: 'Error' }, 'base64');
-            const rawPayload = JSON.stringify({
-                error: errorContent.toString()
-            });
-            const result = clientErr._decodeMessage(Buffer.from(rawPayload), {});
-            expect(result.error.message).to.equal('err!');
-        });
-    });
-
-    // ── _extractMessageMetadata ──────────────────────────────────────────────
-
-    describe('_extractMessageMetadata()', () => {
-        let client;
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-        });
-
-        it('should extract all standard fields', () => {
-            const msgId = uuid.v4();
-            const threadId = uuid.v4();
-            const parentId = uuid.v4();
-            const headers = {
-                [MESSAGE_METADATA_HEADER]: JSON.stringify({
-                    messageId: msgId,
-                    threadId,
-                    parentMessageId: parentId,
-                    stepId: 'step_2',
-                    protocolVersion: 2
-                })
-            };
-            const result = client._extractMessageMetadata(headers);
-            expect(result.messageId).to.equal(msgId);
-            expect(result.threadId).to.equal(threadId);
-            expect(result.parentMessageId).to.equal(parentId);
-            expect(result.stepId).to.equal('step_2');
-            expect(result.protocolVersion).to.equal(2);
-        });
-
-        it('should copy and lowercase x-eio-meta- headers', () => {
-            const headers = {
-                [MESSAGE_METADATA_HEADER]: JSON.stringify({
-                    messageId: uuid.v4(),
-                    threadId: uuid.v4(),
-                    'x-eio-meta-trace-id': 'trace-123',
-                    'X-EIO-META-CUSTOM': 'custom-value'
-                })
-            };
-            const result = client._extractMessageMetadata(headers);
-            expect(result['x-eio-meta-trace-id']).to.equal('trace-123');
-            expect(result['x-eio-meta-custom']).to.equal('custom-value');
-        });
-
-        it('should fall back to x-eio-meta-trace-id as threadId when threadId is absent', () => {
-            const traceId = uuid.v4();
-            const headers = {
-                [MESSAGE_METADATA_HEADER]: JSON.stringify({
-                    messageId: uuid.v4(),
-                    'x-eio-meta-trace-id': traceId
-                })
-            };
-            const result = client._extractMessageMetadata(headers);
-            expect(result.threadId).to.equal(traceId);
-        });
-
-        it('should generate a new threadId when neither threadId nor trace-id is present', () => {
-            const headers = {
-                [MESSAGE_METADATA_HEADER]: JSON.stringify({ messageId: uuid.v4() })
-            };
-            const result = client._extractMessageMetadata(headers);
-            expect(result.threadId).to.be.a('string').and.have.lengthOf(36); // UUID
-        });
-
-        it('should include reply_to when present', () => {
-            const headers = {
-                [MESSAGE_METADATA_HEADER]: JSON.stringify({
-                    messageId: uuid.v4(),
-                    threadId: uuid.v4(),
-                    reply_to: 'reply-queue'
-                })
-            };
-            const result = client._extractMessageMetadata(headers);
-            expect(result.reply_to).to.equal('reply-queue');
-        });
-
-        it('should throw when message-metadata header is missing', () => {
-            expect(() => client._extractMessageMetadata({})).to.throw(
-                'Missing metadata in message stream response'
-            );
-        });
-
-        it('should throw when message-metadata header is invalid JSON', () => {
-            expect(() => client._extractMessageMetadata({
-                [MESSAGE_METADATA_HEADER]: 'not-json'
-            })).to.throw('Failed to parse metadata JSON');
-        });
-    });
-
-    // ── finishProcessing ─────────────────────────────────────────────────────
-
-    describe('finishProcessing()', () => {
-        let client;
-        let mockStream;
-        let mockSession;
-
-        function makeRequestStub(statusCode, body) {
-            return sinon.stub().callsFake(() => {
-                setImmediate(() => {
-                    mockStream.emit('response', { [HTTP2_HEADER_STATUS]: statusCode });
-                    if (body) {
-                        mockStream.emit('data', Buffer.from(body));
-                    }
-                    mockStream.emit('end');
-                });
-                return mockStream;
-            });
-        }
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            mockStream = makeMockStream();
-            mockSession = new EventEmitter();
-            mockSession.request = makeRequestStub(200);
-            mockSession.close = sinon.stub().callsFake((cb) => {
-                if (cb) {
-                    cb();
-                }
-            });
-            mockSession.destroy = sinon.stub();
-            mockSession.destroyed = false;
-            client.closed = false;
-            client.clientSession = mockSession;
-        });
-
-        it('should throw for an invalid status', async () => {
-            const metadata = { messageId: uuid.v4() };
-            try {
-                await client.finishProcessing(metadata, 'invalid');
-                expect.fail('Should have thrown');
-            } catch (e) {
-                expect(e.message).to.equal('Invalid message processing status: invalid');
-            }
-        });
-
-        it('should POST to /finish-processing with correct query params on success', async () => {
-            const metadata = { messageId: 'msg-123' };
-            client.processingMessagesMetadata.add(metadata);
-
-            await client.finishProcessing(metadata, MESSAGE_PROCESSING_STATUS.SUCCESS);
-
-            const callPath = mockSession.request.firstCall.args[0][':path'];
-            expect(callPath).to.include('/finish-processing');
-            expect(callPath).to.include('incomingMessageId=msg-123');
-            expect(callPath).to.include('status=success');
-            expect(callPath).to.include(`clientId=${settings.PROXY_CLIENT_ID}`);
-        });
-
-        it('should remove metadata from processingMessagesMetadata on success', async () => {
-            const metadata = { messageId: 'msg-456' };
-            client.processingMessagesMetadata.add(metadata);
-
-            await client.finishProcessing(metadata, MESSAGE_PROCESSING_STATUS.SUCCESS);
-
-            expect(client.processingMessagesMetadata.has(metadata)).to.be.false;
-        });
-
-        it('should reject with error when server returns non-200', async () => {
-            mockSession.request = makeRequestStub(500, 'Internal Server Error');
-            const metadata = { messageId: 'msg-789' };
-
-            try {
-                await client.finishProcessing(metadata, MESSAGE_PROCESSING_STATUS.ERROR);
-                expect.fail('Should have rejected');
-            } catch (e) {
-                expect(e.message).to.equal('Internal Server Error');
-            }
-        });
-    });
-
-    // ── sendMessage ──────────────────────────────────────────────────────────
-
-    describe('sendMessage()', () => {
-        let client;
-        let mockStream;
-        let mockSession;
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            mockStream = makeMockStream();
-            mockSession = new EventEmitter();
-            // Emit events INSIDE the request stub so they fire after listeners are attached
-            mockSession.request = sinon.stub().callsFake(() => {
-                setImmediate(() => {
-                    mockStream.emit('response', { [HTTP2_HEADER_STATUS]: 200 });
-                    mockStream.emit('end');
-                });
-                return mockStream;
-            });
-            mockSession.close = sinon.stub().callsFake((cb) => {
-                if (cb) {
-                    cb();
-                }
-            });
-            mockSession.destroy = sinon.stub();
-            mockSession.destroyed = false;
-            client.closed = false;
-            client.clientSession = mockSession;
-        });
-
-        it('should POST to /message with correct metadata header and encrypted body', async () => {
-            const data = { body: { hello: 'world' }, headers: {} };
-            const metadata = { taskId: 'task-1', stepId: 'step_1' };
-            const incomingMessageId = uuid.v4();
-
-            await client.sendMessage({ incomingMessageId, type: 'data', data, metadata });
-
-            const reqHeaders = mockSession.request.firstCall.args[0];
-            expect(reqHeaders[':path']).to.include('/message');
-            expect(reqHeaders[':path']).to.include(`incomingMessageId=${incomingMessageId}`);
-            expect(reqHeaders[':path']).to.include('type=data');
-
-            const sentMeta = JSON.parse(reqHeaders[MESSAGE_METADATA_HEADER]);
-            expect(sentMeta.taskId).to.equal('task-1');
-            expect(sentMeta.protocolVersion).to.equal(settings.PROTOCOL_VERSION);
-
-            expect(mockStream.write).to.have.been.calledOnce; // encrypted body was written
-        });
-
-        it('should include customRoutingKey in query params when present in data.headers', async () => {
-            const data = { body: {}, headers: { 'x-eio-routing-key': 'custom.route' } };
-            await client.sendMessage({ incomingMessageId: 'id-1', type: 'data', data, metadata: {} });
-
-            const path = mockSession.request.firstCall.args[0][':path'];
-            expect(path).to.include('customRoutingKey=custom.route');
-        });
-
-        it('should reject with error on non-200 response', async () => {
-            mockSession.request = sinon.stub().callsFake(() => {
-                setImmediate(() => {
-                    mockStream.emit('response', { [HTTP2_HEADER_STATUS]: 500 });
-                    mockStream.emit('data', Buffer.from('server error'));
-                    mockStream.emit('end');
-                });
-                return mockStream;
-            });
-            try {
-                await client.sendMessage({
-                    incomingMessageId: 'id-1',
-                    type: 'data',
-                    data: { body: {} },
-                    metadata: {}
-                });
-                expect.fail('Should have rejected');
-            } catch (e) {
-                expect(e.message).to.equal('server error');
-            }
-        });
-
-        it('should reject and mark error as isNetworkError on stream error', async () => {
-            mockSession.request = sinon.stub().callsFake(() => {
-                setImmediate(() => {
-                    mockStream.emit('error', new Error('ECONNRESET'));
-                });
-                return mockStream;
-            });
-            try {
-                await client.sendMessage({
-                    incomingMessageId: 'id-1',
-                    type: 'data',
-                    data: { body: {} },
-                    metadata: {}
-                });
-                expect.fail('Should have rejected');
-            } catch (e) {
-                expect(e.message).to.equal('ECONNRESET');
-            }
-        });
-    });
-
-    // ── sendError ────────────────────────────────────────────────────────────
-
-    describe('sendError()', () => {
-        let client;
-        let sendMessageStub;
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            sendMessageStub = sandbox.stub(client, 'sendMessage').resolves();
-        });
-
-        it('should call sendMessage with type=error and encrypted error payload', async () => {
-            const err = { name: 'TestError', message: 'boom', stack: 'at line 1' };
-            const outgoingMetadata = { stepId: 'step_1' };
-            const incomingMetadata = { messageId: 'msg-1', protocolVersion: 1 };
-
-            await client.sendError(err, outgoingMetadata, null, incomingMetadata);
-
-            expect(sendMessageStub).to.have.been.calledOnce;
-            const args = sendMessageStub.firstCall.args[0];
-            expect(args.type).to.equal('error');
-            expect(args.incomingMessageId).to.equal('msg-1');
-
-            const payload = JSON.parse(args.data);
-            expect(payload).to.have.property('error');
-            // error is: encryptMessageContent({...}, 'base64').toString()
-            // so it's a base64 string that itself is base64-encoded ciphertext
-            const decryptedError = encryptor.decryptMessageContent(payload.error, 'base64');
-            expect(decryptedError.message).to.equal('boom');
-        });
-
-        it('should include errorInput for protocolVersion 1', async () => {
-            const err = { name: 'E', message: 'msg', stack: '' };
-            const originalMsg = { body: { original: true } };
-            const incomingMeta = { messageId: 'id-1', protocolVersion: 1 };
-
-            await client.sendError(err, {}, originalMsg, incomingMeta);
-
-            const payload = JSON.parse(sendMessageStub.firstCall.args[0].data);
-            expect(payload).to.have.property('errorInput');
-        });
-
-        it('should include errorInput for protocolVersion 2', async () => {
-            const err = { name: 'E', message: 'msg', stack: '' };
-            const originalMsg = { body: { original: true } };
-            const incomingMeta = { messageId: 'id-1', protocolVersion: 2 };
-
-            await client.sendError(err, {}, originalMsg, incomingMeta);
-
-            const payload = JSON.parse(sendMessageStub.firstCall.args[0].data);
-            expect(payload).to.have.property('errorInput');
-        });
-
-        it('should omit errorInput when originalMessage is not provided', async () => {
-            const err = { name: 'E', message: 'no-input', stack: '' };
-            await client.sendError(err, {}, null, { messageId: 'id-1' });
-
-            const payload = JSON.parse(sendMessageStub.firstCall.args[0].data);
-            expect(payload).to.not.have.property('errorInput');
-        });
-    });
-
-    // ── sendRebound ──────────────────────────────────────────────────────────
-
-    describe('sendRebound()', () => {
-        let client;
-        let sendMessageStub;
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            sendMessageStub = sandbox.stub(client, 'sendMessage').resolves();
-        });
-
-        it('should call sendMessage with type=rebound and reboundReason', async () => {
-            const reboundError = new Error('Too busy');
-            const metadata = { messageId: 'msg-1' };
-            const outgoingMetadata = { stepId: 'step_1' };
-
-            await client.sendRebound(reboundError, metadata, outgoingMetadata);
-
-            expect(sendMessageStub).to.have.been.calledOnce;
-            const args = sendMessageStub.firstCall.args[0];
-            expect(args.type).to.equal('rebound');
-            expect(args.incomingMessageId).to.equal('msg-1');
-            expect(args.metadata.reboundReason).to.equal('Too busy');
-            expect(args.metadata.end).to.be.a('number');
-        });
-    });
-
-    // ── sendSnapshot ─────────────────────────────────────────────────────────
-
-    describe('sendSnapshot()', () => {
-        let client;
-        let sendMessageStub;
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            sendMessageStub = sandbox.stub(client, 'sendMessage').resolves();
-        });
-
-        it('should call sendMessage with type=snapshot and JSON-stringified data', async () => {
-            const snapData = { lastModified: 12345 };
-            const meta = { stepId: 'step_1' };
-
-            await client.sendSnapshot(snapData, meta);
-
-            expect(sendMessageStub).to.have.been.calledOnce;
-            const args = sendMessageStub.firstCall.args[0];
-            expect(args.type).to.equal('snapshot');
-            expect(args.data).to.equal(JSON.stringify(snapData));
-            expect(args.metadata).to.equal(meta);
-        });
-    });
-
-    // ── fetchMessageBody ─────────────────────────────────────────────────────
-
-    describe('fetchMessageBody()', () => {
-        const OBJECT_ID_HEADER = 'x-ipaas-object-storage-id';
-        let client;
-        let mockStream;
-        let mockSession;
-        const logger = { debug: () => {}, trace: () => {}, error: () => {} };
-
-        function makeRequestStub(statusCode, body) {
-            return sinon.stub().callsFake(() => {
-                setImmediate(() => {
-                    mockStream.emit('response', { [HTTP2_HEADER_STATUS]: statusCode });
-                    if (body) {
-                        mockStream.emit('data', body);
-                    }
-                    mockStream.emit('end');
-                });
-                return mockStream;
-            });
-        }
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            mockStream = makeMockStream();
-            mockSession = new EventEmitter();
-            mockSession.request = makeRequestStub(200);
-            mockSession.close = sinon.stub().callsFake((cb) => {
-                if (cb) {
-                    cb();
-                }
-            });
-            mockSession.destroy = sinon.stub();
-            mockSession.destroyed = false;
-            client.closed = false;
-            client.clientSession = mockSession;
-        });
-
-        it('should return body as-is when headers are absent', async () => {
-            const msg = { body: { raw: true }, headers: null };
-            const result = await client.fetchMessageBody(msg, logger);
-            expect(result).to.deep.equal(msg.body);
-            expect(mockSession.request).not.to.have.been.called;
-        });
-
-        it('should return body as-is when OBJECT_ID_HEADER is not set', async () => {
-            const msg = { body: { raw: true }, headers: {} };
-            const result = await client.fetchMessageBody(msg, logger);
-            expect(result).to.deep.equal(msg.body);
-            expect(mockSession.request).not.to.have.been.called;
-        });
-
-        it('should GET /object/:id and return decrypted body on success', async () => {
-            const objectId = 'obj-abc';
-            const payload = { fetched: 'data' };
-            const encrypted = encryptor.encryptMessageContent(payload);
-            const msg = {
-                body: {},
-                headers: { [OBJECT_ID_HEADER]: objectId }
-            };
-
-            mockSession.request = makeRequestStub(200, encrypted);
-            const result = await client.fetchMessageBody(msg, logger);
-
-            expect(result).to.deep.equal(payload);
-            const path = mockSession.request.firstCall.args[0][':path'];
-            expect(path).to.equal(`/object/${objectId}`);
-        });
-
-        it('should reject on non-200 response with statusCode on the error', async () => {
-            const msg = { body: {}, headers: { [OBJECT_ID_HEADER]: 'obj-missing' } };
-            mockSession.request = makeRequestStub(404, Buffer.from('Not Found'));
-            const err = await client.fetchMessageBody(msg, logger).catch(e => e);
-            expect(err.message).to.equal('Not Found');
-            expect(err.statusCode).to.equal(404);
-        });
-    });
-
-    // ── uploadMessageBody ────────────────────────────────────────────────────
-
-    describe('uploadMessageBody()', () => {
-        let client;
-        let mockStream;
-        let mockSession;
-
-        function makeRequestStub(statusCode, body) {
-            return sinon.stub().callsFake(() => {
-                setImmediate(() => {
-                    mockStream.emit('response', { [HTTP2_HEADER_STATUS]: statusCode });
-                    if (body) {
-                        mockStream.emit('data', Buffer.from(body));
-                    }
-                    mockStream.emit('end');
-                });
-                return mockStream;
-            });
-        }
-
-        beforeEach(() => {
-            client = new ProxyClient(settings);
-            mockStream = makeMockStream();
-            mockSession = new EventEmitter();
-            mockSession.request = makeRequestStub(200, JSON.stringify({ objectId: 'default-id' }));
-            mockSession.close = sinon.stub().callsFake((cb) => {
-                if (cb) {
-                    cb();
-                }
-            });
-            mockSession.destroy = sinon.stub();
-            mockSession.destroyed = false;
-            client.closed = false;
-            client.clientSession = mockSession;
-        });
-
-        it('should POST to /object and return the objectId on success', async () => {
-            const payload = { data: 'to-store' };
-            const objectId = 'new-object-id';
-            mockSession.request = makeRequestStub(200, JSON.stringify({ objectId }));
-
-            const result = await client.uploadMessageBody(payload);
-
-            expect(result).to.equal(objectId);
-            const path = mockSession.request.firstCall.args[0][':path'];
-            expect(path).to.equal('/object');
-            expect(mockStream.write).to.have.been.calledOnce; // encrypted body written
-        });
-
-        it('should reject on non-200 response', async () => {
-            mockSession.request = makeRequestStub(500, 'upload failed');
-            try {
-                await client.uploadMessageBody({ data: 'x' });
-                expect.fail('Should have rejected');
-            } catch (e) {
-                expect(e.message).to.equal('upload failed');
-            }
-        });
-    });
-
-    // ── _handleDisconnection ─────────────────────────────────────────────────
 
     describe('_handleDisconnection()', () => {
-        it('should set reconnecting=true, destroy session, and schedule reconnect', () => {
+        it('starts reconnection flow and destroys the active session', () => {
             const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
+            const session = makeMockSession();
             client.closed = false;
-            client.clientSession = mockSession;
-            client._cleanupMessageStreams = sinon.stub();
-            client._scheduleReconnect = sinon.stub();
+            client.clientSession = session;
+            const stopPingInterval = sandbox.stub(client, '_stopPingInterval');
+            const cleanup = sandbox.stub(client, '_cleanupMessageStreams');
+            const scheduleReconnect = sandbox.stub(client, '_scheduleReconnect');
 
-            client._handleDisconnection('error', new Error('net'));
+            client._handleDisconnection('error', new Error('boom'));
 
-            expect(client.reconnecting).to.be.true;
-            expect(mockSession.destroy).to.have.been.calledOnce;
-            expect(client.clientSession).to.be.null;
-            expect(client._scheduleReconnect).to.have.been.calledOnce;
+            expect(stopPingInterval).to.have.been.calledOnce;
+            expect(cleanup).to.have.been.calledOnce;
+            expect(session.destroy).to.have.been.calledOnce;
+            expect(client.clientSession).to.equal(null);
+            expect(client.reconnecting).to.equal(true);
+            expect(scheduleReconnect).to.have.been.calledOnce;
         });
 
-        it('should be a no-op if already closed', () => {
+        it('does nothing when already reconnecting or closed', () => {
             const client = new ProxyClient(settings);
-            client.closed = true;
-            client._scheduleReconnect = sinon.stub();
-            client._handleDisconnection('close');
-            expect(client._scheduleReconnect).not.to.have.been.called;
-        });
+            const scheduleReconnect = sandbox.stub(client, '_scheduleReconnect');
 
-        it('should be a no-op if already reconnecting', () => {
-            const client = new ProxyClient(settings);
-            client.closed = false;
             client.reconnecting = true;
-            client._scheduleReconnect = sinon.stub();
             client._handleDisconnection('close');
-            expect(client._scheduleReconnect).not.to.have.been.called;
+            client.reconnecting = false;
+            client.closed = true;
+            client._handleDisconnection('close');
+
+            expect(scheduleReconnect).not.to.have.been.called;
         });
     });
 
-    // ── _scheduleReconnect ───────────────────────────────────────────────────
-
     describe('_scheduleReconnect()', () => {
-        it('should set closed=true when max retries is reached', () => {
+        beforeEach(() => {
+            clock = sinon.useFakeTimers();
+        });
+
+        it('skips scheduling when connection was intentionally closed', () => {
+            const client = new ProxyClient(settings);
+            client.closed = true;
+            client.reconnecting = true;
+
+            client._scheduleReconnect();
+
+            expect(client.reconnecting).to.equal(false);
+            expect(client.reconnectTimer).to.equal(null);
+        });
+
+        it('marks the client closed when max retries is reached', () => {
             const client = new ProxyClient(makeSettings({ PROXY_RECONNECT_MAX_RETRIES: 0 }));
             client.closed = false;
             client.reconnecting = true;
@@ -958,128 +356,831 @@ describe('ProxyClient', () => {
 
             client._scheduleReconnect();
 
-            expect(client.closed).to.be.true;
-            expect(client.reconnecting).to.be.false;
+            expect(client.closed).to.equal(true);
+            expect(client.reconnecting).to.equal(false);
         });
 
-        it('should skip reconnection if intentionally closed', () => {
+        it('schedules reconnect, resumes processing, and clears reconnecting on success', async () => {
             const client = new ProxyClient(settings);
-            client.closed = true;
-            client._reconnect = sinon.stub();
+            client.closed = false;
+            client.reconnecting = true;
+            const reconnect = sandbox.stub(client, '_reconnect').resolves();
+            const resumeProcessing = sandbox.stub(client, 'resumeProcessing').resolves();
 
             client._scheduleReconnect();
+            expect(client.reconnectAttempts).to.equal(1);
 
-            expect(client.reconnecting).to.be.false;
-            expect(client._reconnect).not.to.have.been.called;
+            clock.tick(settings.PROXY_RECONNECT_INITIAL_DELAY);
+            await Promise.resolve();
+            await Promise.resolve();
+
+            expect(reconnect).to.have.been.calledOnce;
+            expect(resumeProcessing).to.have.been.calledOnce;
+            expect(client.reconnecting).to.equal(false);
         });
     });
 
-    // ── MESSAGE_PROCESSING_STATUS exports ────────────────────────────────────
-
-    describe('MESSAGE_PROCESSING_STATUS', () => {
-        it('should export SUCCESS = "success"', () => {
-            expect(MESSAGE_PROCESSING_STATUS.SUCCESS).to.equal('success');
-        });
-
-        it('should export ERROR = "error"', () => {
-            expect(MESSAGE_PROCESSING_STATUS.ERROR).to.equal('error');
-        });
-    });
-
-    // ── Ping keepalive ───────────────────────────────────────────────────────
-
-    describe('_startPingInterval() / _stopPingInterval()', () => {
-        let clock;
-
+    describe('_startPingInterval() and _stopPingInterval()', () => {
         beforeEach(() => {
             clock = sinon.useFakeTimers();
         });
 
-        afterEach(() => {
-            clock.restore();
+        it('pings on each interval and only creates one interval', () => {
+            const client = new ProxyClient(settings);
+            const session = makeMockSession();
+            client.clientSession = session;
+
+            client._startPingInterval();
+            const firstInterval = client._pingInterval;
+            client._startPingInterval();
+            clock.tick(settings.PROXY_PING_INTERVAL_MS);
+
+            expect(client._pingInterval).to.equal(firstInterval);
+            expect(session.ping).to.have.been.calledOnce;
         });
 
-        it('should send a ping on every interval tick', () => {
+        it('does not ping a destroyed session', () => {
             const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
-            mockSession.ping = sinon.stub().yields(null, 5, Buffer.alloc(8));
-            client.clientSession = mockSession;
+            const session = makeMockSession();
+            session.destroyed = true;
+            client.clientSession = session;
 
             client._startPingInterval();
             clock.tick(settings.PROXY_PING_INTERVAL_MS);
 
-            expect(mockSession.ping).to.have.been.calledOnce;
+            expect(session.ping).not.to.have.been.called;
         });
 
-        it('should not start a second interval if already running', () => {
+        it('handles ping errors only while the client is open', () => {
             const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
-            mockSession.ping = sinon.stub().yields(null, 5, Buffer.alloc(8));
-            client.clientSession = mockSession;
-
-            client._startPingInterval();
-            const first = client._pingInterval;
-            client._startPingInterval();
-
-            expect(client._pingInterval).to.equal(first);
-        });
-
-        it('should call _handleDisconnection if ping errors', () => {
-            const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
-            const pingErr = new Error('ping timeout');
-            mockSession.ping = sinon.stub().yields(pingErr, 0, Buffer.alloc(8));
-            client.clientSession = mockSession;
+            const session = makeMockSession();
+            session.ping = sandbox.stub().yields(new Error('ping failed'));
+            client.clientSession = session;
             client.closed = false;
-            client._handleDisconnection = sinon.stub();
+            const handleDisconnection = sandbox.stub(client, '_handleDisconnection');
 
             client._startPingInterval();
             clock.tick(settings.PROXY_PING_INTERVAL_MS);
 
-            expect(client._handleDisconnection).to.have.been.calledOnce;
-            expect(client._handleDisconnection.firstCall.args[0]).to.equal('ping_timeout');
-        });
+            expect(handleDisconnection).to.have.been.calledOnce;
+            expect(handleDisconnection).to.have.been.calledWith('ping_timeout');
 
-        it('should not call _handleDisconnection on ping error if closed', () => {
-            const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
-            mockSession.ping = sinon.stub().yields(new Error('x'), 0, Buffer.alloc(8));
-            client.clientSession = mockSession;
-            client.closed = true;
-            client._handleDisconnection = sinon.stub();
-
-            client._startPingInterval();
-            clock.tick(settings.PROXY_PING_INTERVAL_MS);
-
-            expect(client._handleDisconnection).not.to.have.been.called;
-        });
-
-        it('_stopPingInterval should clear the interval', () => {
-            const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
-            mockSession.ping = sinon.stub().yields(null, 5, Buffer.alloc(8));
-            client.clientSession = mockSession;
-
-            client._startPingInterval();
-            expect(client._pingInterval).to.not.be.null;
             client._stopPingInterval();
-            expect(client._pingInterval).to.be.null;
-
-            clock.tick(settings.PROXY_PING_INTERVAL_MS * 2);
-            expect(mockSession.ping).not.to.have.been.called;
-        });
-
-        it('should skip ping if session is destroyed', () => {
-            const client = new ProxyClient(settings);
-            const mockSession = makeMockSession();
-            mockSession.ping = sinon.stub();
-            mockSession.destroyed = true;
-            client.clientSession = mockSession;
-
+            handleDisconnection.resetHistory();
+            client.closed = true;
             client._startPingInterval();
             clock.tick(settings.PROXY_PING_INTERVAL_MS);
 
-            expect(mockSession.ping).not.to.have.been.called;
+            expect(handleDisconnection).not.to.have.been.called;
+        });
+
+        it('stops the ping interval', () => {
+            const client = new ProxyClient(settings);
+            const session = makeMockSession();
+            client.clientSession = session;
+
+            client._startPingInterval();
+            client._stopPingInterval();
+            clock.tick(settings.PROXY_PING_INTERVAL_MS * 2);
+
+            expect(client._pingInterval).to.equal(null);
+            expect(session.ping).not.to.have.been.called;
+        });
+    });
+
+    describe('_cleanupMessageStreams()', () => {
+        it('destroys open streams and clears the set', () => {
+            const client = new ProxyClient(settings);
+            const openStream = makeMockStream();
+            const closedStream = makeMockStream();
+            closedStream.closed = true;
+            const destroyedStream = makeMockStream();
+            destroyedStream.destroyed = true;
+            client.getMessageStreams.add(openStream);
+            client.getMessageStreams.add(closedStream);
+            client.getMessageStreams.add(destroyedStream);
+
+            client._cleanupMessageStreams();
+
+            expect(openStream.destroy).to.have.been.calledOnce;
+            expect(closedStream.destroy).not.to.have.been.called;
+            expect(destroyedStream.destroy).not.to.have.been.called;
+            expect(client.getMessageStreams.size).to.equal(0);
+        });
+    });
+
+    describe('listenForMessages()', () => {
+        it('decodes a received message and passes it to the handler', async () => {
+            const client = new ProxyClient(settings);
+            const metadata = {
+                messageId: uuid.v4(),
+                threadId: uuid.v4(),
+                protocolVersion: 1
+            };
+            const payload = { body: { hello: 'world' }, headers: { a: 'b' } };
+            const encryptedPayload = encryptor.encryptMessageContent(payload, 'base64');
+            let stream;
+            const session = makeMockSession(() => {
+                stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', {
+                        [HTTP2_HEADER_STATUS]: 200,
+                        [MESSAGE_METADATA_HEADER]: JSON.stringify(metadata)
+                    });
+                    stream.emit('data', encryptedPayload);
+                    stream.emit('end');
+                });
+                return stream;
+            });
+            client.closed = false;
+            client.clientSession = session;
+            const handler = sandbox.stub().callsFake(async (messageMetadata, message) => {
+                expect(messageMetadata.messageId).to.equal(metadata.messageId);
+                expect(message.body).to.deep.equal(payload.body);
+                expect(message.headers).to.deep.equal(payload.headers);
+                client.listeningForMessages = false;
+            });
+
+            await client.listenForMessages(handler);
+
+            expect(handler).to.have.been.calledOnce;
+            expect(client.processingMessagesMetadata.size).to.equal(1);
+            expect(stream.destroy).to.have.been.calledOnce;
+            expect(client.getMessageStreams.size).to.equal(0);
+        });
+
+        it('handles 204 streams by closing them and not invoking the handler', async () => {
+            const client = new ProxyClient(settings);
+            let stream;
+            const session = makeMockSession(() => {
+                stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', { [HTTP2_HEADER_STATUS]: 204 });
+                    client.listeningForMessages = false;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+            client.closed = false;
+            client.clientSession = session;
+            const handler = sandbox.stub();
+
+            await client.listenForMessages(handler);
+
+            expect(stream.close).to.have.been.calledOnceWith(NGHTTP2_NO_ERROR);
+            expect(handler).not.to.have.been.called;
+        });
+
+        it('treats disconnected close as a recoverable network problem', async () => {
+            const client = new ProxyClient(settings);
+            let stream;
+            const cleanup = sandbox.spy(client, '_cleanupMessageStreams');
+            const session = makeMockSession(() => {
+                stream = makeMockStream();
+                setImmediate(() => {
+                    client.closed = true;
+                    client.listeningForMessages = false;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+            client.closed = false;
+            client.clientSession = session;
+
+            await client.listenForMessages(sandbox.stub());
+
+            expect(cleanup).to.have.been.called;
+            expect(client.getMessageStreams.size).to.equal(0);
+        });
+
+        it('treats non-zero rstCode close as an error while still connected', async () => {
+            const client = new ProxyClient(settings);
+            let stream;
+            const cleanup = sandbox.spy(client, '_cleanupMessageStreams');
+            const session = makeMockSession(() => {
+                stream = makeMockStream();
+                stream.rstCode = 2;
+                setImmediate(() => {
+                    client.listeningForMessages = false;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+            client.closed = false;
+            client.clientSession = session;
+
+            await client.listenForMessages(sandbox.stub());
+
+            expect(cleanup).to.have.been.called;
+        });
+
+        it('treats no-error close as an empty stream result', async () => {
+            const client = new ProxyClient(settings);
+            const session = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    client.listeningForMessages = false;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+            client.closed = false;
+            client.clientSession = session;
+            const handler = sandbox.stub();
+
+            await client.listenForMessages(handler);
+
+            expect(handler).not.to.have.been.called;
+        });
+    });
+
+    describe('sendMessage()', () => {
+        let client;
+
+        beforeEach(() => {
+            client = new ProxyClient(settings);
+            client.closed = false;
+        });
+
+        it('posts encrypted data with metadata and content length', async () => {
+            let stream;
+            const session = makeMockSession((headers) => {
+                stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', { [HTTP2_HEADER_STATUS]: 200 });
+                    stream.emit('end');
+                });
+                return stream;
+            });
+            client.clientSession = session;
+            const data = { body: { hello: 'world' }, headers: { 'X-Test': '1' } };
+            const metadata = { taskId: 'task-1' };
+
+            await client.sendMessage({
+                incomingMessageId: 'incoming-1',
+                type: 'data',
+                data,
+                metadata
+            });
+
+            const requestHeaders = session.request.firstCall.args[0];
+            expect(requestHeaders[HTTP2_HEADER_PATH]).to.include('/message?');
+            expect(requestHeaders[HTTP2_HEADER_PATH]).to.include('incomingMessageId=incoming-1');
+            expect(requestHeaders[HTTP2_HEADER_PATH]).to.include('type=data');
+            expect(requestHeaders[HTTP2_HEADER_METHOD]).to.equal('POST');
+            expect(requestHeaders[HTTP2_HEADER_AUTHORIZATION]).to.equal(client.authHeader);
+            expect(JSON.parse(requestHeaders[MESSAGE_METADATA_HEADER])).to.deep.include({
+                taskId: 'task-1',
+                protocolVersion: settings.PROTOCOL_VERSION
+            });
+            expect(requestHeaders[HTTP2_HEADER_CONTENT_LENGTH]).to.equal(stream.write.firstCall.args[0].length);
+            const decrypted = encryptor.decryptMessageContent(stream.write.firstCall.args[0], 'base64');
+            expect(decrypted).to.deep.equal({ body: { hello: 'world' }, headers: { 'X-Test': '1' } });
+            expect(stream.end).to.have.been.calledOnce;
+        });
+
+        it('adds customRoutingKey to the request path', async () => {
+            const session = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', { [HTTP2_HEADER_STATUS]: 200 });
+                    stream.emit('end');
+                });
+                return stream;
+            });
+            client.clientSession = session;
+
+            await client.sendMessage({
+                incomingMessageId: 'incoming-2',
+                type: 'data',
+                data: { body: {}, headers: { 'X-EIO-Routing-Key': 'custom.route' } },
+                metadata: {}
+            });
+
+            expect(session.request.firstCall.args[0][HTTP2_HEADER_PATH]).to.include('customRoutingKey=custom.route');
+        });
+
+        it('rejects when outgoing payload exceeds the size limit', async () => {
+            client = new ProxyClient(makeSettings({ OUTGOING_MESSAGE_SIZE_LIMIT: 5 }));
+            client.closed = false;
+            client.clientSession = makeMockSession();
+
+            await expectRejected(client.sendMessage({
+                incomingMessageId: 'incoming-3',
+                type: 'snapshot',
+                data: '123456',
+                metadata: {}
+            }), (error) => {
+                expect(error.message).to.match(/Outgoing message size/);
+            });
+        });
+
+        it('rejects on stream error and marks it as a network error', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('error', new Error('ECONNRESET'));
+                });
+                return stream;
+            });
+
+            await expectRejected(client.sendMessage({
+                incomingMessageId: 'incoming-4',
+                type: 'data',
+                data: { body: {} },
+                metadata: {}
+            }), (error) => {
+                expect(error.message).to.equal('ECONNRESET');
+                expect(error.isNetworkError).to.equal(true);
+            });
+        });
+
+        it('rejects when close happens after connection loss', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    client.closed = true;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await expectRejected(client.sendMessage({
+                incomingMessageId: 'incoming-5',
+                type: 'data',
+                data: { body: {} },
+                metadata: {}
+            }), (error) => {
+                expect(error.message).to.equal('Send message stream closed due to lost connection');
+                expect(error.isNetworkError).to.equal(true);
+            });
+        });
+
+        it('rejects when close has a non-zero rstCode while still connected', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                stream.rstCode = 7;
+                setImmediate(() => {
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await expectRejected(client.sendMessage({
+                incomingMessageId: 'incoming-6',
+                type: 'data',
+                data: { body: {} },
+                metadata: {}
+            }), (error) => {
+                expect(error.message).to.equal('Send message stream closed with error, rstCode: 7');
+                expect(error.isNetworkError).to.equal(false);
+            });
+        });
+
+        it('resolves when close has NGHTTP2_NO_ERROR', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await client.sendMessage({
+                incomingMessageId: 'incoming-7',
+                type: 'data',
+                data: { body: {} },
+                metadata: {}
+            });
+        });
+    });
+
+    describe('finishProcessing()', () => {
+        let client;
+
+        beforeEach(() => {
+            client = new ProxyClient(settings);
+            client.closed = false;
+        });
+
+        it('rejects invalid statuses', async () => {
+            await expectRejected(
+                client.finishProcessing({ messageId: 'msg-1' }, 'invalid'),
+                (error) => {
+                    expect(error.message).to.equal('Invalid message processing status: invalid');
+                }
+            );
+        });
+
+        it('posts expected query params and removes processed metadata', async () => {
+            let stream;
+            const metadata = { messageId: 'msg-2' };
+            client.processingMessagesMetadata.add(metadata);
+            client.clientSession = makeMockSession(() => {
+                stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', { [HTTP2_HEADER_STATUS]: 200 });
+                    stream.emit('end');
+                });
+                return stream;
+            });
+
+            await client.finishProcessing(metadata, MESSAGE_PROCESSING_STATUS.SUCCESS);
+
+            const path = client.clientSession.request.firstCall.args[0][HTTP2_HEADER_PATH];
+            expect(path).to.include('/finish-processing?');
+            expect(path).to.include('incomingMessageId=msg-2');
+            expect(path).to.include('status=success');
+            expect(path).not.to.include('clientId=');
+            expect(stream.end).to.have.been.calledOnce;
+            expect(client.processingMessagesMetadata.has(metadata)).to.equal(false);
+        });
+
+        it('rejects on server error responses', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', { [HTTP2_HEADER_STATUS]: 500 });
+                    stream.emit('data', Buffer.from('finish failed'));
+                    stream.emit('end');
+                });
+                return stream;
+            });
+
+            await expectRejected(
+                client.finishProcessing({ messageId: 'msg-3' }, MESSAGE_PROCESSING_STATUS.ERROR),
+                (error) => {
+                    expect(error.message).to.equal('finish failed');
+                    expect(error.statusCode).to.equal(500);
+                }
+            );
+        });
+
+        it('rejects when close happens after connection loss', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    client.closed = true;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await expectRejected(
+                client.finishProcessing({ messageId: 'msg-4' }, MESSAGE_PROCESSING_STATUS.SUCCESS),
+                (error) => {
+                    expect(error.message).to.equal('Finish processing stream closed due to lost connection');
+                    expect(error.isNetworkError).to.equal(true);
+                }
+            );
+        });
+
+        it('rejects when close has a non-zero rstCode while still connected', async () => {
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                stream.rstCode = 9;
+                setImmediate(() => {
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await expectRejected(
+                client.finishProcessing({ messageId: 'msg-5' }, MESSAGE_PROCESSING_STATUS.SUCCESS),
+                (error) => {
+                    expect(error.message).to.equal('Finish processing stream closed with error, rstCode: 9');
+                    expect(error.isNetworkError).to.equal(false);
+                }
+            );
+        });
+
+        it('resolves when close has NGHTTP2_NO_ERROR', async () => {
+            const metadata = { messageId: 'msg-6' };
+            client.processingMessagesMetadata.add(metadata);
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await client.finishProcessing(metadata, MESSAGE_PROCESSING_STATUS.SUCCESS);
+            expect(client.processingMessagesMetadata.has(metadata)).to.equal(false);
+        });
+    });
+
+    describe('resumeProcessing()', () => {
+        let client;
+
+        beforeEach(() => {
+            client = new ProxyClient(settings);
+            client.closed = false;
+        });
+
+        it('returns early when there are no in-flight messages', async () => {
+            client.clientSession = makeMockSession();
+
+            await client.resumeProcessing();
+
+            expect(client.clientSession.request).not.to.have.been.called;
+        });
+
+        it('posts in-flight message metadata to /resume-processing', async () => {
+            let stream;
+            const metadata = { messageId: 'msg-7' };
+            client.processingMessagesMetadata.add(metadata);
+            client.clientSession = makeMockSession(() => {
+                stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('response', { [HTTP2_HEADER_STATUS]: 200 });
+                    stream.emit('end');
+                });
+                return stream;
+            });
+
+            await client.resumeProcessing();
+
+            const requestHeaders = client.clientSession.request.firstCall.args[0];
+            expect(requestHeaders[HTTP2_HEADER_PATH]).to.equal('/resume-processing');
+            expect(requestHeaders[HTTP2_HEADER_METHOD]).to.equal('POST');
+            expect(JSON.parse(stream.write.firstCall.args[0])).to.deep.equal([{
+                messageId: 'msg-7',
+                stepId: settings.STEP_ID,
+                taskId: settings.FLOW_ID
+            }]);
+            expect(stream.end).to.have.been.calledOnce;
+        });
+
+        it('rejects when close happens after connection loss', async () => {
+            client.processingMessagesMetadata.add({ messageId: 'msg-8' });
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    client.closed = true;
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await expectRejected(client.resumeProcessing(), (error) => {
+                expect(error.message).to.equal('Resume processing stream closed due to lost connection');
+                expect(error.isNetworkError).to.equal(true);
+            });
+        });
+
+        it('rejects when close has a non-zero rstCode while still connected', async () => {
+            client.processingMessagesMetadata.add({ messageId: 'msg-9' });
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                stream.rstCode = 4;
+                setImmediate(() => {
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await expectRejected(client.resumeProcessing(), (error) => {
+                expect(error.message).to.equal('Resume processing stream closed with error, rstCode: 4');
+            });
+        });
+
+        it('resolves when close has NGHTTP2_NO_ERROR', async () => {
+            client.processingMessagesMetadata.add({ messageId: 'msg-10' });
+            client.clientSession = makeMockSession(() => {
+                const stream = makeMockStream();
+                setImmediate(() => {
+                    stream.emit('close');
+                });
+                return stream;
+            });
+
+            await client.resumeProcessing();
+        });
+    });
+
+    describe('_prepareData()', () => {
+        let client;
+
+        beforeEach(() => {
+            client = new ProxyClient(settings);
+        });
+
+        it('encrypts data messages and stores the configured protocolVersion', () => {
+            const data = { body: { a: 1 }, headers: {} };
+            const metadata = { taskId: 'task-1' };
+
+            const { preparedData, preparedMetadata } = client._prepareData(data, metadata, 'data');
+
+            expect(preparedMetadata.protocolVersion).to.equal(settings.PROTOCOL_VERSION);
+            expect(encryptor.decryptMessageContent(preparedData, 'base64')).to.deep.equal(data);
+        });
+
+        it('uses protocolVersion 1 for http-reply and strips routing key headers case-insensitively', () => {
+            const data = {
+                body: { ok: true },
+                headers: {
+                    'X-EIO-Routing-Key': 'custom.route',
+                    'X-Other': 'keep-me'
+                }
+            };
+
+            const { preparedData, preparedMetadata } = client._prepareData(data, {}, 'http-reply');
+            const decrypted = encryptor.decryptMessageContent(preparedData, 'base64');
+
+            expect(preparedMetadata.protocolVersion).to.equal(1);
+            expect(decrypted.headers).to.deep.equal({ 'X-Other': 'keep-me' });
+        });
+
+        it('supports forceProtocolVersion and leaves snapshots unencrypted', () => {
+            const forced = client._prepareData({ body: { forced: true } }, {}, 'data', 2);
+            expect(forced.preparedMetadata.protocolVersion).to.equal(2);
+            expect(encryptor.decryptMessageContent(forced.preparedData)).to.deep.equal({ body: { forced: true } });
+
+            const snapshot = client._prepareData('snapshot-payload', { protocolVersion: 99 }, 'snapshot');
+            expect(snapshot.preparedData).to.equal('snapshot-payload');
+            expect(snapshot.preparedMetadata).not.to.have.property('protocolVersion');
+        });
+    });
+
+    describe('encryptMessageContent()', () => {
+        let client;
+
+        beforeEach(() => {
+            client = new ProxyClient(settings);
+        });
+
+        it('encrypts protocol version 1 payloads as base64', () => {
+            const encrypted = client.encryptMessageContent({ hello: 'v1' }, 1);
+
+            expect(encryptor.decryptMessageContent(encrypted, 'base64')).to.deep.equal({ hello: 'v1' });
+        });
+
+        it('encrypts protocol version 2 payloads without base64 wrapper', () => {
+            const encrypted = client.encryptMessageContent({ hello: 'v2' }, 2);
+
+            expect(encryptor.decryptMessageContent(encrypted)).to.deep.equal({ hello: 'v2' });
+        });
+    });
+
+    describe('_decodeMessage()', () => {
+        it('decodes default messages and adds reply_to into headers', () => {
+            const client = new ProxyClient(settings);
+            const payload = { body: { hello: 'world' }, headers: {} };
+            const encrypted = encryptor.encryptMessageContent(payload, 'base64');
+
+            const message = client._decodeMessage(encrypted, { protocolVersion: 1, reply_to: 'reply-queue' });
+
+            expect(message.body).to.deep.equal(payload.body);
+            expect(message.headers.reply_to).to.equal('reply-queue');
+        });
+
+        it('decodes error-format messages', () => {
+            const client = new ProxyClient(makeSettings({ INPUT_FORMAT: 'error' }));
+            const originalMessage = { body: { input: true } };
+            const payload = JSON.stringify({
+                error: encryptor.encryptMessageContent({ name: 'Error', message: 'boom' }, 'base64').toString(),
+                errorInput: encryptor.encryptMessageContent(originalMessage, 'base64').toString()
+            });
+
+            const message = client._decodeMessage(Buffer.from(payload), {});
+
+            expect(message.error.message).to.equal('boom');
+            expect(message.errorInput).to.deep.equal(originalMessage);
+        });
+    });
+
+    describe('_extractMessageMetadata()', () => {
+        let client;
+
+        beforeEach(() => {
+            client = new ProxyClient(settings);
+        });
+
+        it('extracts standard fields and lowercases x-eio-meta-* keys', () => {
+            const headers = {
+                [MESSAGE_METADATA_HEADER]: JSON.stringify({
+                    stepId: 'step-2',
+                    messageId: 'message-1',
+                    threadId: 'thread-1',
+                    parentMessageId: 'parent-1',
+                    protocolVersion: 2,
+                    'X-EIO-META-Trace-Id': 'trace-1'
+                })
+            };
+
+            const metadata = client._extractMessageMetadata(headers);
+
+            expect(metadata).to.deep.include({
+                stepId: 'step-2',
+                messageId: 'message-1',
+                threadId: 'thread-1',
+                parentMessageId: 'parent-1',
+                protocolVersion: 2,
+                'x-eio-meta-trace-id': 'trace-1'
+            });
+        });
+
+        it('falls back to x-eio-meta-trace-id and preserves reply_to', () => {
+            const headers = {
+                [MESSAGE_METADATA_HEADER]: JSON.stringify({
+                    messageId: 'message-2',
+                    reply_to: 'reply-queue',
+                    'x-eio-meta-trace-id': 'trace-2'
+                })
+            };
+
+            const metadata = client._extractMessageMetadata(headers);
+
+            expect(metadata.threadId).to.equal('trace-2');
+            expect(metadata.reply_to).to.equal('reply-queue');
+        });
+
+        it('generates a threadId when one is not provided', () => {
+            const headers = {
+                [MESSAGE_METADATA_HEADER]: JSON.stringify({
+                    messageId: 'message-3'
+                })
+            };
+
+            const metadata = client._extractMessageMetadata(headers);
+
+            expect(metadata.threadId).to.be.a('string');
+            expect(metadata.threadId).to.have.lengthOf(36);
+        });
+
+        it('throws for missing or invalid metadata header', () => {
+            expect(() => client._extractMessageMetadata({})).to.throw(
+                'Missing metadata in message stream response'
+            );
+            expect(() => client._extractMessageMetadata({
+                [MESSAGE_METADATA_HEADER]: 'not-json'
+            })).to.throw('Failed to parse metadata JSON');
+        });
+    });
+
+    describe('sendError()', () => {
+        it('sends encrypted error payload with original input when provided', async () => {
+            const client = new ProxyClient(settings);
+            const sendMessage = sandbox.stub(client, 'sendMessage').resolves();
+            const err = new Error('boom');
+            const originalMessage = { body: { original: true } };
+
+            await client.sendError(err, { taskId: 'task-1' }, originalMessage, {
+                messageId: 'incoming-8',
+                protocolVersion: 1
+            });
+
+            const args = sendMessage.firstCall.args[0];
+            expect(args.type).to.equal('error');
+            expect(args.incomingMessageId).to.equal('incoming-8');
+            const payload = JSON.parse(args.data);
+            expect(encryptor.decryptMessageContent(Buffer.from(payload.error), 'base64')).to.deep.include({
+                name: 'Error',
+                message: 'boom'
+            });
+            expect(encryptor.decryptMessageContent(Buffer.from(payload.errorInput), 'base64')).to.deep.equal(originalMessage);
+        });
+    });
+
+    describe('sendRebound()', () => {
+        it('sends rebound metadata with reason and end timestamp', async () => {
+            const client = new ProxyClient(settings);
+            const sendMessage = sandbox.stub(client, 'sendMessage').resolves();
+            const outgoingMetadata = { taskId: 'task-1' };
+
+            await client.sendRebound(new Error('Too busy'), { messageId: 'incoming-9' }, outgoingMetadata);
+
+            const args = sendMessage.firstCall.args[0];
+            expect(args.type).to.equal('rebound');
+            expect(args.incomingMessageId).to.equal('incoming-9');
+            expect(args.metadata.reboundReason).to.equal('Too busy');
+            expect(args.metadata.end).to.be.a('number');
+        });
+    });
+
+    describe('sendSnapshot()', () => {
+        it('stringifies payloads and forwards them as snapshot messages', async () => {
+            const client = new ProxyClient(settings);
+            const sendMessage = sandbox.stub(client, 'sendMessage').resolves();
+            const snapshot = { state: 'ok' };
+
+            await client.sendSnapshot(snapshot, { taskId: 'task-2' });
+
+            expect(sendMessage).to.have.been.calledOnceWith({
+                type: 'snapshot',
+                data: JSON.stringify(snapshot),
+                metadata: { taskId: 'task-2' }
+            });
+        });
+    });
+
+    describe('MESSAGE_PROCESSING_STATUS', () => {
+        it('exports the expected status constants', () => {
+            expect(MESSAGE_PROCESSING_STATUS).to.deep.equal({
+                SUCCESS: 'success',
+                ERROR: 'error'
+            });
         });
     });
 });

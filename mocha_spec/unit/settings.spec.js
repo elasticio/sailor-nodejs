@@ -23,6 +23,8 @@ describe('Settings', () => {
         envVars.ELASTICIO_SAILOR_PROXY_URI = 'http://proxy:1245';
         envVars.ELASTICIO_SAILOR_PROXY_JWT_SECRET = 'testProxySecret';
 
+        envVars.ELASTICIO_OUTGOING_MESSAGE_SIZE_LIMIT = '1000000';
+
         envVars.ELASTICIO_MESSAGE_CRYPTO_IV = 'initiailization vector';
         envVars.ELASTICIO_MESSAGE_CRYPTO_PASSWORD = 'this is password';
     });
