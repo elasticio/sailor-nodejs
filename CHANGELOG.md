@@ -1,4 +1,4 @@
-## 2.7.9 (August 20, 2026)
+## 2.7.9 (August 27, 2026)
 
 * Fix double-stringifying of string bodies in lightweight message emission — if `body` or passthrough body was already a string, `JSON.stringify` would wrap it in extra quotes ([#226](https://github.com/elasticio/sailor-nodejs/issues/226))
 * Update package dependencies
