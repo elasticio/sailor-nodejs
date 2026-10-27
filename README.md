@@ -1,53 +1,134 @@
-# elasticio-sailor-nodejs [![Build Status][travis-image]][travis-url] [![Dependency Status][daviddm-image]][daviddm-url]
+# elasticio-sailor-nodejs
 
 > The official elastic.io library for bootstrapping and executing for Node.js connectors.
 
 [![NPM](https://nodei.co/npm/elasticio-sailor-nodejs.png?downloads=true)](https://nodei.co/npm/elasticio-sailor-nodejs/)
 
-`elasticio-sailor-nodejs` is a **required dependency for all components build for [elastic.io platform](http://www.elastic.io) in Node.js**. Add the dependency in the `package.json` file in the following way:
+`elasticio-sailor-nodejs` is a **required dependency for all components build for [elastic.io platform](http://www.elastic.io) in Node.js**.
+
+## Install
+
+Requires **Node.js >= 24.22.1**.
 
 ```json
     "dependencies": {
-        "q": "^1.4.1",
-        "elasticio-sailor-nodejs": "^2.2.1",
-        "elasticio-node": "^0.0.8"
+        "elasticio-sailor-nodejs": "^3.0.0"
     }
 ```
 
-## Building components in Node.js
+Sailor no longer brings `q`, `co` or `lodash` in. If your component uses them, declare them in its own `package.json`.
+See the [CHANGELOG](CHANGELOG.md) for everything that changed in 3.0.0.
 
-If you plan to build a component for [elastic.io platform](http://www.elastic.io) in Node.js then you can visit our dedicated documentation page which describes [how to build a component in node.js](https://docs.elastic.io/guides/building-nodejs-component).
+## How it works: Sailor Proxy
 
-### Before you start
+Since 3.0.0 sailor does not connect to RabbitMQ. It is a client of **Sailor Proxy**, which mediates between
+sailors and the message broker:
 
-Before you can deploy any code into our system **you must be a registered elastic.io platform user**. Please see our home page at [http://www.elastic.io](http://www.elastic.io) to learn how.
+- sailor keeps one HTTP/2 session to the proxy (`ELASTICIO_SAILOR_PROXY_URI`), with PING keepalive and
+  automatic reconnect (jittered exponential backoff)
+- incoming messages are streamed from the proxy (prefetch: `ELASTICIO_PROXY_PREFETCH_SAILOR`); each one is
+  acknowledged to the proxy when processing finishes
+- `data`, `error`, `snapshot`, rebound etc. emitted by the component are sent to the proxy, rate limited
+  (see [Flow control](#flow-control))
+- every request is signed with a JWT (`ELASTICIO_SAILOR_PROXY_JWT_SECRET`)
+- lightweight message bodies go directly to object storage (Maester), not through the proxy
 
-> Any attempt to deploy a code into our platform without a registration would fail.
+## Components: CommonJS or ESM
 
-After the registration and opening of the account you must **[upload your SSH Key](https://docs.elastic.io/guides/ssh-keys)** into our platform.
+Sailor loads triggers, actions and `verifyCredentials` with dynamic `import()`, so both module formats work:
 
-> If you fail to upload you SSH Key you will get **permission denied** error during the deployment.
+```JavaScript
+// CommonJS
+exports.process = async function process(msg, cfg, snapshot) {
+    await this.emit('data', { body: msg.body });
+};
 
-### Getting Started
+// ESM (component package.json has "type": "module")
+export async function process(msg, cfg, snapshot) {
+    return { body: msg.body }; // a returned value is emitted as `data`, then `end`
+}
+```
 
-After registration and uploading of your SSH Key you can proceed to deploy it into our system. At this stage we suggest you to:
-*   [Create a team](https://docs.elastic.io/guides/teams-and-repos#creating-a-developer-team) to work on your new component. This is not required but will be automatically created using random naming by our system so we suggest you name your team accordingly.
-*   [Create a repository](https://docs.elastic.io/guides/teams-and-repos#create-a-component-repository) inside the team to deploy your new component code.
+`module.exports = fn` (a single function) and `exports.process = fn` both work. Callback-style
+`verifyCredentials(cfg, cb)` and model methods are still supported, as is returning a value or a promise.
 
-### Examples of Node.js components
+## TypeScript
 
-Here is a list of components build on Node.js:
+Sailor is written in TypeScript and ships its types. Type `this` in `process` and hooks:
 
-*   [petstore-component-nodejs](https://github.com/elasticio/petstore-component-nodejs) to build your first component
-*   [code-component](https://github.com/elasticio/code-component) to run pieces of synchronous JavaScript inside your integration flow,
-*   [webhook-component](https://github.com/elasticio/webhook-component) to send and receive WebHooks on elastic.io platform,
-*   [csv-component](https://github.com/elasticio/csv-component) to work with CSV files in your integration flow,
-*   [sugarcrm-component](https://github.com/elasticio/sugarcrm-component) to use Sugar CRM in your integrations
+```TypeScript
+import type { TaskExecContext, IncomingMessage, InitHook } from 'elasticio-sailor-nodejs';
 
-[travis-image]: https://travis-ci.org/elasticio/sailor-nodejs.svg?branch=master
-[travis-url]: https://travis-ci.org/elasticio/sailor-nodejs
-[daviddm-image]: https://david-dm.org/elasticio/sailor-nodejs.svg?theme=shields.io
-[daviddm-url]: https://david-dm.org/elasticio/sailor-nodejs
+export async function process(this: TaskExecContext, msg: IncomingMessage, cfg: { apiKey: string }) {
+    this.logger.info('Processing message');
+    await this.emit('data', { body: msg.body });
+}
+
+export const init: InitHook<{ apiKey: string }> = async function (cfg) {
+    this.logger.info('init');
+};
+```
+
+Exported types: `TaskExecContext`, `IncomingMessage`, `OutgoingMessage`, `Snapshot`, `ProcessFunction`,
+`StartupHook`, `InitHook`, `ShutdownHook`, `HookContext`, `Settings`, `ServiceSettings`, `ServiceExec`,
+`VerifyCredentialsResult`, `ComponentLogger`, `ApiClient`, `StepData`, `MessageMetadata`, `LegacyCallback`.
+
+
+
+## Environment variables
+
+Every variable has the `ELASTICIO_` prefix. They are set by the platform; values are validated at startup
+and an invalid value stops the sailor with an error.
+
+- Numbers must be numeric (`Infinity` is allowed where it is the default) and within the range below.
+- Booleans accept `true`/`1` and `false`/`0` (case-insensitive); empty means the default.
+
+### Mandatory
+
+| Variable | Notes |
+|----------|-------|
+| `FLOW_ID`, `EXEC_ID`, `STEP_ID`, `CONTAINER_ID`, `WORKSPACE_ID`, `USER_ID`, `COMP_ID`, `FUNCTION` | Execution identity |
+| `API_URI`, `API_USERNAME`, `API_KEY` | Platform API credentials |
+| `SAILOR_PROXY_JWT_SECRET` | Signs requests to the sailor proxy |
+| `OUTGOING_MESSAGE_SIZE_LIMIT` | Positive integer, bytes |
+| `SAILOR_PROXY_URI`, `MESSAGE_CRYPTO_PASSWORD`, `MESSAGE_CRYPTO_IV` | Not required when `HOOK_SHUTDOWN` is set |
+
+### Optional
+
+| Variable | Default | Range / notes |
+|----------|---------|---------------|
+| `COMPONENT_PATH` | `''` | Component directory, relative to cwd |
+| `INPUT_FORMAT` | `default` | |
+| `PROTOCOL_VERSION` | `1` | >= 1 |
+| `STARTUP_REQUIRED` | `false` | Run the startup hook |
+| `HOOK_SHUTDOWN` | `false` | Only run the shutdown hook |
+| `NO_SELF_PASSTHROUGH` | `false` | |
+| `EMIT_LIGHTWEIGHT_MESSAGE` | `false` | Store message bodies in object storage |
+| `OBJECT_STORAGE_URI`, `OBJECT_STORAGE_TOKEN` | `null` | |
+| `OBJECT_STORAGE_SIZE_THRESHOLD` | `1048576` | >= 0, bytes |
+| `OBJECT_STORAGE_RETRY_ATTEMPTS` | `2` | 0–4 |
+| `OBJECT_STORAGE_REQUEST_TIMEOUT` | `10000` | 500–20000 ms |
+| `DATA_RATE_LIMIT` | `10` | >= 1, per `RATE_INTERVAL` |
+| `ERROR_RATE_LIMIT` | `2` | >= 1, per `RATE_INTERVAL` |
+| `SNAPSHOT_RATE_LIMIT` | `2` | >= 1, per `RATE_INTERVAL` |
+| `RATE_INTERVAL` | `100` | >= 1 ms |
+| `API_REQUEST_RETRY_ATTEMPTS` | `3` | >= 0 |
+| `API_REQUEST_RETRY_DELAY` | `100` | >= 0 ms |
+| `PROXY_PREFETCH_SAILOR` | `1` | >= 1 |
+| `PROXY_PING_INTERVAL_MS` | `10000` | >= 1 ms |
+| `PROXY_RECONNECT_MAX_RETRIES` | `Infinity` | >= 0 |
+| `PROXY_RECONNECT_INITIAL_DELAY` | `1000` | >= 0 ms |
+| `PROXY_RECONNECT_MAX_DELAY` | `30000` | >= 0 ms |
+| `PROXY_RECONNECT_BACKOFF_MULTIPLIER` | `2` | >= 1 |
+| `PROXY_RECONNECT_JITTER_FACTOR` | `0.3` | >= 0 |
+| `PROXY_OBJECT_REQUEST_RETRY_ATTEMPTS` | `Infinity` | >= 0 |
+| `PROXY_OBJECT_REQUEST_RETRY_DELAY` | `100` | >= 0 ms |
+| `PROXY_OBJECT_REQUEST_MAX_RETRY_DELAY` | `300000` | >= 0 ms |
+| `ADDITIONAL_VARS_FOR_HEADERS` | – | Comma-separated env var names, sent as headers |
+
+`runService` (verifyCredentials, select models) reads `POST_RESULT_URL`, `CFG`, `ACTION_OR_TRIGGER`,
+`GET_MODEL_METHOD`, `COMPONENT_PATH`, `API_URI`, `API_USERNAME`, `API_KEY`, `API_REQUEST_RETRY_ATTEMPTS`,
+`API_REQUEST_RETRY_DELAY`. `this.getConfig()` returns these parsed settings, not `process.env`.
 
 ## Sailor logging
 
@@ -62,7 +143,8 @@ Supported log levels are:
 - `DEBUG`
 - `TRACE`
 
-Default log level is `INFO`. You can change default log level with environment variable `LOG_LEVEL`.
+Default log level is `INFO`. You can change default log level with environment variable `LOG_LEVEL`
+(e.g. `LOG_LEVEL=trace` for sailor internals; `DEBUG=sailor` is no longer used).
 
 Sailor logger adds the following extra context to log messages:
 
@@ -88,8 +170,8 @@ Sailor logger adds the following extra context to log messages:
 Sailor exposes logger object for use in a component. Component logger inherits log level from sailor's logger
 and adds the following extra context to log messages:
 
-- `messageId` (unique ID of the next RabbitMQ message)
-- `parentMessageId` (unique ID of previous RabbitMQ message)
+- `messageId` (unique ID of the next message)
+- `parentMessageId` (unique ID of the previous message)
 - `threadId` (unique ID of execution thread)
 
 Component logger usage example:
@@ -152,19 +234,9 @@ will operate in balance.
 
 ### How to configure it
 
-There is a set of environment variables that are responsible for the configuration of the static flow control
-(dynamic flow control is implemented in the message-oriented middleware of the platform hence can't be configured
-on the component level)
-
- * ELASTICIO_DATA_RATE_LIMIT - a number of maximum `data` messages per second that could be emitted
- by the component
- 
- * ELASTICIO_SNAPSHOT_RATE_LIMIT - a number of maximum `snapshot` messages per second that could be emitted
- by the component
- 
- * ELASTICIO_PROCESS_AMQP_DRAIN, (boolean) - true value means that 'emit' method in component would return
- promise which will resolve to true value when amqplib inner buffer would be empty. Preventing OutOfMemoryError
- on buffer overflow.
+The static flow control is configured with `DATA_RATE_LIMIT`, `ERROR_RATE_LIMIT`, `SNAPSHOT_RATE_LIMIT`
+and `RATE_INTERVAL` (see [Environment variables](#environment-variables)). Dynamic flow control is implemented
+in the message-oriented middleware of the platform hence can't be configured on the component level.
 
 ## Sailor hooks
 
@@ -196,15 +268,13 @@ exports.startup = function(cfg) {
 ```
 
 - Only on the first trigger
-- Called without ``this``
+- Called with ``this`` = `HookContext` (see below)
 - May return promise
 - May return value
 - May throw - not recommended
 - May return a promise that will fail
 
 - Startup logs can be found in the tab of the component on execution page
-- TBD - Separate them under different tab in UI
-- TBD - Where to see restart errors?overwritten
 
 Startup state data - either return value or the result of the promise
 
@@ -236,7 +306,7 @@ exports.shutdown = function(cfg, startData) {
     - If task is running then containers are shutdown
     - If task is sleeping then do nothing
  - Start new trigger container
- - Trigger starts without ``this`` context - it's not possible to log errors or send new data
+ - Called with ``this`` = `HookContext` (see below); it's not possible to send new data
  - Should either return value (ignored) or promise (resolved).
  - Startup data is removed after shutdown hook
  - Call the shutdown hook, parameters that are passed is from the startup results or ``{}`` if nothing was returned
@@ -244,4 +314,21 @@ exports.shutdown = function(cfg, startData) {
  - If shutdown hook won't complete within 60 seconds then container will be killed
  - As soon as user pressed stop, task is marked as inactive and 'webhooks gateway' will start responding with the error (Task either does not exist or is inactive) to possible data
 
-TBD - log for shutdown hooks?
+### Hook context
+
+`startup`, `init` and `shutdown` are called with `this` set to a hook context:
+
+- `this.logger` – the component logger
+- `this.getApiClient()` – the platform API client
+- `this.getConfig()` – the sailor settings
+
+Hooks that do not use `this` keep working.
+
+## Local development
+
+```bash
+npm run dev:local                            # run against a local sailor-proxy, env from config/local.json
+npm run encode -- '{"body":{"k":"v"}}' [1|2] # encrypt a message (protocol version 1 or 2)
+npm run decode -- <base64> [1|2]             # decrypt a message
+npm test                                     # build, lint, unit + integration tests
+```

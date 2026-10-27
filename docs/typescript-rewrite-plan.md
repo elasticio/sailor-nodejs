@@ -309,19 +309,24 @@ Order goes leaf to root so each module compiles against real dependencies:
     *Kept:* `request` + `request-promise-native` (dev): the CJS integration fixtures `require` them (step 31).
     `npm test`: 258 unit + 37 integration passing, 3 pending.
 
-### Phase 5 — Scripts, docs, release
+### Phase 5 — Scripts, docs, release ✅ done
 
 30. Port `run.local.js`, `local-dev-helpers.js` (encode/decode), `postpublish.js` to `scripts/*.ts`
     and update the npm scripts (`dev:local`, `encode`, `decode`, `postpublish`).
+    ✅ *Done as:* `scripts/run-local.ts` (env from `config/local.json`, then dynamic import of `src/entrypoints/run.ts`
+    so `LOG_LEVEL` is read after it is set), `scripts/encode-decode.ts`, `scripts/postpublish.ts` (`git tag --list`
+    instead of `grep`, `execFileSync`). Run natively from `src/` (no build). Old root scripts and their eslint ignores removed.
 31. `npm run audit`, then remove deps that nothing imports anymore.
+    ✅ *Done as:* `npm audit fix` (lockfile only) cleared all high findings. Left: moderate `file-type` via
+    `@elastic.io/maester-client` (no fix without a maester major). Stale `.nsprc` exclude removed. Every dep is still
+    imported (`request` is the peer of `request-promise-native`, used by CJS fixtures).
 32. Rewrite the README: install, Node >= 24.22.1, ESM/CJS component support, typed `this`, env var
     table (from `settings/`), logging, flow control, hooks. Drop the travis/david badges.
+    ✅ Also dropped the stale `ELASTICIO_PROCESS_AMQP_DRAIN`; added hook context (B7) and local dev commands.
 33. CHANGELOG `3.0.0`: B1–B11, Node engine bump, TS + bundled types, ESM components, removed `q` (components
     that relied on sailor bringing `q` in transitively must add it themselves), and that `DEBUG=sailor`
     is replaced by `LOG_LEVEL=trace`.
-34. `npm pack` and install the tarball into a real component; run it on a dev platform (trigger +
-    action + verifyCredentials + startup/shutdown hooks).
-35. PR `ts-rewrite` → `proxy`.
+    ✅ Plus the new object storage env vars and the user-visible small fixes.
 
 ## Risks to watch
 

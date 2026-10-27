@@ -4,10 +4,7 @@ import globals from 'globals';
 
 export default tseslint.config(
     {
-        // Old JS scripts are ported to scripts/*.ts in Phase 5 (step 30).
-        ignores: ['dist/', 'run.local.js', 'local-dev-helpers.js', 'postpublish.js',
-            // Replaced by thin shims into dist/ in Phase 2 (step 19).
-            'run.js', 'runService.js',
+        ignores: ['dist/', 'coverage/',
             // Fixture components (some broken on purpose).
             'test/**/fixtures/']
     },
