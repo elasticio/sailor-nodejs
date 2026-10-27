@@ -1,5 +1,19 @@
-import restNode, { type RetryRequestConfig, type RetryResponse } from 'elasticio-rest-node';
+import restNode from 'elasticio-rest-node';
 import type { Settings } from '../settings/index.ts';
+
+// Mirrors `src/types/elasticio-rest-node.d.ts`, which is not emitted: kept here so published `.d.ts` files
+// don't import the untyped package.
+export interface RetryRequestConfig {
+    retriesCount?: number;
+    requestTimeout?: number;
+    retryDelay?: number;
+}
+
+export interface RetryResponse {
+    statusCode: number;
+    body: unknown;
+    headers: Record<string, unknown>;
+}
 
 /** `axiosReqWithRetryOnServerError` signature (injectable for tests). */
 export type RetryRequest = (options: Record<string, unknown>, config: RetryRequestConfig) => Promise<RetryResponse>;

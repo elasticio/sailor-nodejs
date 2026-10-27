@@ -204,11 +204,35 @@ Order goes leaf to root so each module compiles against real dependencies:
 18. `service/` — port `processService` (POST_RESULT_URL, ACTION_OR_TRIGGER, GET_MODEL_METHOD,
     `verifyCredentials` result normalisation, sub-promise settling). Replace `Q.allSettled` with
     `Promise.allSettled`.
+    ✅ *Done as:* `service/index.ts`: `processService(method, env, deps?)` (same signature as the old
+    module, so `spec/service.spec.js` can call it; `deps` injects `componentReader`, `createApiClient`,
+    `request`), `ServiceExec` (`EventEmitter` + `logger`, `getApiClient()`, `getConfig()` → typed
+    `ServiceSettings`, B5). Model methods and `verifyCredentials` go through `callComponentFunction`.
+    Env is parsed with `readServiceSettings` after the `POST_RESULT_URL` check; a parse error rejects
+    without posting (fail fast).
+    *Small fix:* old code sent the success result through the same `.catch` as execution errors, so a
+    failed success POST (network error after retries) was retried as an `error` POST. Now a POST
+    failure just rejects.
 19. `entrypoints/` + root shims: `run.js` = `import('./dist/entrypoints/run.js')`; keep the
     `__test__.disconnectOnly`, `run`, `putOutToSea`, `addProcessListeners` exports that the tests use.
     Replace the `require.main`/`process.mainModule` check with an `import.meta.main` check (Node 24).
+    ✅ *Done as:* `entrypoints/run.ts` (`run`, `putOutToSea`, `addProcessListeners`, `__test__`, `IPC`
+    (was `lib/ipc.js`), `main`) and `entrypoints/run-service.ts` (`main`). Root `run.js`/`runService.js`
+    are ESM shims: re-export from `dist/` and call `main()` under `import.meta.main` (the `dist/` module
+    checks it too, for direct runs). CJS `require('./run.js')` still works (Node 24 `require(esm)`).
+    B9: graceful shutdown failure → `exit(1)`. B6 needs nothing here: `ProxyClient`'s default
+    `onFatalError` is `criticalErrorAndExit`. `createSailor` is used, so `Sailor.prototype` stubs still apply.
+    *Note for Phase 3:* the old specs (`mocha_spec/`, `spec/`, `lib/`) are CJS and do not load under
+    `type: module` at all (`require is not defined`): they need `{"type":"commonjs"}` package.json files.
+    Until step 22 the root shims point at `dist/`, so `npm run build` is needed before `graceful_shutdown.spec`.
 20. `index.ts` — export public types: `TaskExecContext` (the `this`), `IncomingMessage`,
     `OutgoingMessage`, `Snapshot`, hook signatures, `Settings`.
+    ✅ *Done as:* type-only `index.ts`: `TaskExecContext` (= `TaskExec`), `IncomingMessage`, `OutgoingMessage`,
+    `Snapshot`, `ProcessFunction`, `StartupHook`/`InitHook`/`ShutdownHook`/`AnyHook`, `HookContext`, `HookName`,
+    `Settings`, `ServiceSettings`, `ServiceExec`, `VerifyCredentialsResult`, `ComponentLogger`, `ApiClient`,
+    `StepData`, `MessageMetadata`, `LegacyCallback`. Checked by compiling a consumer `.ts` against `dist/`.
+    *Small fix:* `RetryRequestConfig`/`RetryResponse` now live in `hooks/hooks-data.ts`, so the published
+    `.d.ts` no longer imports the untyped `elasticio-rest-node` (its declaration in `src/types/` is not emitted).
 
 ### Phase 3 — Gate: old tests against new code
 
