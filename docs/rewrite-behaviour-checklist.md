@@ -92,7 +92,7 @@ Specs that import internals: `mocha_spec/run.spec.js` (`lib/logging`, `lib/encry
 - [ ] **customType** `{type, payload, protocolVersion=2}` → `sendMessage` with a forced protocol version.
 - [ ] **end**: only the first one counts (later ones warn); `finishProcessing(error if errorCount>0 else success)`.
 - [ ] `processMessageAndMaybeShutdownCallback`: catches and logs everything; after each message, if shutdown is scheduled and `messagesCount === 0`, resolve it.
-- [ ] `scheduleShutdown`: if already scheduled, replace the callback; else `stopListeningForMessages`, resolve now if idle, otherwise when the last message ends.
+- [ ] 🔧 B11 `scheduleShutdown`: if already scheduled, replace the callback (new: return the same promise); else `stopListeningForMessages`, resolve now if idle, otherwise when the last message ends.
 - [ ] `reportError`: base metadata (no message) + `sendError`.
 
 ## Hooks (`lib/sailor.js`, `lib/hooksData.js`)

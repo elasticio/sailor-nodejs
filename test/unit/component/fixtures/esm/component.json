@@ -1,0 +1,7 @@
+{
+    "actions": {
+        "named": { "main": "./actions/named.js" },
+        "default_export": { "main": "./actions/default_export.js" },
+        "missing_import": { "main": "./actions/missing_import.js" }
+    }
+}
