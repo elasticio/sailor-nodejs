@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import jwt from 'jsonwebtoken';
+import logging from '../../../src/logging/index.ts';
 import { Encryptor } from '../../../src/crypto/index.ts';
 import { ProxyClient, MESSAGE_PROCESSING_STATUS } from '../../../src/proxy/client.ts';
 import { ResumeProcessingFailedError } from '../../../src/proxy/errors.ts';
@@ -34,6 +35,11 @@ describe('ProxyClient', () => {
         it('throws when SAILOR_PROXY_JWT_SECRET is missing', () => {
             const settings = { ...makeSettings('http://x'), SAILOR_PROXY_JWT_SECRET: '' };
             expect(() => new ProxyClient(settings)).to.throw('SAILOR_PROXY_JWT_SECRET must be set');
+        });
+
+        it('throws when PROXY_CLIENT_ID is missing', () => {
+            const settings = { ...makeSettings('http://x'), PROXY_CLIENT_ID: '' };
+            expect(() => new ProxyClient(settings)).to.throw('PROXY_CLIENT_ID must be set');
         });
 
         it('throws when API_KEY is missing', () => {
@@ -83,8 +89,42 @@ describe('ProxyClient', () => {
 
             const token = String(req!.headers.authorization).replace(/^Bearer /, '');
             expect(jwt.verify(token, JWT_SECRET)).to.include({
-                username: 'task-1', password: 'key', stepId: 'step', function: 'fn'
+                username: 'task-1', password: 'key', stepId: 'step', clientId: makeSettings('x').PROXY_CLIENT_ID,
+                execId: 'exec', containerId: 'container', workspaceId: 'workspace', userId: 'user',
+                compId: 'comp', function: 'fn'
             });
+            expect(jwt.decode(token, { complete: true })!.header.alg).to.equal('HS256');
+        });
+
+        it('sends http-reply with protocol 1, without routing key or incomingMessageId when not given', async () => {
+            proxy.routes.set('POST /message', ok());
+            const c = createClient({ ELASTICIO_PROTOCOL_VERSION: '2' });
+            await c.connect();
+            await c.sendMessage({ type: 'http-reply', data: { statusCode: 200, body: 'hi' }, metadata: {} });
+            const [req] = proxy.requestsTo('POST', '/message');
+            expect(req!.path).to.equal('/message?type=http-reply');
+            expect(JSON.parse(String(req!.headers['message-metadata']))).to.deep.equal({ protocolVersion: 1 });
+            expect(encryptor.decryptMessageContent(req!.body, 'base64')).to.deep.equal({ statusCode: 200, body: 'hi' });
+        });
+
+        it('forceProtocolVersion wins over the type default', async () => {
+            proxy.routes.set('POST /message', ok());
+            const c = createClient();
+            await c.connect();
+            await c.sendMessage({ type: 'pub-sub', data: { body: 1 }, metadata: {}, forceProtocolVersion: 2 });
+            const [req] = proxy.requestsTo('POST', '/message');
+            expect(JSON.parse(String(req!.headers['message-metadata']))).to.deep.equal({ protocolVersion: 2 });
+            expect(encryptor.decryptMessageContent(req!.body)).to.deep.equal({ body: 1 });
+        });
+
+        it('sends other types without a protocol version as plain JSON', async () => {
+            proxy.routes.set('POST /message', ok());
+            const c = createClient();
+            await c.connect();
+            await c.sendMessage({ type: 'pub-sub', data: { body: 1 }, metadata: { protocolVersion: 2 } });
+            const [req] = proxy.requestsTo('POST', '/message');
+            expect(JSON.parse(String(req!.headers['message-metadata']))).to.deep.equal({});
+            expect(JSON.parse(req!.body.toString())).to.deep.equal({ body: 1 });
         });
 
         it('uses base64 for protocol 1', async () => {
@@ -251,6 +291,50 @@ describe('ProxyClient', () => {
             await c.stopListeningForMessages();
             await c.disconnect();
             await listening;
+        });
+
+        it('warns when finishing an untracked message', async () => {
+            proxy.routes.set('POST /finish-processing', ok());
+            const warn = sinon.spy(logging, 'warn');
+            const c = createClient();
+            await c.connect();
+            await c.finishProcessing({ threadId: 't', messageId: 'x' }, MESSAGE_PROCESSING_STATUS.ERROR);
+            expect(proxy.requestsTo('POST', '/finish-processing')[0]!.path)
+                .to.equal('/finish-processing?incomingMessageId=x&status=error');
+            expect(warn).to.have.been.calledWithMatch(sinon.match.object,
+                'Finished processing message that is not tracked as being processed');
+        });
+
+        it('a non-200 GET is an error; listening goes on', async () => {
+            proxy.routes.set('GET /message', (_req, stream) => {
+                if (proxy.requestsTo('GET', '/message').length === 1) {
+                    respond(stream, 500, 'oops');
+                }
+            });
+            const error = sinon.spy(logging, 'error');
+            const c = createClient();
+            await c.connect();
+            const handler = sinon.stub().resolves();
+            const listening = c.listenForMessages(handler);
+            await waitFor(() => proxy.requestsTo('GET', '/message').length === 2);
+            expect(handler).not.to.have.been.called;
+            expect(error).to.have.been.calledWithMatch(sinon.match({ message: 'oops' }),
+                'Error while listening for messages');
+            await c.stopListeningForMessages();
+            await c.disconnect();
+            await listening;
+        });
+
+        it('stopListeningForMessages closes open GETs and ends the loop', async () => {
+            proxy.routes.set('GET /message', () => undefined);
+            const c = createClient();
+            await c.connect();
+            const listening = c.listenForMessages(async () => undefined);
+            await waitFor(() => proxy.requestsTo('GET', '/message').length === 1);
+            await c.stopListeningForMessages();
+            await listening;
+            expect(proxy.requestsTo('GET', '/message')).to.have.length(1);
+            expect(c.isConnected()).to.equal(true);
         });
 
         it('rejects an invalid status', async () => {

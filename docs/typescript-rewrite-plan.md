@@ -248,15 +248,66 @@ Order goes leaf to root so each module compiles against real dependencies:
 25. Manual smoke: `scripts/run-local.ts` against a locally running sailor-proxy with a real component
     (e.g. petstore), covering an action, a trigger, a lightweight message and SIGTERM during processing.
 
+✅ *Steps 21–24 done as:* `npm run test:legacy` (build first) runs `spec/` + `mocha_spec/` against `dist/`:
+**125 passing, 3 pending**, which is the baseline (47 jasmine + 141 mocha) minus the 63 cases in `proxy-client.spec`.
+- `lib/*.js` are now one-line CJS re-exports of `dist/` (`emitter`, `utils`, `cipher`, `hooksData` removed);
+  `lib/`, `spec/`, `mocha_spec/` got `{"type":"commonjs"}` package.json files.
+- `require('sinon-chai')` → `.default` (ESM-only now). `nock` pinned back to 13.5.6: nock 15 (mswjs) hijacks
+  `http2.connect` sockets, so the sailor never reached `FakeSailorProxy`. Nothing in `test/` uses nock.
+- jasmine `spec/*` run on mocha through `spec/jasmine-compat.js` (`expect().toEqual/…`, `spyOn().andCallThrough()`,
+  `runs`/`waitsFor`, jasmine 1.3 equality), loaded with one `install()` line per file. Native promises have no
+  `.done`/`isFulfilled`: `.done(done, done)` → `.then(() => done(), done)`, and `Q(...)` around
+  4 promises in `component_reader.spec`.
+- `mocha_spec/unit/sailor.spec.js` uses `mocha_spec/unit/legacy-sailor.js`, which builds the old `new Sailor(settings)`
+  shape from the new collaborators. The spec only changes its import line.
+- *Assertion changes:* B4 `NO_SELF_PASSTRHOUGH` → `NO_SELF_PASSTHROUGH` (`settings.spec`, `sailor.spec`,
+  `run.spec`, only in setup and titles). `executor.spec` "should properly store variables": `taskexec._variables`
+  → `taskexec.getFlowVariables()`, because the field is now a private `#variables`.
+- *Not ported:* `mocha_spec/unit/proxy-client.spec.js` (47 of 63 cases fail). It is white-box: it puts a fake into
+  `client.session` and stubs or calls `_startPingInterval`, `_reconnect`, `_scheduleReconnect`, `_handleDisconnection`
+  and others, which now live inside `ProxySession`/`codec.ts`. Making it pass would mean rewriting it, which is Phase 4.
+  Its behaviour is covered by `test/unit/proxy/*` and, black-box, by `run.spec` + `graceful_shutdown.spec`.
+- *Small fix:* settings coerce non-string env values (`String(v)`). `run.spec` puts numbers into its env object,
+  and the old `parseInt` accepted them.
+- Step 25 (manual smoke) is still open: it needs `scripts/run-local.ts` (step 30) and a local sailor-proxy.
+
 ### Phase 4 — Rewrite the tests
 
 26. Unit tests in `test/unit/` mirroring `src/`, injecting fakes through constructors, covering every
     line of the Phase 0 checklist. Use the old unit specs as the list of cases.
+    ✅ *Done as:* gap pass over the specs written in Phase 2 (216 → 258 cases, all checklist lines ticked;
+    c8 line coverage of `src/` 94.8% → 97.9%). New: `proxy/session.spec` (fake http2 session injected via
+    `connect`: reconnect on error/close/goaway/timeout, backoff + max delay, give-up, PING, `ensureConnection`
+    waiting, B6 paths), `entrypoints/run-service.spec`; `run.spec` gains signals/graceful shutdown/B9/
+    process listeners/keep-alive agents; `client.spec` gains full JWT payload, http-reply/forced/no protocol
+    version, GET non-200, `stopListeningForMessages`, untracked finish warning; `message-processor.spec`
+    gains full metadata, data send failure → error, per-message deep copies.
+    *Small fix:* `ProxySession` — a reconnect still connecting when `disconnect()` is called no longer keeps
+    the new session (and its PING) alive or calls `onReconnect`/`criticalErrorAndExit` afterwards.
+    Left uncovered on purpose: `main()` under `import.meta.main`, real-dependency defaults, defensive
+    stream-destroy `catch`es.
 27. Move integration helpers (`FakeSailorProxy`, `ShellTester`) and fixture components into
     `test/integration/`. The fixture components **stay JS (CJS)** to prove D1; add one ESM fixture
     component to prove D4.
+    ✅ *Done as:* `test/integration/helpers/` (`index.ts`, `fake-sailor-proxy.ts`, `shell-tester.ts`; TS, `uuid` →
+    `crypto.randomUUID`, Encryptor from `src/`, `DEBUG` env dropped). Fixtures: `test/integration/fixtures/component/`
+    (moved as-is, `{"type":"commonjs"}`) and `fixtures/esm-component/` (`type: module`, named `async process`
+    returning data). `esm-component.spec.ts` forks `run.js` with it (D4, needs `npm run build`).
+    `mocha_spec/*.spec.js` `require()` the TS helpers (Node 24 `require(esm)` + type stripping): `test:legacy`
+    still 125 passing / 3 pending. `.mocharc` `spec` removed (fixes the step 8 glob issue). Added `@types/express`.
 28. Convert `run.spec` + `graceful_shutdown.spec` to TS.
+    ✅ *Done as:* `test/integration/run.spec.ts` + `graceful-shutdown.spec.ts` (git-moved, assertions unchanged).
+    `run.spec` imports `src/` (not `dist/`): `run.ts` statically instead of the `require.cache` reload (`putOutToSea`
+    resets the module state each run), `randomUUID` for `uuid`, a typed `decrypt()` helper. Settings are readonly,
+    so overrides are spreads (`{ ...readFrom(env), STARTUP_REQUIRED: true }`; the old `'1'` strings → `true`).
+    `.deep.eql` → `.deep.equal` (chai types). `graceful-shutdown` uses a local `tester` per test.
+    `test:integration`: 37 passing / 3 pending; `test:legacy`: 89 passing (125 − the 36 moved).
 29. Delete `spec/`, `mocha_spec/`, `lib/`, the temporary shim, `.eslintrc.json`, gulp leftovers.
+    ✅ *Done as:* deleted `lib/`, `spec/` (incl. `jasmine-compat.js`), `mocha_spec/` (incl. `legacy-sailor.js` and the
+    never-ported `proxy-client.spec.js`), `.eslintrc.json`; dropped `test:legacy`, their eslint ignores and the
+    `.npmignore` entry; removed dev deps `q`, `co`, `uuid`. No gulp leftovers were found.
+    *Kept:* `request` + `request-promise-native` (dev): the CJS integration fixtures `require` them (step 31).
+    `npm test`: 258 unit + 37 integration passing, 3 pending.
 
 ### Phase 5 — Scripts, docs, release
 

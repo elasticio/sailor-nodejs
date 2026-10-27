@@ -96,14 +96,17 @@ describe('processService', () => {
     describe('verifyCredentials', () => {
         it('inits the component reader and calls verify with cfg and this = ServiceExec', async () => {
             const verify = sinon.stub().resolves({ verified: true, extra: 1 });
-            const { run, componentReader } = setup({ verify });
+            const { run, componentReader, apiClient } = setup({ verify });
             expect(await run('verifyCredentials')).to.deep.equal({
                 status: 'success', data: { verified: true, extra: 1 }
             });
             expect(componentReader.init).to.have.been.calledWith('/comp');
             expect(verify.firstCall.thisValue).to.be.instanceOf(ServiceExec);
             expect(verify.firstCall.args[0]).to.deep.equal({ _account: 'acc' });
-            expect(verify.firstCall.thisValue.getConfig().API_KEY).to.equal('key');
+            expect(verify.firstCall.thisValue.getConfig())
+                .to.include({ API_KEY: 'key', API_REQUEST_RETRY_ATTEMPTS: 3 });
+            expect(verify.firstCall.thisValue.getApiClient()).to.equal(apiClient);
+            expect(verify.firstCall.thisValue.logger.info).to.be.a('function');
         });
 
         it('a callback result without verified counts as verified', async () => {

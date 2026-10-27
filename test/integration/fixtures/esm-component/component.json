@@ -1,0 +1,12 @@
+{
+  "title": "ESM component",
+  "description": "Native ES module component (D4)",
+  "credentials": {
+  },
+  "triggers": {
+    "echo_incoming_data": {
+      "main": "./triggers/echo_incoming_data.js",
+      "title": "incoming message is being emitted as data"
+    }
+  }
+}

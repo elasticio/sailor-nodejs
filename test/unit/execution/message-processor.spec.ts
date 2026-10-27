@@ -64,6 +64,7 @@ describe('MessageProcessor', () => {
         expect(data).to.deep.equal({ body: { out: { in: 1 } }, headers: {} });
         expect(sent).to.include({
             parentMessageId: 'in-1', threadId: 'thread-1', execId: settings.EXEC_ID, taskId: settings.FLOW_ID,
+            workspaceId: settings.WORKSPACE_ID, containerId: settings.CONTAINER_ID, userId: settings.USER_ID,
             stepId: settings.STEP_ID, compId: settings.COMP_ID, function: settings.FUNCTION
         });
         expect(sent).not.to.have.property('messageId');
@@ -98,6 +99,37 @@ describe('MessageProcessor', () => {
         await processor.processMessage(metadata(), payload());
         expect(proxyClient.sendMessage).to.have.been.calledOnce;
         expect(proxyClient.finishProcessing).to.have.been.calledOnce;
+    });
+
+    it('keeps incoming metadata fields in the outgoing metadata', async () => {
+        const { processor, proxyClient } = setup({ process: () => ({ body: {} }) });
+        await processor.processMessage({ ...metadata(), 'x-eio-meta-custom': 'c' } as MessageMetadata, payload());
+        expect(proxyClient.sendMessage.firstCall.args[0].metadata).to.include({ 'x-eio-meta-custom': 'c' });
+    });
+
+    it('treats a data send failure like an error emit', async () => {
+        const { processor, proxyClient } = setup({ process: () => ({ body: {} }) });
+        proxyClient.sendMessage.rejects(new Error('too big'));
+        await processor.processMessage(metadata(), payload());
+        expect(proxyClient.sendError).to.have.been.calledOnceWith(sinon.match({ message: 'too big' }));
+        expect(proxyClient.finishProcessing).to.have.been.calledOnceWith(sinon.match.any, 'error');
+    });
+
+    it('gives each message its own deep copy of cfg and snapshot', async () => {
+        const seen: unknown[] = [];
+        const { processor } = setup({
+            stepData: { config: { nested: { n: 1 } }, snapshot: { s: { n: 1 } } },
+            async process(_msg, cfg, snapshot) {
+                seen.push(structuredClone({ cfg, snapshot }));
+                (cfg.nested as { n: number }).n++;
+                (snapshot as { s: { n: number } }).s.n++;
+                await this.emit('end');
+            }
+        });
+        await processor.processMessage(metadata(), payload());
+        await processor.processMessage(metadata(), payload());
+        expect(seen[1]).to.deep.equal(seen[0]);
+        expect(processor.stepData.config).to.deep.equal({ nested: { n: 1 } });
     });
 
     describe('passthrough', () => {

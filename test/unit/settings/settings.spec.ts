@@ -127,6 +127,12 @@ describe('settings', () => {
             it('empty means default', () => {
                 expect(readFrom(env({ ELASTICIO_DATA_RATE_LIMIT: '' })).DATA_RATE_LIMIT).to.equal(10);
             });
+            it('accepts non-string values in a plain env object', () => {
+                const extra = { ELASTICIO_PROTOCOL_VERSION: 2, ELASTICIO_STARTUP_REQUIRED: true } as unknown as Env;
+                const s = readFrom(env(extra));
+                expect(s.PROTOCOL_VERSION).to.equal(2);
+                expect(s.STARTUP_REQUIRED).to.equal(true);
+            });
         });
 
         describe('B3: optional booleans', () => {

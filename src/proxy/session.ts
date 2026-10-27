@@ -241,10 +241,21 @@ export class ProxySession {
         try {
             logging.debug({ attempt: this.#reconnectAttempts }, 'Attempting to reconnect');
             await this.#open();
+            if (this.#closed) {
+                // disconnect() was called while connecting: drop the new session.
+                this.#stopPing();
+                this.#session?.close();
+                return;
+            }
             logging.debug('Successfully reconnected to Sailor Proxy, going to resume processing in-flight messages');
             await this.#hooks.onReconnect?.();
             this.#reconnecting = false;
         } catch (err) {
+            if (this.#closed) {
+                logging.debug({ err }, 'Reconnection attempt ended after disconnect');
+                this.#reconnecting = false;
+                return;
+            }
             if (err instanceof ResumeProcessingFailedError) {
                 this.#reconnecting = false;
                 if (this.#hooks.onFatalError) {

@@ -1,6 +1,5 @@
 {
     "extension": ["ts"],
-    "spec": ["test/**/*.spec.ts"],
     "recursive": true,
     "require": ["test/setup.ts"],
     "exit": true

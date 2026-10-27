@@ -117,8 +117,9 @@ export interface ServiceSettings {
 }
 
 function raw(env: Env, key: string): string | undefined {
-    const value = env[PREFIX + key];
-    return value === undefined || value === '' ? undefined : value;
+    const value: unknown = env[PREFIX + key];
+    // Coerced: callers (and old specs) sometimes pass numbers/booleans in a plain env object.
+    return value === undefined || value === null || value === '' ? undefined : String(value);
 }
 
 export function parseNumber(env: Env, key: string, spec: NumberSpec): number {
