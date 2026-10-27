@@ -73,7 +73,133 @@ Exported types: `TaskExecContext`, `IncomingMessage`, `OutgoingMessage`, `Snapsh
 `StartupHook`, `InitHook`, `ShutdownHook`, `HookContext`, `Settings`, `ServiceSettings`, `ServiceExec`,
 `VerifyCredentialsResult`, `ComponentLogger`, `ApiClient`, `StepData`, `MessageMetadata`, `LegacyCallback`.
 
+## Using sailor in a component
 
+### The `process` function
+
+Every trigger and action exports `process(msg, cfg, snapshot)`:
+
+- `msg` – the incoming message: `{ id, body, headers, attachments, passthrough, … }`
+- `cfg` – the step configuration (credentials and fields set by the user)
+- `snapshot` – the step snapshot (state kept between executions, see `snapshot` below)
+
+How processing of one message ends:
+
+| `process` does | Sailor does |
+|----------------|-------------|
+| returns a truthy value (or a promise resolving to one) | emits it as `data`, then `end` |
+| throws / returns a rejecting promise | emits `error`, then `end` |
+| returns nothing (or a falsy value) | nothing: the component must emit `end` itself |
+
+The message is acknowledged to Sailor Proxy on `end`. Until then sailor counts it as in flight (graceful shutdown
+waits for it). Emitting `end` more than once only logs a warning.
+
+```JavaScript
+// Return style: one output message
+exports.process = async function (msg, cfg) {
+    const result = await callApi(cfg, msg.body);
+    return { body: result };
+};
+
+// Emit style: many output messages, explicit end
+exports.process = async function (msg, cfg) {
+    for (const item of await listItems(cfg)) {
+        await this.emit('data', { body: item });
+    }
+    await this.emit('end');
+};
+```
+
+### `this` inside `process`
+
+- `this.emit(event, payload)` – see below. Returns a promise that resolves once the event was sent; `await` it
+  to respect [flow control](#flow-control)
+- `this.logger` – component logger (see [Component logging](#component-logging))
+- `this.getApiClient()` – platform API client
+- `this.getConfig()` – the parsed sailor settings (see [Environment variables](#environment-variables))
+- `this.getFlowVariables()` – flow variables
+
+### Emits
+
+| Event | Payload | What it does |
+|-------|---------|--------------|
+| `data` | `{ id?, body, headers?, attachments? }` | Sends an output message to the next step. `id` becomes the outgoing message id. Passthrough is added when the step has it enabled. With `EMIT_LIGHTWEIGHT_MESSAGE`, bodies above `OBJECT_STORAGE_SIZE_THRESHOLD` go to object storage and only a reference is sent. A message above `OUTGOING_MESSAGE_SIZE_LIMIT`, or any send failure, is reported as `error`. Rate limited by `DATA_RATE_LIMIT` |
+| `error` | `Error` (or anything with `message`) | Reports an error for this message, with the incoming message attached. Does **not** end processing; after `end` the message is marked as failed. Rate limited by `ERROR_RATE_LIMIT` |
+| `rebound` | `Error` | Asks the platform to redeliver the incoming message later (e.g. the target system is temporarily unavailable). The error message is sent as the rebound reason |
+| `snapshot` | object | Replaces the step snapshot. Rate limited by `SNAPSHOT_RATE_LIMIT` |
+| `updateSnapshot` | object | Merges the fields into the snapshot (shallow). Non-objects and `$set` are ignored with a log line |
+| `updateKeys` | object | Updates the keys of the credential (`cfg._account`), e.g. refreshed OAuth tokens. A failure is emitted as `error` |
+| `httpReply` | `{ statusCode, body, headers }` | Sends the HTTP response of a request-reply flow back to the webhook caller |
+| `customType` | `{ type, payload: { body, headers }, protocolVersion? }` | Sends `payload` to Sailor Proxy as a message of type `type`. Sailor does not interpret `type`; the proxy does. Currently supported: `pub-sub` (topic in the `x-eio-routing-key` header) |
+| `end` | – | Finishes processing of the incoming message (success, or failure if any `error` was emitted) |
+
+```JavaScript
+exports.process = async function (msg, cfg, snapshot) {
+    const since = snapshot.lastSync || new Date(0).toISOString();
+    try {
+        for (const item of await fetchSince(cfg, since)) {
+            await this.emit('data', { body: item });
+        }
+        await this.emit('snapshot', { lastSync: new Date().toISOString() });
+    } catch (err) {
+        if (err.statusCode === 503) {
+            await this.emit('rebound', err);
+        } else {
+            await this.emit('error', err);
+        }
+    }
+    await this.emit('end');
+};
+```
+
+Publishing to a pub-sub topic:
+
+```JavaScript
+await this.emit('customType', {
+    type: 'pub-sub',
+    payload: { body: msg.body, headers: { 'x-eio-routing-key': topic } }
+});
+```
+
+### verifyCredentials and select models
+
+`verifyCredentials(cfg[, cb])` and model methods (`getMetaModel`, select model functions) can take a
+node-style callback or return a value / promise. For `verifyCredentials`:
+
+- a result with a `verified` field (`{ verified: false, reason }`) is reported as is
+- any other result counts as `verified: true`
+- a thrown error / rejection is reported as `verified: false` with its message as `reason`
+
+
+## Building components in Node.js
+
+If you plan to build a component for [elastic.io platform](http://www.elastic.io) in Node.js then you can visit our dedicated documentation page which describes [how to build a component in node.js](https://docs.elastic.io/guides/building-nodejs-component).
+
+### Before you start
+
+Before you can deploy any code into our system **you must be a registered elastic.io platform user**. Please see our home page at [http://www.elastic.io](http://www.elastic.io) to learn how.
+
+> Any attempt to deploy a code into our platform without a registration would fail.
+
+After the registration and opening of the account you must **[upload your SSH Key](https://docs.elastic.io/guides/ssh-keys)** into our platform.
+
+> If you fail to upload you SSH Key you will get **permission denied** error during the deployment.
+
+### Getting Started
+
+After registration and uploading of your SSH Key you can proceed to deploy it into our system. At this stage we suggest you to:
+*   [Create a team](https://docs.elastic.io/guides/teams-and-repos#creating-a-developer-team) to work on your new component. This is not required but will be automatically created using random naming by our system so we suggest you name your team accordingly.
+*   [Create a repository](https://docs.elastic.io/guides/teams-and-repos#create-a-component-repository) inside the team to deploy your new component code.
+
+### Examples of Node.js components
+
+Here is a list of components build on Node.js:
+
+*   [petstore-component-nodejs](https://github.com/elasticio/petstore-component-nodejs) to build your first component
+*   [code-component](https://github.com/elasticio/code-component) to run pieces of synchronous JavaScript inside your integration flow,
+*   [webhook-component](https://github.com/elasticio/webhook-component) to send and receive WebHooks on elastic.io platform,
+*   [csv-component](https://github.com/elasticio/csv-component) to work with CSV files in your integration flow,
+*   [sugarcrm-component](https://github.com/elasticio/sugarcrm-component) to use Sugar CRM in your integrations
 
 ## Environment variables
 
@@ -132,8 +258,8 @@ and an invalid value stops the sailor with an error.
 
 ## Sailor logging
 
-Sailor uses [bunyan](https://github.com/trentm/node-bunyan) logging framework. 
- 
+Sailor uses [bunyan](https://github.com/trentm/node-bunyan) logging framework.
+
 Supported log levels are:
 
 - `FATAL`

@@ -20,6 +20,42 @@ It is also rewritten in TypeScript.
   * rebounds/errors: `REBOUND_LIMIT`, `REBOUND_INITIAL_EXPIRATION`, `NO_ERROR_REPLIES`
 * Lightweight message bodies still go directly to object storage (Maester)
 
+### Breaking changes for components
+
+* `this.__getAmqp()` is removed: sailor has no direct access to AMQP any more.
+* New emit type `customType` replaces publishing to exchanges yourself:
+  ```javascript
+  await this.emit('customType', { type: '{TYPE_STRING}', payload: { body: {}, headers: {} } });
+  ```
+  Sailor sends the payload as `POST /message?type={TYPE_STRING}` and does not interpret `type`, so new custom
+  types only need a change in Sailor Proxy, not in sailor. Currently the only type is `pub-sub`.
+
+  Migrating a pub-sub publisher, before:
+  ```javascript
+  const amqp = this.__getAmqp();
+  const encryptedBody = amqp.encryptMessageContent({ body: msg.body }, 2);
+  await amqp.sendToExchange(pubSubExchange, topic, encryptedBody, {
+      contentType: 'application/json',
+      contentEncoding: 'utf8',
+      mandatory: true,
+      headers: {
+          protocolVersion: 2,
+          messageId: uuid.v4(),
+          pubSubOriginalMessageId: msg.headers.messageId
+      }
+  });
+  ```
+  After (the topic goes into the `x-eio-routing-key` header; encryption and message ids are handled by sailor):
+  ```javascript
+  await this.emit('customType', {
+      type: 'pub-sub',
+      payload: {
+          body: msg.body,
+          headers: { 'x-eio-routing-key': topic }
+      }
+  });
+  ```
+
 ### Requirements
 
 * Node.js `>=24.22.1`
