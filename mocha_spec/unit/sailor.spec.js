@@ -1252,7 +1252,7 @@ describe('Sailor', () => {
                 });
 
                 it('should upload string body without double-stringifying', async () => {
-                    await sailor.processMessage(payload, message);
+                    await sailor.processMessage(metadata, payload);
                     await new Promise(resolve => setTimeout(resolve, 10));
 
                     sinon.assert.calledOnce(addObjectStub);
@@ -1274,15 +1274,18 @@ describe('Sailor', () => {
                     // Must NOT start with a double-quote (which would indicate double-stringify)
                     expect(uploadedContent).to.not.match(/^"/);
 
-                    expect(fakeAMQPConnection.sendData).to.have.been.calledOnce.and.calledWith(
+                    expect(sailor.proxyClient.sendMessage).to.have.been.calledOnce.and.calledWith(
                         sinon.match({
-                            body: {},
-                            headers: { [Sailor.OBJECT_ID_HEADER]: bodyObjectId }
-                        }),
-                        sinon.match({
-                            function: 'string_data_trigger',
-                            stepId: 'step_1',
-                            taskId: '5559edd38968ec0736000003'
+                            type: 'data',
+                            data: sinon.match({
+                                body: {},
+                                headers: { [Sailor.OBJECT_ID_HEADER]: bodyObjectId }
+                            }),
+                            metadata: sinon.match({
+                                function: 'string_data_trigger',
+                                stepId: 'step_1',
+                                taskId: '5559edd38968ec0736000003'
+                            })
                         })
                     );
                 });
@@ -1304,17 +1307,17 @@ describe('Sailor', () => {
                 it('should send string body directly without uploading', async () => {
                     const addObjectSpy = sandbox.spy(sailor.objectStorage, 'add');
 
-                    await sailor.processMessage(payload, message);
+                    await sailor.processMessage(metadata, payload);
                     await new Promise(resolve => setTimeout(resolve, 10));
 
                     sinon.assert.notCalled(addObjectSpy);
-                    sinon.assert.calledOnce(fakeAMQPConnection.sendData);
+                    sinon.assert.calledOnce(sailor.proxyClient.sendMessage);
                     sinon.assert.calledWith(
-                        fakeAMQPConnection.sendData,
+                        sailor.proxyClient.sendMessage,
                         sinon.match({
-                            body: ndjsonBody
-                        }),
-                        sinon.match.any
+                            type: 'data',
+                            data: sinon.match({ body: ndjsonBody })
+                        })
                     );
                 });
             });
