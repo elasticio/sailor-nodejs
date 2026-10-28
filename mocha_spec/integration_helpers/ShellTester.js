@@ -10,9 +10,18 @@ class ShellTester extends EventEmitter {
         this._filename = filename;
         this._args = args;
 
+        this._settled = false;
         this._promise = new Promise((resolve, reject) => {
-            this._promiseResolve = resolve;
-            this._promiseReject = reject;
+            this._promiseResolve = (v) => {
+                if (!this._settled) {
+                    this._settled = true; resolve(v);
+                }
+            };
+            this._promiseReject = (e) => {
+                if (!this._settled) {
+                    this._settled = true; reject(e);
+                }
+            };
         });
 
         this._env = env;
@@ -41,8 +50,8 @@ class ShellTester extends EventEmitter {
             env: this._env
         };
 
-        //// Uncomment this code in order to figure out, what's going on in the child process stdout/stderr in logs
-        //// this._fork.stdout won't stops working after sendKill(), so the only way to debug  –  it's log files
+        /// / Uncomment this code in order to figure out, what's going on in the child process stdout/stderr in logs
+        /// / this._fork.stdout won't stops working after sendKill(), so the only way to debug  –  it's log files
         // const fs = require('fs');
         // fs.writeFileSync('./out.log', '');
         // fs.writeFileSync('./err.log', '');

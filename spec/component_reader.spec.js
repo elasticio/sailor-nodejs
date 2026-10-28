@@ -1,9 +1,7 @@
 describe('Component reader', () => {
-
     var ComponentReader = require('../lib/component_reader.js').ComponentReader;
 
     it('Should find component located on the path', () => {
-
         var reader = new ComponentReader();
         var promise = reader.init('/spec/component/');
 
@@ -16,7 +14,6 @@ describe('Component reader', () => {
     });
 
     it('Should find component trigger', () => {
-
         var reader = new ComponentReader();
         var filename;
         var error;
@@ -37,7 +34,6 @@ describe('Component reader', () => {
     });
 
     it('Should return error if trigger not found', () => {
-
         var reader = new ComponentReader();
         var filename;
         var error;
@@ -58,7 +54,6 @@ describe('Component reader', () => {
     });
 
     it('Should return appropriate error if trigger file is missing', () => {
-
         var reader = new ComponentReader();
 
         var promise = reader.init('/spec/component/')
@@ -70,7 +65,7 @@ describe('Component reader', () => {
             expect(promise.isRejected()).toEqual(true);
             var err = promise.inspect().reason;
             expect(err.message).toMatch(
-                //eslint-disable-next-line no-useless-escape
+                // eslint-disable-next-line no-useless-escape
                 /Failed to load file \'.\/triggers\/missing_trigger.js\': Cannot find module.+missing_trigger\.js/
             );
             expect(err.code).toEqual('MODULE_NOT_FOUND');
@@ -78,7 +73,6 @@ describe('Component reader', () => {
     });
 
     it('Should return appropriate error if missing dependency is required by module', () => {
-
         var reader = new ComponentReader();
 
         var promise = reader.init('/spec/component/')
@@ -92,15 +86,14 @@ describe('Component reader', () => {
             const { message } = err;
             const [errMessage] = message.split('\n');
             expect(errMessage).toEqual(
-                'Failed to load file \'./triggers/trigger_with_wrong_dependency.js\': '
-                + 'Cannot find module \'../not-found-dependency\''
+                'Failed to load file \'./triggers/trigger_with_wrong_dependency.js\': ' +
+                'Cannot find module \'../not-found-dependency\''
             );
             expect(err.code).toEqual('MODULE_NOT_FOUND');
         });
     });
 
     it('Should return appropriate error if trigger file is presented, but contains syntax error', () => {
-
         var reader = new ComponentReader();
 
         var promise = reader.init('/spec/component/')
@@ -112,14 +105,13 @@ describe('Component reader', () => {
             expect(promise.isRejected()).toEqual(true);
             var err = promise.inspect().reason;
             expect(err.message).toEqual(
-                "Trigger or action 'syntax_error_trigger' is found, but can not be loaded. "
-                + "Please check if the file './triggers/syntax_error_trigger.js' is correct."
+                "Trigger or action 'syntax_error_trigger' is found, but can not be loaded. " +
+                "Please check if the file './triggers/syntax_error_trigger.js' is correct."
             );
         });
     });
 
     it('Should return error if trigger not initialized', () => {
-
         var reader = new ComponentReader();
         var filename;
         var error;
@@ -136,5 +128,4 @@ describe('Component reader', () => {
             expect(error.message).toEqual('Component.json was not loaded');
         });
     });
-
 });

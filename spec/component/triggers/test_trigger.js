@@ -7,7 +7,6 @@ function processTrigger(msg, cfg) {
     that.emit('data', { content: 'Data 2' });
     that.emit('data');
 
-
     that.emit('error', 'Error 1');
     that.emit('error', new Error('Error 2'));
     that.emit('error');

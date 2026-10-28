@@ -11,22 +11,23 @@ const Encryptor = require('../lib/encryptor');
 const settings = require('../lib/settings');
 const { Sailor } = require('../lib/sailor');
 const { IPC } = require('../lib/ipc.js');
-const messagesDB = require('../lib/messagesDB.js');
 
 chai.use(require('sinon-chai'));
 
 function requireRun() {
-    //@todo it would be great to use something like this https://github.com/jveski/shelltest
+    // @todo it would be great to use something like this https://github.com/jveski/shelltest
     const path = '../run.js';
     const resolved = require.resolve(path);
     delete require.cache[resolved];
     return require(path);
 }
 
+const HTTP_REPLY_ROUTING_KEY = 'test_http_reply_routing_key';
+
 describe('Integration Test', () => {
     let encryptor;
     let env;
-    let amqpHelper;
+    let proxyHelper;
     let ipc;
     const originalEnvironment = { ...process.env };
     const customers = [
@@ -57,19 +58,26 @@ describe('Integration Test', () => {
 
         encryptor = new Encryptor(env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD, env.ELASTICIO_MESSAGE_CRYPTO_IV);
         env.ELASTICIO_FUNCTION = 'init_trigger';
-        amqpHelper = helpers.amqp(env);
-        await amqpHelper.prepare();
+        proxyHelper = helpers.proxy(env);
+        await proxyHelper.start();
         runner = requireRun();
         ipc = new IPC();
     });
 
     afterEach(async () => {
-        await runner.__test__.disconnectOnly();
+        // Run concurrently: disconnectOnly sets closed=true while stop() sends 204
+        // to any pending GET /message, allowing the HTTP/2 session to close cleanly.
+        await Promise.all([
+            runner.__test__.disconnectOnly(),
+            proxyHelper.stop()
+        ]);
         nock.cleanAll();
-        await amqpHelper.cleanUp();
         sinon.restore();
-        messagesDB.__reset__();
     });
+
+    function receiveMessage() {
+        return new Promise(resolve => proxyHelper.once('message', (msg, type) => resolve({ ...msg, type })));
+    }
 
     describe('when sailor is being invoked for message processing', () => {
         let parentMessageId;
@@ -82,9 +90,8 @@ describe('Integration Test', () => {
             messageId = uuid.v4();
         });
 
-        for (let protocolVersion of [1, 2]) {
+        for (const protocolVersion of [1, 2]) {
             describe(`for output protocolVersion ${protocolVersion}`, () => {
-
                 let encoding;
                 beforeEach(() => {
                     env.ELASTICIO_PROTOCOL_VERSION = protocolVersion;
@@ -102,28 +109,23 @@ describe('Integration Test', () => {
                         .get('/customers')
                         .reply(200, customers);
 
-                    await amqpHelper.publishMessage(inputMessage, {
-                        messageId,
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(inputMessage, {
                         parentMessageId,
                         threadId
                     });
                     runner.run(settings.readFrom(env), ipc);
-                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                        'data',
-                        (message, queueName) => resolve({ message, queueName })
-                    ));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                    const { properties, content } = message;
-                    const { body } = encryptor.decryptMessageContent(content, encoding);
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                    const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                    expect(type).to.eql('data');
 
-                    expect(properties.headers.messageId).to.be.a('string');
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.messageId;
+                    expect(metadata.messageId).to.be.a('string');
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
 
-                    expect(properties.headers).to.deep.equal({
+                    expect(metadata).to.deep.equal({
                         execId: env.ELASTICIO_EXEC_ID,
                         taskId: env.ELASTICIO_FLOW_ID,
                         workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -133,26 +135,8 @@ describe('Integration Test', () => {
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
                         threadId,
-                        parentMessageId: messageId,
+                        parentMessageId: incomingMessageId,
                         protocolVersion: protocolVersion
-                    });
-
-                    delete properties.headers;
-
-                    expect(properties).to.deep.equal({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        deliveryMode: 1,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
                     });
 
                     expect(body).to.deep.equal({
@@ -178,10 +162,9 @@ describe('Integration Test', () => {
                         .get('/customers')
                         .reply(200, customers);
 
-                    await amqpHelper.publishMessage(
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(
                         inputMessage,
                         {
-                            messageId,
                             parentMessageId,
                             threadId
                         },
@@ -191,22 +174,18 @@ describe('Integration Test', () => {
                     );
 
                     runner.run(settings.readFrom(env), ipc);
-                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                        'data',
-                        (message, queueName) => resolve({ message, queueName })
-                    ));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                    const { properties, content } = message;
-                    const { body } = encryptor.decryptMessageContent(content, encoding);
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                    const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                    expect(type).to.eql('data');
 
-                    expect(properties.headers.messageId).to.be.a('string');
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.messageId;
+                    expect(metadata.messageId).to.be.a('string');
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
 
-                    expect(properties.headers).to.deep.equal({
+                    expect(metadata).to.deep.equal({
                         execId: env.ELASTICIO_EXEC_ID,
                         taskId: env.ELASTICIO_FLOW_ID,
                         workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -216,26 +195,8 @@ describe('Integration Test', () => {
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
                         threadId,
-                        parentMessageId: messageId,
+                        parentMessageId: incomingMessageId,
                         protocolVersion: protocolVersion
-                    });
-
-                    delete properties.headers;
-
-                    expect(properties).to.deep.equal({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        deliveryMode: 1,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
                     });
 
                     expect(body).to.deep.equal({
@@ -276,29 +237,24 @@ describe('Integration Test', () => {
                         }
                     };
 
-                    await amqpHelper.publishMessage(psMsg, {
-                        messageId,
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(psMsg, {
                         parentMessageId,
                         threadId
                     });
 
                     runner.run(settings.readFrom(env), ipc);
-                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                        'data',
-                        (message, queueName) => resolve({ message, queueName })
-                    ));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                    const { properties, content } = message;
-                    const { passthrough } = encryptor.decryptMessageContent(content, encoding);
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                    const { passthrough } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                    expect(type).to.eql('data');
 
-                    expect(properties.headers.messageId).to.be.a('string');
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.messageId;
+                    expect(metadata.messageId).to.be.a('string');
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
 
-                    expect(properties.headers).to.deep.equal({
+                    expect(metadata).to.deep.equal({
                         taskId: env.ELASTICIO_FLOW_ID,
                         execId: env.ELASTICIO_EXEC_ID,
                         workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -308,7 +264,7 @@ describe('Integration Test', () => {
                         stepId: env.ELASTICIO_STEP_ID,
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
-                        parentMessageId: messageId,
+                        parentMessageId: incomingMessageId,
                         protocolVersion: protocolVersion
                     });
 
@@ -319,29 +275,11 @@ describe('Integration Test', () => {
                         hai: 'there',
                         id: 'someId'
                     });
-
-                    delete properties.headers;
-
-                    expect(properties).to.deep.eql({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        deliveryMode: 1,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
-                    });
                 });
 
                 it(
-                    'should paste data from incoming message into passthrough '
-                    + 'and not copy own data if NO_SELF_PASSTRHOUGH',
+                    'should paste data from incoming message into passthrough ' +
+                    'and not copy own data if NO_SELF_PASSTRHOUGH',
                     async () => {
                         env.ELASTICIO_STEP_ID = 'step_2';
                         env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
@@ -369,21 +307,16 @@ describe('Integration Test', () => {
                             }
                         };
 
-                        await amqpHelper.publishMessage(psMsg, {
-                            messageId,
+                        proxyHelper.queueMessage(psMsg, {
                             parentMessageId,
                             threadId
                         });
 
                         runner.run(sailorSettings, ipc);
-                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        ));
+                        const { body: encryptedBody, type } = await receiveMessage();
 
-                        const { properties, content } = message;
-                        const { passthrough } = encryptor.decryptMessageContent(content, encoding);
-                        expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                        const { passthrough } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                        expect(type).to.eql('data');
 
                         expect(passthrough).to.deep.eql({
                             step_oth: {
@@ -395,44 +328,6 @@ describe('Integration Test', () => {
                                 headers: inputMessage.headers,
                                 body: inputMessage.body
                             }
-                        });
-
-                        expect(properties.headers.messageId).to.be.a('string');
-                        delete properties.headers.start;
-                        delete properties.headers.end;
-                        delete properties.headers.cid;
-                        delete properties.headers.messageId;
-
-                        expect(properties.headers).to.deep.equal({
-                            taskId: env.ELASTICIO_FLOW_ID,
-                            execId: env.ELASTICIO_EXEC_ID,
-                            workspaceId: env.ELASTICIO_WORKSPACE_ID,
-                            containerId: env.ELASTICIO_CONTAINER_ID,
-                            userId: env.ELASTICIO_USER_ID,
-                            threadId,
-                            stepId: env.ELASTICIO_STEP_ID,
-                            compId: env.ELASTICIO_COMP_ID,
-                            function: env.ELASTICIO_FUNCTION,
-                            parentMessageId: messageId,
-                            protocolVersion: protocolVersion
-                        });
-
-                        delete properties.headers;
-
-                        expect(properties).to.deep.eql({
-                            contentType: 'application/json',
-                            contentEncoding: 'utf8',
-                            deliveryMode: 1,
-                            priority: undefined,
-                            correlationId: undefined,
-                            replyTo: undefined,
-                            expiration: undefined,
-                            messageId: undefined,
-                            timestamp: undefined,
-                            type: undefined,
-                            userId: undefined,
-                            appId: undefined,
-                            clusterId: undefined
                         });
                     }
                 );
@@ -458,26 +353,21 @@ describe('Integration Test', () => {
                         },
                         headers: {
                             'x-custom-component-header': '123_abc',
-                            'stepId': 'step_1'
+                            stepId: 'step_1'
                         }
                     });
 
-                    await amqpHelper.publishMessage(psMsg, {
-                        messageId,
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(psMsg, {
                         parentMessageId,
                         threadId
                     });
 
                     runner.run(settings.readFrom(env), ipc);
-                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                        'data',
-                        (message, queueName) => resolve({ message, queueName })
-                    ));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                    const { properties, content } = message;
-                    const { passthrough } = encryptor.decryptMessageContent(content, encoding);
+                    const { passthrough } = encryptor.decryptMessageContent(encryptedBody, encoding);
 
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                    expect(type).to.eql('data');
 
                     expect(passthrough.step_oth).to.deep.eql({
                         id: 'm-34',
@@ -493,14 +383,14 @@ describe('Integration Test', () => {
                         id: 'someId'
                     });
 
-                    expect(properties.headers.messageId).to.be.a('string');
+                    expect(metadata.messageId).to.be.a('string');
 
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.messageId;
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
 
-                    expect(properties.headers).to.deep.equal({
+                    expect(metadata).to.deep.equal({
                         taskId: env.ELASTICIO_FLOW_ID,
                         execId: env.ELASTICIO_EXEC_ID,
                         workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -510,112 +400,9 @@ describe('Integration Test', () => {
                         stepId: env.ELASTICIO_STEP_ID,
                         compId: env.ELASTICIO_COMP_ID,
                         function: env.ELASTICIO_FUNCTION,
-                        parentMessageId: messageId,
+                        parentMessageId: incomingMessageId,
                         protocolVersion
                     });
-
-                    delete properties.headers;
-
-                    expect(properties).to.deep.eql({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        deliveryMode: 1,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
-                    });
-                });
-
-
-                it('should reopen if consumer channel closed', async () => {
-                    helpers.mockApiTaskStepResponse(env);
-
-                    nock('https://api.acme.com')
-                        .post('/subscribe')
-                        .reply(200, {
-                            id: 'subscription_12345'
-                        })
-                        .get('/customers')
-                        .reply(200, customers);
-
-
-                    runner.run(settings.readFrom(env), ipc);
-
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-
-                    await runner.__test__.closeConsumerChannel();
-
-                    await amqpHelper.publishMessage(inputMessage, {
-                        messageId,
-                        parentMessageId,
-                        threadId
-                    });
-
-                    const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                        'data',
-                        (message, queueName) => resolve({ message, queueName })
-                    ));
-
-                    const { properties, content } = message;
-                    const { body } = encryptor.decryptMessageContent(content, encoding);
-                    expect(queueName).to.eql(amqpHelper.nextStepQueue);
-
-                    expect(properties.headers.messageId).to.be.a('string');
-                    delete properties.headers.start;
-                    delete properties.headers.end;
-                    delete properties.headers.cid;
-                    delete properties.headers.messageId;
-
-                    expect(properties.headers).to.deep.equal({
-                        execId: env.ELASTICIO_EXEC_ID,
-                        taskId: env.ELASTICIO_FLOW_ID,
-                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
-                        containerId: env.ELASTICIO_CONTAINER_ID,
-                        userId: env.ELASTICIO_USER_ID,
-                        stepId: env.ELASTICIO_STEP_ID,
-                        compId: env.ELASTICIO_COMP_ID,
-                        function: env.ELASTICIO_FUNCTION,
-                        threadId,
-                        parentMessageId: messageId,
-                        protocolVersion: protocolVersion
-                    });
-
-                    delete properties.headers;
-
-                    expect(properties).to.deep.equal({
-                        contentType: 'application/json',
-                        contentEncoding: 'utf8',
-                        deliveryMode: 1,
-                        priority: undefined,
-                        correlationId: undefined,
-                        replyTo: undefined,
-                        expiration: undefined,
-                        messageId: undefined,
-                        timestamp: undefined,
-                        type: undefined,
-                        userId: undefined,
-                        appId: undefined,
-                        clusterId: undefined
-                    });
-
-                    expect(body).to.deep.equal({
-                        originalMsg: inputMessage,
-                        customers: customers,
-                        subscription: {
-                            id: 'subscription_12345',
-                            cfg: {
-                                apiKey: 'secret'
-                            }
-                        }
-                    });
-
                 });
 
                 describe('when env ELASTICIO_STARTUP_REQUIRED is set', () => {
@@ -662,17 +449,15 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
 
                             runner.run(sailorSettings, ipc);
-                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            ));
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                            const { properties, content } = message;
-                            const { body } = encryptor.decryptMessageContent(content, encoding);
-                            expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                            const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                            expect(type).to.eql('data');
 
                             expect(startupRegistrationRequest).to.deep.equal({
                                 data: 'startup'
@@ -687,14 +472,14 @@ describe('Integration Test', () => {
                             expect(startupRegistrationNock.isDone()).to.be.ok;
                             expect(hooksDataNock.isDone()).to.be.ok;
 
-                            expect(properties.headers.messageId).to.be.a('string');
+                            expect(metadata.messageId).to.be.a('string');
 
-                            delete properties.headers.start;
-                            delete properties.headers.end;
-                            delete properties.headers.cid;
-                            delete properties.headers.messageId;
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
 
-                            expect(properties.headers).to.eql({
+                            expect(metadata).to.eql({
                                 execId: env.ELASTICIO_EXEC_ID,
                                 taskId: env.ELASTICIO_FLOW_ID,
                                 workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -703,9 +488,9 @@ describe('Integration Test', () => {
                                 stepId: env.ELASTICIO_STEP_ID,
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: env.ELASTICIO_FUNCTION,
-                                parentMessageId: messageId,
                                 protocolVersion,
-                                threadId
+                                threadId,
+                                parentMessageId: incomingMessageId
                             });
 
                             expect(body).to.deep.equal({
@@ -783,17 +568,15 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
 
                             runner.run(sailorSettings, ipc);
-                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            ));
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                            const { properties, content } = message;
-                            const { body } = encryptor.decryptMessageContent(content, encoding);
-                            expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                            const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                            expect(type).to.eql('data');
 
                             expect(startupRegistrationRequest).to.deep.equal({
                                 data: 'startup'
@@ -816,14 +599,14 @@ describe('Integration Test', () => {
                                 }
                             });
 
-                            expect(properties.headers.messageId).to.be.a('string');
+                            expect(metadata.messageId).to.be.a('string');
 
-                            delete properties.headers.start;
-                            delete properties.headers.end;
-                            delete properties.headers.cid;
-                            delete properties.headers.messageId;
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
 
-                            expect(properties.headers).to.eql({
+                            expect(metadata).to.eql({
                                 execId: env.ELASTICIO_EXEC_ID,
                                 taskId: env.ELASTICIO_FLOW_ID,
                                 workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -832,9 +615,9 @@ describe('Integration Test', () => {
                                 stepId: env.ELASTICIO_STEP_ID,
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: env.ELASTICIO_FUNCTION,
-                                parentMessageId: messageId,
                                 protocolVersion: protocolVersion,
-                                threadId
+                                threadId,
+                                parentMessageId: incomingMessageId
                             });
 
                             expect(body).to.deep.equal({
@@ -888,17 +671,15 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
 
                             runner.run(sailorSettings, ipc);
-                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            ));
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                            const { properties, content } = message;
-                            const { body } = encryptor.decryptMessageContent(content, encoding);
-                            expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                            const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                            expect(type).to.eql('data');
 
                             expect(startupRegistrationRequest).to.deep.equal({
                                 data: 'startup'
@@ -908,14 +689,14 @@ describe('Integration Test', () => {
                             expect(hooksDataNock.isDone()).to.be.ok;
                             expect(hooksDataDeleteNock.isDone()).to.not.be.ok;
 
-                            expect(properties.headers.messageId).to.be.a('string');
+                            expect(metadata.messageId).to.be.a('string');
 
-                            delete properties.headers.start;
-                            delete properties.headers.end;
-                            delete properties.headers.cid;
-                            delete properties.headers.messageId;
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
 
-                            expect(properties.headers).to.eql({
+                            expect(metadata).to.eql({
                                 execId: env.ELASTICIO_EXEC_ID,
                                 taskId: env.ELASTICIO_FLOW_ID,
                                 workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -925,8 +706,8 @@ describe('Integration Test', () => {
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: sailorSettings.FUNCTION,
                                 protocolVersion: protocolVersion,
-                                parentMessageId: messageId,
-                                threadId
+                                threadId,
+                                parentMessageId: incomingMessageId
                             });
 
                             expect(body).to.deep.equal({
@@ -959,26 +740,24 @@ describe('Integration Test', () => {
                                 .get('/customers')
                                 .reply(200, customers);
 
-                            await amqpHelper.publishMessage(inputMessage, { messageId, threadId });
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
 
                             runner.run(sailorSettings, ipc);
-                            const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                                'data',
-                                (message, queueName) => resolve({ message, queueName })
-                            ));
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
 
-                            const { properties, content } = message;
-                            const { body } = encryptor.decryptMessageContent(content, encoding);
-                            expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                            const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                            expect(type).to.eql('data');
 
-                            expect(properties.headers.messageId).to.be.a('string');
+                            expect(metadata.messageId).to.be.a('string');
 
-                            delete properties.headers.start;
-                            delete properties.headers.end;
-                            delete properties.headers.cid;
-                            delete properties.headers.messageId;
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
 
-                            expect(properties.headers).to.eql({
+                            expect(metadata).to.eql({
                                 execId: env.ELASTICIO_EXEC_ID,
                                 taskId: env.ELASTICIO_FLOW_ID,
                                 workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -988,8 +767,8 @@ describe('Integration Test', () => {
                                 compId: env.ELASTICIO_COMP_ID,
                                 function: sailorSettings.FUNCTION,
                                 protocolVersion: protocolVersion,
-                                parentMessageId: messageId,
-                                threadId
+                                threadId,
+                                parentMessageId: incomingMessageId
                             });
 
                             expect(body).to.deep.equal({
@@ -1003,10 +782,9 @@ describe('Integration Test', () => {
                 });
 
                 describe('when env ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS is set', () => {
-
                     beforeEach(() => {
-                        env.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS = 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV ,'
-                            + 'ELASTICIO_NOT_PRESENT';
+                        env.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS = 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV ,' +
+                            'ELASTICIO_NOT_PRESENT';
 
                         env.ELASTICIO_RANDOM = 'random';
                         env.ELASTICIO_FIRST = 'first';
@@ -1021,8 +799,6 @@ describe('Integration Test', () => {
                     });
 
                     it('should run trigger successfully and pass additional vars to headers', async () => {
-
-
                         helpers.mockApiTaskStepResponse(env);
 
                         nock('https://api.acme.com')
@@ -1033,33 +809,27 @@ describe('Integration Test', () => {
                             .get('/customers')
                             .reply(200, customers);
 
-                        await amqpHelper.publishMessage(inputMessage, {
-                            messageId,
+                        const { messageId: incomingMessageId } = proxyHelper.queueMessage(inputMessage, {
                             parentMessageId,
                             threadId
                         });
 
                         runner.run(settings.readFrom(env), ipc);
-                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        ));
+                        const { metadata, body: encryptedBody, type } = await receiveMessage();
 
+                        const { body } = encryptor.decryptMessageContent(encryptedBody, encoding);
+                        expect(type).to.eql('data');
 
-                        const { properties, content } = message;
-                        const { body } = encryptor.decryptMessageContent(content, encoding);
-                        expect(queueName).to.eql(amqpHelper.nextStepQueue);
+                        expect(metadata.messageId).to.be.a('string');
 
-                        expect(properties.headers.messageId).to.be.a('string');
+                        delete metadata.start;
+                        delete metadata.end;
+                        delete metadata.cid;
+                        delete metadata.messageId;
 
-                        delete properties.headers.start;
-                        delete properties.headers.end;
-                        delete properties.headers.cid;
-                        delete properties.headers.messageId;
-
-                        expect(properties.headers).to.deep.equal({
+                        expect(metadata).to.deep.equal({
                             first: 'first',
-                            secondElasticioEnv: 'second',
+                            second_elasticio_env: 'second',
                             execId: env.ELASTICIO_EXEC_ID,
                             taskId: env.ELASTICIO_FLOW_ID,
                             workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -1069,7 +839,7 @@ describe('Integration Test', () => {
                             compId: env.ELASTICIO_COMP_ID,
                             function: env.ELASTICIO_FUNCTION,
                             threadId,
-                            parentMessageId: messageId,
+                            parentMessageId: incomingMessageId,
                             protocolVersion
                         });
 
@@ -1084,48 +854,28 @@ describe('Integration Test', () => {
                             }
                         });
                     });
-
                 });
 
                 describe('when reply_to header is set', () => {
                     it('should send http reply successfully', async () => {
-
                         env.ELASTICIO_FUNCTION = 'http_reply_action';
 
                         helpers.mockApiTaskStepResponse(env);
 
-                        nock('https://api.acme.com')
-                            .post('/subscribe')
-                            .reply(200, {
-                                id: 'subscription_12345'
-                            })
-                            .get('/customers')
-                            .reply(200, customers);
-
-                        await amqpHelper.publishMessage(inputMessage, {}, {
-                            reply_to: amqpHelper.httpReplyQueueRoutingKey,
-                            messageId,
+                        const { messageId: incomingMessageId } = proxyHelper.queueMessage(inputMessage, {}, {
+                            reply_to: HTTP_REPLY_ROUTING_KEY,
                             threadId
                         });
 
                         runner.run(settings.readFrom(env), ipc);
-                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        ));
+                        const { metadata, body, type } = await receiveMessage();
 
-                        const { properties, content } = message;
-                        const emittedMessage = encryptor.decryptMessageContent(content, 'base64');
-                        expect(queueName).to.eql(amqpHelper.httpReplyQueueName);
+                        const emittedMessage = encryptor.decryptMessageContent(body, 'base64');
+                        expect(type).to.eql('http-reply');
 
-                        delete properties.headers.start;
-                        delete properties.headers.end;
-                        delete properties.headers.cid;
+                        delete metadata.start;
 
-                        expect(properties.headers.messageId).to.be.a('string');
-                        delete properties.headers.messageId;
-
-                        expect(properties.headers).to.eql({
+                        expect(metadata).to.eql({
                             execId: env.ELASTICIO_EXEC_ID,
                             taskId: env.ELASTICIO_FLOW_ID,
                             workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -1134,10 +884,10 @@ describe('Integration Test', () => {
                             stepId: env.ELASTICIO_STEP_ID,
                             compId: env.ELASTICIO_COMP_ID,
                             function: env.ELASTICIO_FUNCTION,
-                            reply_to: amqpHelper.httpReplyQueueRoutingKey,
+                            reply_to: HTTP_REPLY_ROUTING_KEY,
                             protocolVersion: 1,
-                            parentMessageId: messageId,
-                            threadId
+                            threadId,
+                            parentMessageId: incomingMessageId
                         });
 
                         expect(emittedMessage).to.eql({
@@ -1151,7 +901,7 @@ describe('Integration Test', () => {
                 });
 
                 describe('when sailor could not init the module', () => {
-                    it('should publish init errors to RabbitMQ', async () => {
+                    it('should publish init errors to Sailor Proxy', async () => {
                         // NOTICE, don't touch this.
                         // it produces side effect, disabling exit at error
                         // see lib/logging.js
@@ -1161,21 +911,14 @@ describe('Integration Test', () => {
 
                         helpers.mockApiTaskStepResponse(env);
 
-                        const sailorSettings = settings.readFrom(env);
-                        sailorSettings.FUNCTION = 'fails_to_init';
-
                         runner.run(settings.readFrom(env), ipc);
-                        const { message, queueName } = await new Promise(resolve => amqpHelper.on(
-                            'data',
-                            (message, queueName) => resolve({ message, queueName })
-                        ));
+                        const { metadata, body, type } = await receiveMessage();
 
-                        const { properties, content } = message;
-                        const emittedMessage = JSON.parse(content);
+                        const emittedMessage = JSON.parse(body.toString());
                         const error = encryptor.decryptMessageContent(emittedMessage.error, 'base64');
-                        expect(queueName).to.eql(amqpHelper.nextStepErrorQueue);
+                        expect(type).to.eql('error');
                         expect(error.message).to.equal('OMG. I cannot init');
-                        expect(properties.headers).to.deep.include({
+                        expect(metadata).to.deep.include({
                             execId: env.ELASTICIO_EXEC_ID,
                             taskId: env.ELASTICIO_FLOW_ID,
                             workspaceId: env.ELASTICIO_WORKSPACE_ID,
@@ -1201,19 +944,14 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId,
+            proxyHelper.queueMessage(inputMessage, {
                 parentMessageId,
                 threadId
             });
             runner.run(settings.readFrom(env), ipc);
-            const { message } = await new Promise(resolve => amqpHelper.on(
-                'data',
-                (message, queueName) => resolve({ message, queueName })
-            ));
+            const { body: encryptedBody } = await receiveMessage();
 
-            const { content } = message;
-            const { body } = encryptor.decryptMessageContent(content, 'base64');
+            const { body } = encryptor.decryptMessageContent(encryptedBody, 'base64');
 
             expect(body).to.deep.equal({
                 originalMsg: inputMessage,
@@ -1235,19 +973,14 @@ describe('Integration Test', () => {
                 .get('/customers')
                 .reply(200, customers);
 
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId,
+            proxyHelper.queueMessage(inputMessage, {
                 parentMessageId,
                 threadId
             });
             runner.run(settings.readFrom(env), ipc);
-            const { message } = await new Promise(resolve => amqpHelper.on(
-                'data',
-                (message, queueName) => resolve({ message, queueName })
-            ));
+            const { body: encryptedBody } = await receiveMessage();
 
-            const { content } = message;
-            const { body } = encryptor.decryptMessageContent(content, 'base64');
+            const { body } = encryptor.decryptMessageContent(encryptedBody, 'base64');
 
             expect(body).to.deep.equal({
                 originalMsg: inputMessage,
@@ -1255,143 +988,18 @@ describe('Integration Test', () => {
                 keepAlive: true
             });
         });
-
-        it('should fail if queue deleted', async () => {
-            helpers.mockApiTaskStepResponse(env);
-
-            nock('https://api.acme.com')
-                .post('/subscribe')
-                .reply(200, {
-                    id: 'subscription_12345'
-                })
-                .get('/customers')
-                .reply(200, customers);
-
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId,
-                parentMessageId,
-                threadId
-            });
-            try {
-                await amqpHelper.removeListenQueue();
-                await runner.putOutToSea(settings.readFrom(env), ipc);
-            } catch (e) {
-                expect(e.message).to.match(/BasicConsume; 404/);
-                await runner.__test__.disconnectOnly();
-                return;
-            }
-
-            throw new Error('Error expected!');
-        });
-
-        it('should reconnect if consumer connection closed and continue message processing', async () => {
-            let threadId2 = uuid.v4();
-            helpers.mockApiTaskStepResponse(env);
-
-            nock('https://api.acme.com')
-                .post('/subscribe')
-                .reply(200, {
-                    id: 'subscription_12345'
-                })
-                .get('/customers')
-                .times(2)
-                .reply(200, customers);
-
-            const repliesPromise = new Promise((resolve) => {
-                const replies = [];
-                amqpHelper.on(
-                    'data',
-                    ({ properties: { headers: { threadId } } }, queueName) => {
-                        replies.push({ threadId, queueName });
-                        if (replies.length === 2) {
-                            resolve(replies);
-                        }
-                    }
-                );
-            });
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId,
-                parentMessageId,
-                threadId
-            });
-            await runner.putOutToSea(settings.readFrom(env), ipc);
-            const connection = await amqpHelper.serverConnectionWait('read');
-            await amqpHelper.serverConnectionClose(connection);
-            const messageId2 = uuid.v4();
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId: messageId2,
-                parentMessageId,
-                threadId: threadId2
-            });
-            const replies = await repliesPromise;
-            expect(replies).to.deep.equal([
-                { threadId, queueName: amqpHelper.nextStepQueue },
-                { threadId: threadId2, queueName: amqpHelper.nextStepQueue }
-            ]);
-        }).timeout(5000); // waiting for rabbitmq http api to finally show connections can be slow
-
-        it(`should not fail if message is acknowledged while read Connection
-            is closed and processing is slow`, async () => {
-            env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
-
-            let threadId2 = uuid.v4();
-            helpers.mockApiTaskStepResponse(env);
-
-            nock('https://api.acme.com')
-                .post('/subscribe')
-                .reply(200, {
-                    id: 'subscription_12345'
-                })
-                .get('/customers')
-                .times(2)
-                .reply(200, customers);
-
-            const repliesPromise = new Promise((resolve) => {
-                const replies = [];
-                amqpHelper.on(
-                    'data',
-                    ({ properties: { headers: { threadId } } }, queueName) => {
-                        replies.push({ threadId, queueName });
-                        if (replies.length === 2) {
-                            resolve(replies);
-                        }
-                    }
-                );
-            });
-            await runner.putOutToSea(settings.readFrom(env), ipc);
-            const connection = await amqpHelper.serverConnectionWait('read');
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId,
-                parentMessageId,
-                threadId
-            });
-            await amqpHelper.serverConnectionClose(connection);
-            const connection2 = await amqpHelper.serverConnectionWait('read');
-            const messageId2 = uuid.v4();
-            await amqpHelper.publishMessage(inputMessage, {
-                messageId: messageId2,
-                parentMessageId,
-                threadId: threadId2
-            });
-            await amqpHelper.serverConnectionClose(connection2);
-            const replies = await repliesPromise;
-            expect(replies).to.deep.equal([
-                { threadId, queueName: amqpHelper.nextStepQueue },
-                { threadId: threadId2, queueName: amqpHelper.nextStepQueue }
-            ]);
-        }).timeout(20000); // waiting for rabbitmq http api to finally show connections can be slow
     });
 
     describe('when sailor is being invoked for start', () => {
-        describe('when error connecting to AMQP', () => {
-            it('should not send error to AMQP queue', async () => {
+        describe('when error connecting to Sailor Proxy', () => {
+            it('should not report error when connection fails', async () => {
                 // NOTICE, don't touch this.
                 // it produces side effect, disabling exit at error
                 // see lib/logging.js
                 const fakeLogging = sinon.stub(logging, 'criticalErrorAndExit');
 
                 const sailorSettings = settings.readFrom(env);
-                const error = new Error('Error connecting to AMQP');
+                const error = new Error('Error connecting to Sailor Proxy');
                 sinon.stub(Sailor.prototype, 'connect').rejects(error);
                 const reportError = sinon.spy(Sailor.prototype, 'reportError');
 
@@ -1399,7 +1007,6 @@ describe('Integration Test', () => {
 
                 expect(fakeLogging).to.have.been.calledOnce.and.calledWith('putOutToSea.catch', error);
                 expect(reportError).to.not.have.been.called;
-
             });
         });
     });
@@ -1440,7 +1047,6 @@ describe('Integration Test', () => {
 
                 runner.run(sailorSettings, ipc);
                 await new Promise(resolve =>
-                    // hooksDataDeleteNock.on('replied', () => setTimeout(() => resolve(), 50)))
                     hooksDataDeleteNock.on('replied', () => resolve()));
 
                 expect(hooksDataGetNock.isDone()).to.be.ok;

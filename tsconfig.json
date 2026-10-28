@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "lib": [
+            "es2020"
+        ],
+        "types": ["node", "mocha"],
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "target": "es2019",
+        "noImplicitAny": false,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "sourceMap": true,
+        "outDir": "dist",
+        "skipLibCheck": true,
+        "typeRoots": ["./node_modules/@types", "./src/@types"]
+    },
+    "include": [
+        "src/**/*"
+    ]
+}

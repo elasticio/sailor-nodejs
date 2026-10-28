@@ -5,8 +5,7 @@ const request = require('request');
 exports.process = processTrigger;
 
 function processTrigger(msg, cfg) {
-
-    return co(function* gen() {
+    return co(function * gen() {
         const tokenOptions = {
             uri: 'https://login.acme/oauth2/v2.0/token',
             json: true,

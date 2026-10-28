@@ -12,5 +12,10 @@ module.exports = {
     },
     'parserOptions': {
         'ecmaVersion': 2018
+    },
+    'rules': {
+        'node/no-unpublished-require': 'off',
+        'no-unused-expressions': 'off'
     }
+
 };

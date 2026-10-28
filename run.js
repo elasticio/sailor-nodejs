@@ -24,15 +24,17 @@ function prepareSandbox() {
 }
 
 async function putOutToSea(settings, ipc) {
+    logger.trace({ settings }, 'putOutToSea called');
     ipc.send('init:started');
     const deferred = Q.defer();
     sailorInit = deferred.promise;
     sailor = new Sailor(settings);
 
-    //eslint-disable-next-line no-extra-boolean-cast
+    // eslint-disable-next-line no-extra-boolean-cast
     if (!!settings.HOOK_SHUTDOWN) {
+        logger.trace('Running hook shutdown');
         disconnectRequired = false;
-        //eslint-disable-next-line no-empty-function
+        // eslint-disable-next-line no-empty-function
         sailor.reportError = () => {
         };
         await sailor.prepare();
@@ -44,32 +46,16 @@ async function putOutToSea(settings, ipc) {
     await sailor.connect();
     await sailor.prepare();
 
-    //eslint-disable-next-line no-extra-boolean-cast
+    // eslint-disable-next-line no-extra-boolean-cast
     if (!!settings.STARTUP_REQUIRED) {
         await sailor.startup();
     }
 
     await sailor.runHookInit();
-    await sailor.run();
     deferred.resolve();
     ipc.send('init:ended');
-}
 
-async function disconnectAndExit() {
-    if (!disconnectRequired) {
-        return;
-    }
-    disconnectRequired = false;
-
-    try {
-        logger.info('Disconnecting...');
-        await sailor.disconnect();
-        logger.info('Successfully disconnected');
-        process.exit();
-    } catch (err) {
-        logger.error(err, 'Unable to disconnect');
-        process.exit(-1);
-    }
+    await sailor.run();
 }
 
 async function gracefulShutdown() {
@@ -82,44 +68,37 @@ async function gracefulShutdown() {
         return;
     }
 
-    // we connect to amqp, create channels, start listen a queue on init and interrupting this process with 'disconnect'
-    // will lead to undefined behaviour
+    // Wait for init to complete before disconnecting
     logger.trace('Checking/waiting for init before graceful shutdown');
     await sailorInit;
     logger.trace('Waited an init before graceful shutdown');
 
-    await sailor.scheduleShutdown();
-    await disconnectAndExit();
+    try {
+        logger.info('Scheduling shutdown...');
+        await sailor.scheduleShutdown();
+        logger.info('Finished shutdown. Disconnecting...');
+        await sailor.disconnect();
+        logger.info('Successfully disconnected');
+        process.exit();
+    } catch (err) {
+        logger.error(err, 'Unable to disconnect');
+        process.exit(-1);
+    }
 }
 
 async function run(settings, ipc) {
     prepareSandbox();
     try {
         await putOutToSea(settings, ipc);
-        logger.info('Fully initialized and waiting for messages');
     } catch (e) {
-        if (sailor && !sailor.amqpConnection.closed) {
+        if (sailor && sailor.isConnected()) {
             await sailor.reportError(e);
         }
         logger.criticalErrorAndExit('putOutToSea.catch', e);
     }
 }
 
-exports.__test__ = {
-    disconnectOnly: function disconnectOnly() {
-        if (!disconnectRequired) {
-            return Promise.resolve();
-        }
-        return sailor.disconnect();
-    },
-    closeConsumerChannel: function closeConsumerChannel() {
-        return sailor.amqpConnection.consumerChannel.close();
-    }
-};
-exports.run = run;
-exports.putOutToSea = putOutToSea;
-
-if (require.main === module || process.mainModule.filename === __filename) {
+function addProcessListeners() {
     process.on('SIGTERM', function onSigterm() {
         logger.info('Received SIGTERM');
         gracefulShutdown();
@@ -132,8 +111,22 @@ if (require.main === module || process.mainModule.filename === __filename) {
 
     process.on('uncaughtException', logger.criticalErrorAndExit.bind(logger, 'process.uncaughtException'));
     process.on('unhandledRejection', (err) => logger.error(err, 'process.unhandledRejection'));
+}
 
+exports.__test__ = {
+    disconnectOnly: function disconnectOnly() {
+        if (!disconnectRequired) {
+            return Promise.resolve();
+        }
+        return sailor.disconnect();
+    }
+};
+exports.run = run;
+exports.putOutToSea = putOutToSea;
+exports.addProcessListeners = addProcessListeners;
+
+if (require.main === module || process.mainModule.filename === __filename) {
+    addProcessListeners();
     const ipc = new IPC();
-
     run(settings.readFrom(process.env), ipc);
 }

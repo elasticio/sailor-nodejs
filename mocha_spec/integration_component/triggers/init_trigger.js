@@ -52,8 +52,7 @@ function initTrigger(cfg) {
 }
 
 function processTrigger(msg, cfg) {
-
-    //eslint-disable-next-line no-invalid-this
+    // eslint-disable-next-line no-invalid-this
     const that = this;
     const options = {
         uri: 'https://api.acme.com/customers',
@@ -71,5 +70,4 @@ function processTrigger(msg, cfg) {
         });
         that.emit('end');
     });
-
 }

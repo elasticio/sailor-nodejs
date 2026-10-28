@@ -1,5 +1,6 @@
+'use strict';
+
 const expect = require('chai').expect;
-const messagesDB = require('../lib/messagesDB');
 const helpers = require('./integration_helpers');
 
 describe('Graceful shutdown', function test() {
@@ -14,27 +15,36 @@ describe('Graceful shutdown', function test() {
         }
     };
 
-    let amqpHelper;
+    let proxyHelper;
     let env;
+    let sailorTester;
 
     beforeEach(async () => {
         env = helpers.prepareEnv();
-        amqpHelper = helpers.amqp(env);
-        await amqpHelper.prepare();
+        proxyHelper = helpers.proxy(env);
+        sailorTester = null;
+        await proxyHelper.start();
         await helpers.fakeApiServerStart(env);
     });
 
     afterEach(async () => {
         await helpers.fakeApiServerStop();
-        await amqpHelper.cleanUp();
-        messagesDB.__reset__();
+        // Kill subprocess if it's still alive (e.g., the test failed early)
+        if (sailorTester && sailorTester.getExitResult() === null) {
+            sailorTester.sendKill('SIGKILL');
+            await Promise.race([
+                sailorTester.getPromise().catch(() => {}),
+                new Promise(resolve => setTimeout(resolve, 1000))
+            ]);
+        }
+        await proxyHelper.stop();
     });
 
     describe('start, no messages, shutdown', () => {
         it('should shutdown instantly after fully initialized', async () => {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({
+            sailorTester = helpers.ShellTester.init({
                 timeout: 1000,
                 env
             });
@@ -49,10 +59,11 @@ describe('Graceful shutdown', function test() {
             // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
             await sailorTester.getPromise();
         });
+
         it('should shutdown w/o errors in any random moment', async () => {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({
+            sailorTester = helpers.ShellTester.init({
                 timeout: 1000,
                 env
             });
@@ -68,11 +79,12 @@ describe('Graceful shutdown', function test() {
             await sailorTester.getPromise();
         });
     });
+
     describe('start, no messages, shutdown, send more messages', () => {
         it('should not consume messages', async () => {
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({
+            sailorTester = helpers.ShellTester.init({
                 timeout: 1500,
                 env
             });
@@ -86,16 +98,16 @@ describe('Graceful shutdown', function test() {
 
             // let sailor to schedule shutdown
             await new Promise(resolve => setTimeout(resolve, 200));
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
+            proxyHelper.queueMessage(inputMessage);
 
-            // let amqp to take the messages
+            // let proxy to settle
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // if sailor won't shutdown shortly, this promise will be rejected since sailorTester.timeout is 1000ms
             await sailorTester.getPromise();
 
-            // make sure, that the message won't be consumed by the sailor
-            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor(200);
+            // make sure the message won't be consumed by the sailor
+            const messagesLeft = await proxyHelper.retrieveMessagesNotConsumed();
             expect(messagesLeft).to.have.lengthOf(1);
         });
     });
@@ -105,12 +117,12 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({ env });
+            sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
+            proxyHelper.queueMessage(inputMessage);
 
-            // let (sailor + amqp) some time to handle all messages
+            // let (sailor + proxy) some time to handle all messages
             await sailorTester.waitForEvent('init:ended');
             await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -120,10 +132,10 @@ describe('Graceful shutdown', function test() {
             await sailorTester.getPromise();
 
             // make sure that echo_incoming_data finished processing
-            expect(amqpHelper.dataMessages).to.have.lengthOf(1);
+            expect(proxyHelper.dataMessages).to.have.lengthOf(1);
 
             // make sure that incoming messages queue is empty
-            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor();
+            const messagesLeft = await proxyHelper.retrieveMessagesNotConsumed();
             expect(messagesLeft).to.have.lengthOf(0);
         });
     });
@@ -133,18 +145,18 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({ env });
+            sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
+            proxyHelper.queueMessage(inputMessage);
 
-            // let (sailor + amqp) some time to handle all messages
+            // let (sailor + proxy) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // just to double check, that sailor is not processed the message yet
+            // just to double check, that sailor has not processed the message yet
             // (otherwise this test is equal to previous)
-            expect(amqpHelper.dataMessages).to.have.lengthOf(0);
+            expect(proxyHelper.dataMessages).to.have.lengthOf(0);
 
             await sailorTester.sendKill();
 
@@ -152,10 +164,10 @@ describe('Graceful shutdown', function test() {
             await sailorTester.getPromise();
 
             // make sure that echo_incoming_data finished processing
-            expect(amqpHelper.dataMessages).to.have.lengthOf(1);
+            expect(proxyHelper.dataMessages).to.have.lengthOf(1);
 
             // make sure that incoming messages queue is empty
-            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor();
+            const messagesLeft = await proxyHelper.retrieveMessagesNotConsumed();
             expect(messagesLeft).to.have.lengthOf(0);
         });
     });
@@ -165,18 +177,18 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({ env });
+            sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
+            proxyHelper.queueMessage(inputMessage);
 
-            // let (sailor + amqp) some time to handle all messages
+            // let (sailor + proxy) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // just to double check, that sailor is not processed the message yet
+            // just to double check, that sailor has not processed the message yet
             // (otherwise this test is equal to previous)
-            expect(amqpHelper.dataMessages).to.have.lengthOf(0);
+            expect(proxyHelper.dataMessages).to.have.lengthOf(0);
 
             await sailorTester.sendKill();
             await new Promise(resolve => setTimeout(resolve, 50));
@@ -187,10 +199,10 @@ describe('Graceful shutdown', function test() {
             await sailorTester.getPromise();
 
             // make sure that echo_incoming_data finished processing
-            expect(amqpHelper.dataMessages).to.have.lengthOf(1);
+            expect(proxyHelper.dataMessages).to.have.lengthOf(1);
 
             // make sure that incoming messages queue is empty
-            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor();
+            const messagesLeft = await proxyHelper.retrieveMessagesNotConsumed();
             expect(messagesLeft).to.have.lengthOf(0);
         });
     });
@@ -200,18 +212,18 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'wait_2_seconds_and_echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({ env });
+            sailorTester = helpers.ShellTester.init({ env });
             await sailorTester.run();
 
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_2' });
+            proxyHelper.queueMessage(inputMessage);
+            proxyHelper.queueMessage(inputMessage);
 
-            // let (sailor + amqp) some time to handle all messages
+            // let (sailor + proxy) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // just to double check, that sailor is not processed the message yet
-            expect(amqpHelper.dataMessages).to.have.lengthOf(0);
+            // just to double check, that sailor has not processed the message yet
+            expect(proxyHelper.dataMessages).to.have.lengthOf(0);
 
             await sailorTester.sendKill();
 
@@ -219,11 +231,11 @@ describe('Graceful shutdown', function test() {
             await sailorTester.getPromise();
 
             // make sure that echo_incoming_data finished processing
-            expect(amqpHelper.dataMessages).to.have.lengthOf(1);
+            expect(proxyHelper.dataMessages).to.have.lengthOf(1);
 
             // sailor must not consume new messages once shutdown is scheduled
-            // so make sure that the second messages is not consumed
-            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor();
+            // so make sure that the second message is not consumed
+            const messagesLeft = await proxyHelper.retrieveMessagesNotConsumed();
             expect(messagesLeft).to.have.lengthOf(1);
         });
     });
@@ -238,27 +250,26 @@ describe('Graceful shutdown', function test() {
             // selecting certain trigger of the component
             env.ELASTICIO_FUNCTION = 'echo_incoming_data';
 
-            const sailorTester = helpers.ShellTester.init({ env });
+            sailorTester = helpers.ShellTester.init({ env });
 
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_1' });
-            amqpHelper.publishMessage(inputMessage, { messageId: 'test_message_2' });
+            proxyHelper.queueMessage(inputMessage);
+            proxyHelper.queueMessage(inputMessage);
 
             await sailorTester.run();
-            // let (sailor + amqp) some time to handle all messages
+            // let (sailor + proxy) some time to handle all messages
             await sailorTester.waitForEvent('init:started');
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // make sure sailor is processed the messages
-            expect(amqpHelper.dataMessages).to.have.lengthOf(2);
+            // make sure sailor has processed the messages
+            expect(proxyHelper.dataMessages).to.have.lengthOf(2);
 
             await sailorTester.sendKill();
 
             // waiting until sailor finished
             await sailorTester.getPromise();
 
-            // sailor must not consume new messages once shutdown is scheduled
-            // so make sure that the second messages is not consumed
-            const messagesLeft = await amqpHelper.retrieveAllMessagesNotConsumedBySailor();
+            // make sure that no messages are left in the queue
+            const messagesLeft = await proxyHelper.retrieveMessagesNotConsumed();
             expect(messagesLeft).to.have.lengthOf(0);
         });
     });

@@ -6,3 +6,4 @@ out.log
 err.log
 .nyc_output
 .vscode
+mise.toml
