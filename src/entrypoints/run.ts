@@ -25,12 +25,14 @@ function prepareSandbox(): void {
  * connect → prepare → startup (if `STARTUP_REQUIRED`) → init → listen.
  * `HOOK_SHUTDOWN`: prepare → shutdown hook only.
  */
-export async function putOutToSea(settings: Settings, ipc: IPC): Promise<void> {
+export async function putOutToSea(
+    settings: Settings, ipc: IPC, instance: Sailor = createSailor(settings)
+): Promise<void> {
     logging.trace({ settings }, 'putOutToSea called');
     ipc.send('init:started');
     const init = Promise.withResolvers<void>();
     sailorInit = init.promise;
-    sailor = createSailor(settings);
+    sailor = instance;
 
     if (settings.HOOK_SHUTDOWN) {
         logging.trace('Running hook shutdown');
@@ -83,10 +85,10 @@ async function gracefulShutdown(): Promise<void> {
     }
 }
 
-export async function run(settings: Settings, ipc: IPC): Promise<void> {
+export async function run(settings: Settings, ipc: IPC, instance?: Sailor): Promise<void> {
     prepareSandbox();
     try {
-        await putOutToSea(settings, ipc);
+        await putOutToSea(settings, ipc, instance);
     } catch (e) {
         if (sailor?.isConnected()) {
             await sailor.reportError(e as Error);
@@ -107,15 +109,6 @@ export function addProcessListeners(): void {
     process.on('uncaughtException', err => logging.criticalErrorAndExit('process.uncaughtException', err));
     process.on('unhandledRejection', err => logging.error(err, 'process.unhandledRejection'));
 }
-
-export const __test__ = {
-    disconnectOnly(): Promise<void> {
-        if (!disconnectRequired) {
-            return Promise.resolve();
-        }
-        return sailor!.disconnect();
-    }
-};
 
 /** What `node run.js` does. */
 export function main(): void {

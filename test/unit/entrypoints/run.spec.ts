@@ -3,8 +3,8 @@ import https from 'node:https';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import logging from '../../../src/logging/index.ts';
-import { Sailor } from '../../../src/sailor.ts';
-import { IPC, run, addProcessListeners, __test__ } from '../../../src/entrypoints/run.ts';
+import { Sailor, createSailor } from '../../../src/sailor.ts';
+import { IPC, run, addProcessListeners } from '../../../src/entrypoints/run.ts';
 import { makeSettings } from '../proxy/helpers.ts';
 
 describe('entrypoints/run', () => {
@@ -43,12 +43,11 @@ describe('entrypoints/run', () => {
         sinon.assert.callOrder(p.prepare!, p.startup!, p.runHookInit!);
     });
 
-    it('HOOK_SHUTDOWN: prepare + shutdown hook only, no connect, disconnectOnly is a no-op', async () => {
+    it('HOOK_SHUTDOWN: prepare + shutdown hook only, no connect', async () => {
         await run(makeSettings('http://proxy', { ELASTICIO_HOOK_SHUTDOWN: '1' }), ipc);
         const p = Sailor.prototype as unknown as Record<string, sinon.SinonStub>;
         expect(p.connect).not.to.have.been.called;
         sinon.assert.callOrder(p.prepare!, p.runHookShutdown!);
-        await __test__.disconnectOnly();
     });
 
     it('a failure is reported when connected, then criticalErrorAndExit', async () => {
@@ -148,10 +147,10 @@ describe('entrypoints/run', () => {
         });
     });
 
-    it('disconnectOnly disconnects after a normal run', async () => {
-        const disconnect = sinon.stub(Sailor.prototype, 'disconnect').resolves();
-        await run(makeSettings('http://proxy'), ipc);
-        await __test__.disconnectOnly();
-        expect(disconnect).to.have.been.calledOnce;
+    it('uses the injected sailor', async () => {
+        const settings = makeSettings('http://proxy');
+        const sailor = createSailor(settings);
+        await run(settings, ipc, sailor);
+        expect((Sailor.prototype.run as sinon.SinonStub)).to.have.been.calledOn(sailor);
     });
 });

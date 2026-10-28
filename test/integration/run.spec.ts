@@ -8,7 +8,7 @@ import * as helpers from './helpers/index.ts';
 import { Encryptor, type ContentEncoding } from '../../src/crypto/index.ts';
 import * as settings from '../../src/settings/index.ts';
 import type { Settings } from '../../src/settings/index.ts';
-import { Sailor } from '../../src/sailor.ts';
+import { Sailor, createSailor } from '../../src/sailor.ts';
 import * as runner from '../../src/entrypoints/run.ts';
 import type { FakeSailorProxy, ReceivedMessage } from './helpers/fake-sailor-proxy.ts';
 
@@ -23,6 +23,7 @@ describe('Integration Test', () => {
     let env: helpers.TestEnv;
     let proxyHelper: FakeSailorProxy;
     let ipc: InstanceType<typeof IPC>;
+    let sailor: Sailor | undefined;
     const originalEnvironment = { ...process.env };
     const customers = [
         {
@@ -57,15 +58,23 @@ describe('Integration Test', () => {
     });
 
     afterEach(async () => {
-        // Run concurrently: disconnectOnly sets closed=true while stop() sends 204
+        // Run concurrently: disconnect sets closed=true while stop() sends 204
         // to any pending GET /message, allowing the HTTP/2 session to close cleanly.
         await Promise.all([
-            runner.__test__.disconnectOnly(),
+            sailor?.disconnect(),
             proxyHelper.stop()
         ]);
+        sailor = undefined;
         nock.cleanAll();
         sinon.restore();
     });
+
+    /** Runs the sailor, keeping a handle so `afterEach` can disconnect it (not needed for HOOK_SHUTDOWN). */
+    function runSailor(sailorSettings: Settings): Promise<void> {
+        const instance = createSailor(sailorSettings);
+        sailor = sailorSettings.HOOK_SHUTDOWN ? undefined : instance;
+        return runner.run(sailorSettings, ipc, instance);
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- decrypted test payloads
     function decrypt(payload: Buffer, encoding?: ContentEncoding): any {
@@ -111,7 +120,7 @@ describe('Integration Test', () => {
                         parentMessageId,
                         threadId
                     });
-                    runner.run(settings.readFrom(env), ipc);
+                    runSailor(settings.readFrom(env));
                     const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                     const { body } = decrypt(encryptedBody, encoding);
@@ -171,7 +180,7 @@ describe('Integration Test', () => {
                         }
                     );
 
-                    runner.run(settings.readFrom(env), ipc);
+                    runSailor(settings.readFrom(env));
                     const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                     const { body } = decrypt(encryptedBody, encoding);
@@ -240,7 +249,7 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    runner.run(settings.readFrom(env), ipc);
+                    runSailor(settings.readFrom(env));
                     const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                     const { passthrough } = decrypt(encryptedBody, encoding);
@@ -309,7 +318,7 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner.run(sailorSettings, ipc);
+                        runSailor(sailorSettings);
                         const { body: encryptedBody, type } = await receiveMessage();
 
                         const { passthrough } = decrypt(encryptedBody, encoding);
@@ -359,7 +368,7 @@ describe('Integration Test', () => {
                         threadId
                     });
 
-                    runner.run(settings.readFrom(env), ipc);
+                    runSailor(settings.readFrom(env));
                     const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                     const { passthrough } = decrypt(encryptedBody, encoding);
@@ -449,7 +458,7 @@ describe('Integration Test', () => {
                                 inputMessage, { threadId }
                             );
 
-                            runner.run(sailorSettings, ipc);
+                            runSailor(sailorSettings);
                             const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                             const { body } = decrypt(encryptedBody, encoding);
@@ -568,7 +577,7 @@ describe('Integration Test', () => {
                                 inputMessage, { threadId }
                             );
 
-                            runner.run(sailorSettings, ipc);
+                            runSailor(sailorSettings);
                             const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                             const { body } = decrypt(encryptedBody, encoding);
@@ -671,7 +680,7 @@ describe('Integration Test', () => {
                                 inputMessage, { threadId }
                             );
 
-                            runner.run(sailorSettings, ipc);
+                            runSailor(sailorSettings);
                             const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                             const { body } = decrypt(encryptedBody, encoding);
@@ -740,7 +749,7 @@ describe('Integration Test', () => {
                                 inputMessage, { threadId }
                             );
 
-                            runner.run(sailorSettings, ipc);
+                            runSailor(sailorSettings);
                             const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                             const { body } = decrypt(encryptedBody, encoding);
@@ -811,7 +820,7 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner.run(settings.readFrom(env), ipc);
+                        runSailor(settings.readFrom(env));
                         const { metadata, body: encryptedBody, type } = await receiveMessage();
 
                         const { body } = decrypt(encryptedBody, encoding);
@@ -864,7 +873,7 @@ describe('Integration Test', () => {
                             threadId
                         });
 
-                        runner.run(settings.readFrom(env), ipc);
+                        runSailor(settings.readFrom(env));
                         const { metadata, body, type } = await receiveMessage();
 
                         const emittedMessage = decrypt(body, 'base64');
@@ -908,7 +917,7 @@ describe('Integration Test', () => {
 
                         helpers.mockApiTaskStepResponse(env);
 
-                        runner.run(settings.readFrom(env), ipc);
+                        runSailor(settings.readFrom(env));
                         const { metadata, body, type } = await receiveMessage();
 
                         const emittedMessage = JSON.parse(body.toString());
@@ -945,7 +954,7 @@ describe('Integration Test', () => {
                 parentMessageId,
                 threadId
             });
-            runner.run(settings.readFrom(env), ipc);
+            runSailor(settings.readFrom(env));
             const { body: encryptedBody } = await receiveMessage();
 
             const { body } = decrypt(encryptedBody, 'base64');
@@ -974,7 +983,7 @@ describe('Integration Test', () => {
                 parentMessageId,
                 threadId
             });
-            runner.run(settings.readFrom(env), ipc);
+            runSailor(settings.readFrom(env));
             const { body: encryptedBody } = await receiveMessage();
 
             const { body } = decrypt(encryptedBody, 'base64');
@@ -1000,7 +1009,7 @@ describe('Integration Test', () => {
                 sinon.stub(Sailor.prototype, 'connect').rejects(error);
                 const reportError = sinon.spy(Sailor.prototype, 'reportError');
 
-                await runner.run(sailorSettings, ipc);
+                await runSailor(sailorSettings);
 
                 expect(fakeLogging).to.have.been.calledOnce.and.calledWith('putOutToSea.catch', error);
                 expect(reportError).to.not.have.been.called;
@@ -1041,7 +1050,7 @@ describe('Integration Test', () => {
 
                 helpers.mockApiTaskStepResponse(env);
 
-                runner.run(sailorSettings, ipc);
+                runSailor(sailorSettings);
                 await new Promise<void>(resolve =>
                     hooksDataDeleteNock.on('replied', () => resolve()));
 

@@ -3,7 +3,7 @@
  */
 import { main } from './dist/entrypoints/run.js';
 
-export { run, putOutToSea, addProcessListeners, IPC, __test__ } from './dist/entrypoints/run.js';
+export { run, putOutToSea, addProcessListeners, IPC } from './dist/entrypoints/run.js';
 
 if (import.meta.main) {
     main();
