@@ -453,8 +453,33 @@ Hooks that do not use `this` keep working.
 ## Local development
 
 ```bash
-npm run dev:local                            # run against a local sailor-proxy, env from config/local.json
+npm run dev:local [-- <function>]            # run against a local sailor-proxy, env from config/local.json
 npm run encode -- '{"body":{"k":"v"}}' [1|2] # encrypt a message (protocol version 1 or 2)
 npm run decode -- <base64> [1|2]             # decrypt a message
 npm test                                     # build, lint, unit + integration tests
 ```
+
+### Running end to end with a local sailor-proxy
+
+Needs RabbitMQ, MongoDB, Redis and the API (`localhost:9000`) running locally.
+`config/local.json` holds the sailor env: flow/step IDs, crypto settings, and the component
+(`ELASTICIO_COMPONENT_PATH`, `ELASTICIO_FUNCTION`, by default `echo_incoming_data` from
+`test/integration/fixtures/component`). The sailor-proxy scripts read the same file.
+
+In `elasticio/src/sailor-proxy`:
+
+```bash
+npm run dev:local:setup                         # once: creates user, workspace, flow and repo in MongoDB
+npm run dev:local                               # proxy on :4001
+npm run dev:local:tap                           # prints decrypted data/error messages emitted by the step
+npm run dev:local:send -- '{"body":{"hi":1}}'   # publishes a message to the step's queue (no arg: sample message)
+```
+
+Then start the sailor here with `npm run dev:local` (`npm run dev:local -- emit_data` overrides
+`ELASTICIO_FUNCTION`). The order doesn't matter: messages wait in the
+queue until the sailor picks them up. Both sailor-proxy scripts take an optional path to this repo
+(default `../../../sailor-nodejs`).
+
+The tap only sees the configured step's output (`ELASTICIO_STEP_ID`). Outgoing messages above
+`ELASTICIO_OBJECT_STORAGE_SIZE_THRESHOLD` go through Maester (`ELASTICIO_OBJECT_STORAGE_URI`),
+which must be running then.

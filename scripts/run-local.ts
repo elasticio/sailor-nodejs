@@ -1,11 +1,16 @@
 /**
  * Runs the sailor against a local sailor-proxy with env from `config/local.json`.
- * Usage: `npm run dev:local`
+ * Usage: `npm run dev:local [-- <function>]`, the function overrides `ELASTICIO_FUNCTION`.
  */
 import config from '../config/local.json' with { type: 'json' };
 
 for (const [key, value] of Object.entries(config)) {
     process.env[key] = String(value);
+}
+
+const [functionName] = process.argv.slice(2);
+if (functionName) {
+    process.env.ELASTICIO_FUNCTION = functionName;
 }
 
 // Imported after the env is set: logging reads `LOG_LEVEL` on load.

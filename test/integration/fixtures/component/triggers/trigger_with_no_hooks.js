@@ -14,7 +14,6 @@ function processTrigger(msg, cfg) {
 
     rp.get(options).then((data) => {
         that.emit('data', {
-            id: 'f45be600-f770-11e6-b42d-b187bfbf19fd',
             body: {
                 originalMsg: msg,
                 customers: data
