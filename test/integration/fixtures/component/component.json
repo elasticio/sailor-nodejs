@@ -36,6 +36,10 @@
       "main": "./triggers/emit_data.js",
       "title": "emits data"
     },
+    "emit_data_with_id": {
+      "main": "./triggers/emit_data_with_id.js",
+      "title": "emits data with id"
+    },
     "async_trigger": {
       "main": "./triggers/async.js",
       "title": "async trigger"

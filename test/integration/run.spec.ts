@@ -126,7 +126,6 @@ describe('Integration Test', () => {
                     const { body } = decrypt(encryptedBody, encoding);
                     expect(type).to.eql('data');
 
-                    expect(metadata.messageId).to.be.a('string');
                     delete metadata.start;
                     delete metadata.end;
                     delete metadata.cid;
@@ -186,7 +185,6 @@ describe('Integration Test', () => {
                     const { body } = decrypt(encryptedBody, encoding);
                     expect(type).to.eql('data');
 
-                    expect(metadata.messageId).to.be.a('string');
                     delete metadata.start;
                     delete metadata.end;
                     delete metadata.cid;
@@ -216,6 +214,18 @@ describe('Integration Test', () => {
                             }
                         }
                     });
+                });
+
+                it('should use emitted message id as metadata.messageId', async () => {
+                    env.ELASTICIO_FUNCTION = 'emit_data_with_id';
+                    helpers.mockApiTaskStepResponse(env);
+
+                    proxyHelper.queueMessage(inputMessage, { parentMessageId, threadId });
+                    runSailor(settings.readFrom(env));
+                    const { metadata, type } = await receiveMessage();
+
+                    expect(type).to.eql('data');
+                    expect(metadata.messageId).to.equal('f45be600-f770-11e6-b42d-b187bfbf19fd');
                 });
 
                 it('should augment passthrough property with data', async () => {
@@ -255,7 +265,6 @@ describe('Integration Test', () => {
                     const { passthrough } = decrypt(encryptedBody, encoding);
                     expect(type).to.eql('data');
 
-                    expect(metadata.messageId).to.be.a('string');
                     delete metadata.start;
                     delete metadata.end;
                     delete metadata.cid;
@@ -389,7 +398,6 @@ describe('Integration Test', () => {
                         id: 'someId'
                     });
 
-                    expect(metadata.messageId).to.be.a('string');
 
                     delete metadata.start;
                     delete metadata.end;
@@ -477,7 +485,6 @@ describe('Integration Test', () => {
                             expect(startupRegistrationNock.isDone()).to.be.ok;
                             expect(hooksDataNock.isDone()).to.be.ok;
 
-                            expect(metadata.messageId).to.be.a('string');
 
                             delete metadata.start;
                             delete metadata.end;
@@ -604,7 +611,6 @@ describe('Integration Test', () => {
                                 }
                             });
 
-                            expect(metadata.messageId).to.be.a('string');
 
                             delete metadata.start;
                             delete metadata.end;
@@ -694,7 +700,6 @@ describe('Integration Test', () => {
                             expect(hooksDataNock.isDone()).to.be.ok;
                             expect(hooksDataDeleteNock.isDone()).to.not.be.ok;
 
-                            expect(metadata.messageId).to.be.a('string');
 
                             delete metadata.start;
                             delete metadata.end;
@@ -755,7 +760,6 @@ describe('Integration Test', () => {
                             const { body } = decrypt(encryptedBody, encoding);
                             expect(type).to.eql('data');
 
-                            expect(metadata.messageId).to.be.a('string');
 
                             delete metadata.start;
                             delete metadata.end;
@@ -826,7 +830,6 @@ describe('Integration Test', () => {
                         const { body } = decrypt(encryptedBody, encoding);
                         expect(type).to.eql('data');
 
-                        expect(metadata.messageId).to.be.a('string');
 
                         delete metadata.start;
                         delete metadata.end;
