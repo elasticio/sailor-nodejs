@@ -1,5 +1,21 @@
+<<<<<<< HEAD
 ## 3.0.0
 // TODO: write changelog
+
+## 2.7.9 (August 27, 2026)
+
+* Fix double-stringifying of string bodies in lightweight message emission — if `body` or passthrough body was already a string, `JSON.stringify` would wrap it in extra quotes ([#226](https://github.com/elasticio/sailor-nodejs/issues/226))
+* Update package dependencies
+
+## 2.7.8 (February 4, 2026)
+
+* Ensure connection before ack/nack of the message
+[#7855](https://github.com/elasticio/elasticio/issues/7855)
+
+## 2.7.7 (November 19, 2025)
+
+* Improve handling of cases when connection to RabbitMQ is re-established.
+[#7855](https://github.com/elasticio/elasticio/issues/7855)
 
 ## 2.7.6 (August 1, 2025)
 

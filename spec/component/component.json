@@ -59,6 +59,10 @@
     },
     "invalid_trigger": {
       "title": "Error"
+    },
+    "string_data_trigger": {
+      "main": "./triggers/string_data_trigger.js",
+      "title": "Get string data"
     }
   },
   "actions": {
