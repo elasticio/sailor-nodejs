@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## 3.0.0
 
 Sailor no longer connects to RabbitMQ: it talks to the platform through **Sailor Proxy** over HTTP/2.
@@ -92,6 +93,21 @@ It is also rewritten in TypeScript.
 * Graceful shutdown no longer waits forever after a trigger failed to load or a lightweight body could not be fetched
 * Outgoing size check counts bytes, not characters (non-ASCII snapshots)
 * A failed success POST in `runService` is no longer re-sent as an `error` result
+
+## 2.7.9 (August 27, 2026)
+
+* Fix double-stringifying of string bodies in lightweight message emission — if `body` or passthrough body was already a string, `JSON.stringify` would wrap it in extra quotes ([#226](https://github.com/elasticio/sailor-nodejs/issues/226))
+* Update package dependencies
+
+## 2.7.8 (February 4, 2026)
+
+* Ensure connection before ack/nack of the message
+[#7855](https://github.com/elasticio/elasticio/issues/7855)
+
+## 2.7.7 (November 19, 2025)
+
+* Improve handling of cases when connection to RabbitMQ is re-established.
+[#7855](https://github.com/elasticio/elasticio/issues/7855)
 
 ## 2.7.6 (August 1, 2025)
 

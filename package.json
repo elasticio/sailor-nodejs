@@ -22,7 +22,7 @@
         "node": ">=24.22.1"
     },
     "dependencies": {
-        "@elastic.io/maester-client": "6.0.0",
+        "@elastic.io/maester-client": "6.0.3",
         "bunyan": "1.8.10",
         "elasticio-rest-node": "2.0.0",
         "jsonwebtoken": "9.0.3",

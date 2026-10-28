@@ -437,5 +437,32 @@ describe('MessageProcessor', () => {
             expect(storage.uploadMessageBody).not.to.have.been.called;
             expect(proxyClient.sendMessage.firstCall.args[0].data.body).to.deep.equal({ s: 1 });
         });
+
+        describe('with a string body', () => {
+            const ndjsonBody = '{"id":1,"name":"Entity 1"}\n{"id":2,"name":"Entity 2"}\n{"id":3,"name":"Entity 3"}';
+
+            it('uploads it above the threshold without double-stringifying', async () => {
+                const { processor, storage, proxyClient } = setup({ env, process: () => ({ body: ndjsonBody }) });
+                storage.uploadMessageBody.resolves('string-body-object-id');
+                await processor.processMessage(metadata(), payload());
+
+                expect(storage.uploadMessageBody).to.have.been.calledOnce;
+                const uploaded = (storage.uploadMessageBody.firstCall.args[0] as Buffer).toString('utf-8');
+                expect(uploaded).to.equal(ndjsonBody);
+                const { data } = proxyClient.sendMessage.firstCall.args[0];
+                expect(data.body).to.deep.equal({});
+                expect(data.headers).to.deep.equal({ [OBJECT_ID_HEADER]: 'string-body-object-id' });
+            });
+
+            it('sends it directly below the threshold', async () => {
+                const { processor, storage, proxyClient } = setup({
+                    env: { ...env, ELASTICIO_OBJECT_STORAGE_SIZE_THRESHOLD: '1048576' },
+                    process: () => ({ body: ndjsonBody })
+                });
+                await processor.processMessage(metadata(), payload());
+                expect(storage.uploadMessageBody).not.to.have.been.called;
+                expect(proxyClient.sendMessage.firstCall.args[0].data.body).to.equal(ndjsonBody);
+            });
+        });
     });
 });
