@@ -1,10 +1,10 @@
 {
     "name": "elasticio-sailor-nodejs",
     "description": "The official elastic.io library for bootstrapping and executing for Node.js connectors",
-    "version": "3.0.0-ts-rewrite-dev1",
+    "version": "3.0.0-ts-rewrite-dev2",
     "main": "dist/index.js",
     "scripts": {
-        "build": "tsc -p tsconfig.json",
+        "build": "tsc -p tsconfig.build.json",
         "audit": "better-npm-audit audit --level high --production",
         "lint": "eslint .",
         "test": "npm run build && npm run lint && npm run test:unit && npm run test:integration",
@@ -12,7 +12,7 @@
         "dev:local": "sh -c 'node scripts/run-local.ts \"$@\" | bunyan' --",
         "encode": "node scripts/encode-decode.ts encode",
         "decode": "node scripts/encode-decode.ts decode",
-        "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+        "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.json",
         "test:unit": "NODE_ENV=test mocha \"test/unit/**/*.spec.ts\"",
         "test:integration": "NODE_ENV=test mocha \"test/integration/**/*.spec.ts\"",
         "test:coverage": "NODE_ENV=test c8 mocha \"test/unit/**/*.spec.ts\"",
@@ -26,6 +26,7 @@
         "bunyan": "1.8.10",
         "elasticio-rest-node": "2.0.0",
         "jsonwebtoken": "9.0.3",
+        "lodash": "4.18.1",
         "p-throttle": "8.1.1"
     },
     "devDependencies": {
@@ -35,6 +36,7 @@
         "@types/chai-as-promised": "8.0.2",
         "@types/express": "5.0.6",
         "@types/jsonwebtoken": "9.0.10",
+        "@types/lodash": "4.17.27",
         "@types/mocha": "10.0.10",
         "@types/node": "24.19.2",
         "@types/sinon": "22.0.2",

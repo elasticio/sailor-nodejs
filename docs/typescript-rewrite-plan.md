@@ -113,7 +113,7 @@ test/
    Also added `@eslint/js`, `globals`, `@types/{mocha,chai,sinon,sinon-chai}`; `express` is now 5.x.
 6. ✅ `tsconfig.json`: `target ES2024`, `module/moduleResolution nodenext`, `strict`,
    `erasableSyntaxOnly`, `verbatimModuleSyntax`, `rewriteRelativeImportExtensions`, `declaration`,
-   `outDir dist`, `rootDir src`. Separate `tsconfig.test.json` (noEmit) covering `test/` + `scripts/`.
+   `outDir dist`, `rootDir src`. `tsconfig.json` (noEmit) covers `src/` + `test/` + `scripts/`; `tsconfig.build.json` emits `src/` only.
 7. ✅ `eslint.config.js` flat config. Scripts: `build`, `typecheck`, `lint`, `test:unit`,
    `test:integration`, `test` (`build` → lint → both), `prepublishOnly: build`.
    *Deviation:* lint ignores the old JS (`lib/`, `spec/`, `mocha_spec/`, root `*.js`) until it is

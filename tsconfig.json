@@ -4,7 +4,7 @@
         "lib": ["ES2024"],
         "module": "nodenext",
         "moduleResolution": "nodenext",
-        "types": ["node"],
+        "types": ["node", "mocha"],
         "strict": true,
         "erasableSyntaxOnly": true,
         "verbatimModuleSyntax": true,
@@ -13,10 +13,7 @@
         "noImplicitOverride": true,
         "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
-        "declaration": true,
-        "sourceMap": true,
-        "rootDir": "src",
-        "outDir": "dist"
+        "noEmit": true
     },
-    "include": ["src/**/*.ts"]
+    "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
 }

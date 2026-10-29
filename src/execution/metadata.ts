@@ -1,11 +1,11 @@
 import type { Settings } from '../settings/index.ts';
 import type { MessageMetadata } from '../proxy/codec.ts';
 import type { OutgoingMetadata } from '../proxy/client.ts';
-import { snakeCase } from './utils.ts';
+import _ from 'lodash';
 
 /** `ADDITIONAL_VARS_FOR_HEADERS` values, keys in snake_case. */
 export function additionalMetadata(settings: Settings): Record<string, string | undefined> {
-    return Object.fromEntries(Object.entries(settings.additionalVars ?? {}).map(([k, v]) => [snakeCase(k), v]));
+    return Object.fromEntries(Object.entries(settings.additionalVars ?? {}).map(([k, v]) => [_.snakeCase(k), v]));
 }
 
 /** Metadata identifying this step, sent with every outgoing message (and `reportError`). */

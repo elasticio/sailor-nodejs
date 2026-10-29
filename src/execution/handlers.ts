@@ -4,7 +4,7 @@ import type { MessageMetadata } from '../proxy/codec.ts';
 import { MESSAGE_PROCESSING_STATUS, type OutgoingMetadata, type ProxyClient } from '../proxy/client.ts';
 import { prepareOutgoingData, type OutgoingContext, type OutgoingDataMessage } from './outgoing.ts';
 import type { ApiClient, TaskExec } from './task-exec.ts';
-import { isPlainObject } from './utils.ts';
+import _ from 'lodash';
 
 export type ProxyPort = Pick<ProxyClient,
     'sendMessage' | 'sendError' | 'sendRebound' | 'sendSnapshot' | 'finishProcessing'>;
@@ -116,15 +116,16 @@ export function createHandlers(ctx: HandlerContext, onFinished: () => void) {
     async function onUpdateSnapshot(data: unknown): Promise<void> {
         const metadataToSend = metadataCopy();
         metadataToSend.snapshotEvent = 'updateSnapshot';
-        if (!isPlainObject(data)) {
+        if (!_.isPlainObject(data)) {
             logging.error('You should pass an object to the `updateSnapshot` event');
             return;
         }
-        if (data.$set) {
+        const update = data as Record<string, unknown>;
+        if (update.$set) {
             logging.warn('ERROR: $set is not supported any more in `updateSnapshot` event');
             return;
         }
-        Object.assign(state.snapshot, data); // updates the local snapshot
+        Object.assign(state.snapshot, update); // updates the local snapshot
         return proxyClient.sendSnapshot(data, metadataToSend);
     }
 

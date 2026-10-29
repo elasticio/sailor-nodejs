@@ -9,7 +9,7 @@ import { createHandlers, type ExecutionState, type ProxyPort } from './handlers.
 import { outgoingMetadataFor } from './metadata.ts';
 import type { BodyStorage, IncomingPayload, Passthrough } from './outgoing.ts';
 import { TaskExec, type ApiClient, type StepData, type TriggerOrAction } from './task-exec.ts';
-import { pick } from './utils.ts';
+import _ from 'lodash';
 
 export type ReaderPort = Pick<ComponentReader, 'loadTriggerOrAction' | 'findTriggerOrActionDefinition'>;
 
@@ -106,7 +106,7 @@ export class MessageProcessor implements ExecutionState {
 
         await new Promise<void>(resolve => {
             const taskExec = new TaskExec({
-                loggerOptions: pick(metadata, ['threadId', 'messageId', 'parentMessageId']),
+                loggerOptions: _.pick(metadata, ['threadId', 'messageId', 'parentMessageId']),
                 variables: stepData.variables,
                 services: { apiClient, config: settings }
             });

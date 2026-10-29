@@ -3,7 +3,7 @@ import type { Settings } from '../settings/index.ts';
 import type { MessageMetadata } from '../proxy/codec.ts';
 import { OBJECT_ID_HEADER, type MessageStorage } from '../storage/index.ts';
 import type { StepData } from './task-exec.ts';
-import { isEmpty, omit } from './utils.ts';
+import _ from 'lodash';
 
 export interface PassthroughEntry {
     body?: unknown;
@@ -60,7 +60,7 @@ export async function prepareOutgoingData(data: OutgoingDataMessage, ctx: Outgoi
         if (settings.NO_SELF_PASSTHROUGH) {
             const { stepId } = metadata;
             if (stepId) {
-                data.passthrough = { ...origPassthrough, [stepId]: { ...omit(payload, 'passthrough') } };
+                data.passthrough = { ...origPassthrough, [stepId]: { ..._.omit(payload, 'passthrough') } };
             }
         }
     }
@@ -75,7 +75,7 @@ export async function prepareOutgoingData(data: OutgoingDataMessage, ctx: Outgoi
         await Promise.all(Object.keys(passthrough).map(async stepId => {
             logger.trace('Going to check if passthrough for step is lightweight.', { stepId });
             // A non-empty body was downloaded before processing, no need to download again.
-            if (!isEmpty(data.passthrough![stepId]!.body)) {
+            if (!_.isEmpty(data.passthrough![stepId]!.body)) {
                 logger.trace('Body is not empty.', { stepId });
                 return;
             }
@@ -84,7 +84,7 @@ export async function prepareOutgoingData(data: OutgoingDataMessage, ctx: Outgoi
     }
 
     if (stepData.is_passthrough === true && !settings.NO_SELF_PASSTHROUGH) {
-        data.passthrough = { ...origPassthrough, [settings.STEP_ID]: { ...omit(data, 'passthrough') } };
+        data.passthrough = { ...origPassthrough, [settings.STEP_ID]: { ..._.omit(data, 'passthrough') } };
     }
 }
 

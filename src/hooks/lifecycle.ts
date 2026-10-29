@@ -2,7 +2,7 @@ import type { ComponentLogger } from '../logging/index.ts';
 import type { ComponentModule } from '../component/loader.ts';
 import type { ApiClient } from '../execution/task-exec.ts';
 import type { Settings } from '../settings/index.ts';
-import { isEmpty } from '../execution/utils.ts';
+import _ from 'lodash';
 import type { HooksData } from './hooks-data.ts';
 
 export type HookName = 'startup' | 'init' | 'shutdown';
@@ -47,7 +47,7 @@ export class Lifecycle {
         logger.debug('Starting up component');
         const result = await this.invoke('startup');
         logger.trace('Startup data received');
-        const state = isEmpty(result) ? {} : result;
+        const state = _.isEmpty(result) ? {} : result;
         try {
             await hooksData.create(state);
         } catch (err) {
