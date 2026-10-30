@@ -16,7 +16,7 @@ Requires **Node.js >= 24.22.1**.
     }
 ```
 
-Sailor no longer brings `q`, `co` or `lodash` in. If your component uses them, declare them in its own `package.json`.
+Sailor no longer brings `q` or `co` in (`lodash` is still included). If your component uses them, declare them in its own `package.json`.
 See the [CHANGELOG](CHANGELOG.md) for everything that changed in 3.0.0.
 
 ## How it works: Sailor Proxy

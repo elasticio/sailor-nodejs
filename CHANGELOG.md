@@ -60,7 +60,7 @@ It is also rewritten in TypeScript.
 ### Requirements
 
 * Node.js `>=24.22.1`
-* Sailor no longer installs `q`, `co`, `lodash`, `uuid`, `event-to-promise` or `debug`. Components that used
+* Sailor no longer installs `q`, `co`, `uuid`, `event-to-promise` or `debug` (`lodash` is kept). Components that used
   them without declaring them (e.g. `q` coming in transitively) must add them to their own `package.json`.
 
 ### Added
