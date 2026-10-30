@@ -1,0 +1,12 @@
+{
+    "triggers": {
+        "exports_trigger": { "main": "./triggers/exports_trigger.js" },
+        "no_extension": { "main": "./triggers/exports_trigger" },
+        "missing_trigger": { "main": "./triggers/missing_trigger.js" },
+        "wrong_dependency": { "main": "./triggers/wrong_dependency.js" },
+        "syntax_error": { "main": "./triggers/syntax_error.js" }
+    },
+    "actions": {
+        "fn_action": { "main": "./actions/fn_action.js", "autoResolveObjectReferences": false }
+    }
+}

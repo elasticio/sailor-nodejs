@@ -1,0 +1,1084 @@
+import { randomUUID } from 'node:crypto';
+import nock from 'nock';
+import * as chai from 'chai';
+import sinonChai from 'sinon-chai';
+import sinonjs from 'sinon';
+import logging from '../../src/logging/index.ts';
+import * as helpers from './helpers/index.ts';
+import { Encryptor, type ContentEncoding } from '../../src/crypto/index.ts';
+import * as settings from '../../src/settings/index.ts';
+import type { Settings } from '../../src/settings/index.ts';
+import { Sailor, createSailor } from '../../src/sailor.ts';
+import * as runner from '../../src/entrypoints/run.ts';
+import type { FakeSailorProxy, ReceivedMessage } from './helpers/fake-sailor-proxy.ts';
+
+const { expect } = chai;
+chai.use(sinonChai);
+const { IPC } = runner;
+
+const HTTP_REPLY_ROUTING_KEY = 'test_http_reply_routing_key';
+
+describe('Integration Test', () => {
+    let encryptor: Encryptor;
+    let env: helpers.TestEnv;
+    let proxyHelper: FakeSailorProxy;
+    let ipc: InstanceType<typeof IPC>;
+    let sailor: Sailor | undefined;
+    const originalEnvironment = { ...process.env };
+    const customers = [
+        {
+            name: 'Homer Simpson'
+        },
+        {
+            name: 'Marge Simpson'
+        }
+    ];
+    let inputMessage: { headers: Record<string, unknown>; body: Record<string, unknown> };
+    let sinon: sinonjs.SinonSandbox;
+
+    beforeEach(async () => {
+        sinon = sinonjs.createSandbox();
+        inputMessage = {
+            headers: {
+                stepId: 'step_1'
+            },
+            body: {
+                message: 'Just do it!'
+            }
+        };
+        process.env = { ...originalEnvironment };
+        env = helpers.prepareEnv();
+        Object.assign(process.env, env);
+
+        encryptor = new Encryptor(env.ELASTICIO_MESSAGE_CRYPTO_PASSWORD, env.ELASTICIO_MESSAGE_CRYPTO_IV);
+        env.ELASTICIO_FUNCTION = 'init_trigger';
+        proxyHelper = helpers.proxy(env);
+        await proxyHelper.start();
+        ipc = new IPC();
+    });
+
+    afterEach(async () => {
+        // Run concurrently: disconnect sets closed=true while stop() sends 204
+        // to any pending GET /message, allowing the HTTP/2 session to close cleanly.
+        await Promise.all([
+            sailor?.disconnect(),
+            proxyHelper.stop()
+        ]);
+        sailor = undefined;
+        nock.cleanAll();
+        sinon.restore();
+    });
+
+    /** Runs the sailor, keeping a handle so `afterEach` can disconnect it (not needed for HOOK_SHUTDOWN). */
+    function runSailor(sailorSettings: Settings): Promise<void> {
+        const instance = createSailor(sailorSettings);
+        sailor = sailorSettings.HOOK_SHUTDOWN ? undefined : instance;
+        return runner.run(sailorSettings, ipc, instance);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- decrypted test payloads
+    function decrypt(payload: Buffer, encoding?: ContentEncoding): any {
+        return encryptor.decryptMessageContent(payload, encoding);
+    }
+
+    function receiveMessage(): Promise<ReceivedMessage & { type: string }> {
+        return new Promise(resolve => proxyHelper.once('message',
+            (msg: ReceivedMessage, type: string) => resolve({ ...msg, type })));
+    }
+
+    describe('when sailor is being invoked for message processing', () => {
+        let parentMessageId: string;
+        let threadId: string;
+        let messageId: string;
+
+        beforeEach(async () => {
+            threadId = randomUUID();
+            parentMessageId = randomUUID();
+            messageId = randomUUID();
+        });
+
+        for (const protocolVersion of [1, 2]) {
+            describe(`for output protocolVersion ${protocolVersion}`, () => {
+                let encoding: ContentEncoding | undefined;
+                beforeEach(() => {
+                    env.ELASTICIO_PROTOCOL_VERSION = String(protocolVersion);
+                    encoding = protocolVersion < 2 ? 'base64' : undefined;
+                });
+
+                it('should run trigger successfully', async () => {
+                    helpers.mockApiTaskStepResponse(env);
+
+                    nock('https://api.acme.com')
+                        .post('/subscribe')
+                        .reply(200, {
+                            id: 'subscription_12345'
+                        })
+                        .get('/customers')
+                        .reply(200, customers);
+
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(inputMessage, {
+                        parentMessageId,
+                        threadId
+                    });
+                    runSailor(settings.readFrom(env));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                    const { body } = decrypt(encryptedBody, encoding);
+                    expect(type).to.eql('data');
+
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
+
+                    expect(metadata).to.deep.equal({
+                        execId: env.ELASTICIO_EXEC_ID,
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        threadId,
+                        parentMessageId: incomingMessageId,
+                        protocolVersion: protocolVersion
+                    });
+
+                    expect(body).to.deep.equal({
+                        originalMsg: inputMessage,
+                        customers: customers,
+                        subscription: {
+                            id: 'subscription_12345',
+                            cfg: {
+                                apiKey: 'secret'
+                            }
+                        }
+                    });
+                });
+
+                it('should run trigger successfully for input protocolVersion 2', async () => {
+                    helpers.mockApiTaskStepResponse(env);
+
+                    nock('https://api.acme.com')
+                        .post('/subscribe')
+                        .reply(200, {
+                            id: 'subscription_12345'
+                        })
+                        .get('/customers')
+                        .reply(200, customers);
+
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                        inputMessage,
+                        {
+                            parentMessageId,
+                            threadId
+                        },
+                        {
+                            protocolVersion: 2
+                        }
+                    );
+
+                    runSailor(settings.readFrom(env));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                    const { body } = decrypt(encryptedBody, encoding);
+                    expect(type).to.eql('data');
+
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
+
+                    expect(metadata).to.deep.equal({
+                        execId: env.ELASTICIO_EXEC_ID,
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        threadId,
+                        parentMessageId: incomingMessageId,
+                        protocolVersion: protocolVersion
+                    });
+
+                    expect(body).to.deep.equal({
+                        originalMsg: inputMessage,
+                        customers: customers,
+                        subscription: {
+                            id: 'subscription_12345',
+                            cfg: {
+                                apiKey: 'secret'
+                            }
+                        }
+                    });
+                });
+
+                it('should use emitted message id as metadata.messageId', async () => {
+                    env.ELASTICIO_FUNCTION = 'emit_data_with_id';
+                    helpers.mockApiTaskStepResponse(env);
+
+                    proxyHelper.queueMessage(inputMessage, { parentMessageId, threadId });
+                    runSailor(settings.readFrom(env));
+                    const { metadata, type } = await receiveMessage();
+
+                    expect(type).to.eql('data');
+                    expect(metadata.messageId).to.equal('f45be600-f770-11e6-b42d-b187bfbf19fd');
+                });
+
+                it('should augment passthrough property with data', async () => {
+                    env.ELASTICIO_STEP_ID = 'step_2';
+                    env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                    env.ELASTICIO_FUNCTION = 'emit_data';
+
+                    helpers.mockApiTaskStepResponse(env, {
+                        is_passthrough: true
+                    });
+
+                    const psMsg = {
+                        id: messageId,
+                        headers: {
+                            'x-custom-component-header': '123_abc'
+                        },
+                        body: {
+                            message: 'Just do it'
+                        },
+                        passthrough: {
+                            step_1: { // emulating an another step – just to be sure that it's not lost
+                                id: '34',
+                                body: {},
+                                attachments: {}
+                            }
+                        }
+                    };
+
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(psMsg, {
+                        parentMessageId,
+                        threadId
+                    });
+
+                    runSailor(settings.readFrom(env));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                    const { passthrough } = decrypt(encryptedBody, encoding);
+                    expect(type).to.eql('data');
+
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
+
+                    expect(metadata).to.deep.equal({
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        execId: env.ELASTICIO_EXEC_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        threadId,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        parentMessageId: incomingMessageId,
+                        protocolVersion: protocolVersion
+                    });
+
+                    expect(passthrough.step_1).to.deep.equal(psMsg.passthrough.step_1);
+
+                    expect(passthrough.step_2.headers).to.deep.equal(psMsg.headers);
+                    expect(passthrough.step_2.body).to.deep.equal({
+                        hai: 'there',
+                        id: 'someId'
+                    });
+                });
+
+                it(
+                    'should paste data from incoming message into passthrough ' +
+                    'and not copy own data if NO_SELF_PASSTHROUGH',
+                    async () => {
+                        env.ELASTICIO_STEP_ID = 'step_2';
+                        env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                        env.ELASTICIO_FUNCTION = 'emit_data';
+                        const sailorSettings = { ...settings.readFrom(env), NO_SELF_PASSTHROUGH: true };
+
+                        helpers.mockApiTaskStepResponse(env, {
+                            is_passthrough: true
+                        });
+
+                        const psMsg = {
+                            headers: {
+                                stepId: 'step_1'
+                            },
+                            body: {
+                                message: 'Just do it!'
+                            },
+                            passthrough: {
+                                step_oth: { // emulating an another step – just to be sure that it's not lost
+                                    id: 'id-56',
+                                    body: { a: 1 },
+                                    attachments: {}
+                                }
+                            }
+                        };
+
+                        proxyHelper.queueMessage(psMsg, {
+                            parentMessageId,
+                            threadId
+                        });
+
+                        runSailor(sailorSettings);
+                        const { body: encryptedBody, type } = await receiveMessage();
+
+                        const { passthrough } = decrypt(encryptedBody, encoding);
+                        expect(type).to.eql('data');
+
+                        expect(passthrough).to.deep.equal({
+                            step_oth: {
+                                id: 'id-56',
+                                body: { a: 1 },
+                                attachments: {}
+                            },
+                            step_1: {
+                                headers: inputMessage.headers,
+                                body: inputMessage.body
+                            }
+                        });
+                    }
+                );
+
+                it('should work well with async process function emitting data', async () => {
+                    env.ELASTICIO_STEP_ID = 'step_2';
+                    env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+                    env.ELASTICIO_FUNCTION = 'async_trigger';
+                    env.ELASTICIO_DATA_RATE_LIMIT = '1';
+                    env.ELASTICIO_RATE_INTERVAL = '110';
+
+                    helpers.mockApiTaskStepResponse(env, {
+                        is_passthrough: true
+                    });
+
+                    const psMsg = Object.assign(inputMessage, {
+                        passthrough: {
+                            step_oth: { // emulating an another step – just to be sure that it's not lost
+                                id: 'm-34',
+                                body: {},
+                                attachments: {}
+                            }
+                        },
+                        headers: {
+                            'x-custom-component-header': '123_abc',
+                            stepId: 'step_1'
+                        }
+                    });
+
+                    const { messageId: incomingMessageId } = proxyHelper.queueMessage(psMsg, {
+                        parentMessageId,
+                        threadId
+                    });
+
+                    runSailor(settings.readFrom(env));
+                    const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                    const { passthrough } = decrypt(encryptedBody, encoding);
+
+                    expect(type).to.eql('data');
+
+                    expect(passthrough.step_oth).to.deep.equal({
+                        id: 'm-34',
+                        body: {},
+                        attachments: {}
+                    });
+
+                    expect(passthrough.step_2.headers).to.deep.equal({
+                        'x-custom-component-header': '123_abc'
+                    });
+                    expect(passthrough.step_2.body).to.deep.equal({
+                        hai: 'there',
+                        id: 'someId'
+                    });
+
+
+                    delete metadata.start;
+                    delete metadata.end;
+                    delete metadata.cid;
+                    delete metadata.messageId;
+
+                    expect(metadata).to.deep.equal({
+                        taskId: env.ELASTICIO_FLOW_ID,
+                        execId: env.ELASTICIO_EXEC_ID,
+                        workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                        containerId: env.ELASTICIO_CONTAINER_ID,
+                        userId: env.ELASTICIO_USER_ID,
+                        threadId,
+                        stepId: env.ELASTICIO_STEP_ID,
+                        compId: env.ELASTICIO_COMP_ID,
+                        function: env.ELASTICIO_FUNCTION,
+                        parentMessageId: incomingMessageId,
+                        protocolVersion
+                    });
+                });
+
+                describe('when env ELASTICIO_STARTUP_REQUIRED is set', () => {
+                    let sailorSettings: Settings;
+                    beforeEach(() => {
+                        sailorSettings = { ...settings.readFrom(env), STARTUP_REQUIRED: true };
+                    });
+
+                    describe('when hooks data for the task is not created yet', () => {
+                        it('should execute startup successfully', async () => {
+                            let startupRegistrationRequest;
+                            const startupRegistrationNock = nock('http://example.com/')
+                                .post('/subscriptions/enable')
+                                .reply(200, (uri, requestBody) => {
+                                    startupRegistrationRequest = requestBody;
+                                    return {
+                                        status: 'ok'
+                                    };
+                                });
+
+                            helpers.mockApiTaskStepResponse(env);
+
+                            // sailor persists startup data via sailor-support API
+                            let hooksDataRequest;
+                            const hooksDataNock = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .post('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data', {
+                                    subscriptionResult: {
+                                        status: 'ok'
+                                    }
+                                })
+                                .reply(201, (uri, requestBody) => {
+                                    hooksDataRequest = requestBody;
+                                    return requestBody;
+                                });
+
+                            // response for a subscription request, which performed inside of init method
+                            nock('https://api.acme.com')
+                                .post('/subscribe')
+                                .reply(200, {
+                                    id: 'subscription_12345'
+                                })
+                                .get('/customers')
+                                .reply(200, customers);
+
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
+
+                            runSailor(sailorSettings);
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                            const { body } = decrypt(encryptedBody, encoding);
+                            expect(type).to.eql('data');
+
+                            expect(startupRegistrationRequest).to.deep.equal({
+                                data: 'startup'
+                            });
+
+                            expect(hooksDataRequest).to.deep.equal({
+                                subscriptionResult: {
+                                    status: 'ok'
+                                }
+                            });
+
+                            expect(startupRegistrationNock.isDone()).to.be.ok;
+                            expect(hooksDataNock.isDone()).to.be.ok;
+
+
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
+
+                            expect(metadata).to.eql({
+                                execId: env.ELASTICIO_EXEC_ID,
+                                taskId: env.ELASTICIO_FLOW_ID,
+                                workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                                containerId: env.ELASTICIO_CONTAINER_ID,
+                                userId: env.ELASTICIO_USER_ID,
+                                stepId: env.ELASTICIO_STEP_ID,
+                                compId: env.ELASTICIO_COMP_ID,
+                                function: env.ELASTICIO_FUNCTION,
+                                protocolVersion,
+                                threadId,
+                                parentMessageId: incomingMessageId
+                            });
+
+                            expect(body).to.deep.equal({
+                                originalMsg: inputMessage,
+                                customers: customers,
+                                subscription: {
+                                    id: 'subscription_12345',
+                                    cfg: {
+                                        apiKey: 'secret'
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                    describe('when hooks data already exists', () => {
+                        it('should delete previous data and execute startup successfully', async () => {
+                            let startupRegistrationRequest;
+                            const startupRegistrationNock = nock('http://example.com/')
+                                .post('/subscriptions/enable')
+                                .reply(200, (uri, requestBody) => {
+                                    startupRegistrationRequest = requestBody;
+                                    return {
+                                        status: 'ok'
+                                    };
+                                });
+
+                            helpers.mockApiTaskStepResponse(env);
+
+                            let hooksDataRequest1;
+                            let hooksDataRequest2;
+
+                            // sailor persists startup data via sailor-support API
+                            const hooksDataNock1 = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .post('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data', {
+                                    subscriptionResult: {
+                                        status: 'ok'
+                                    }
+                                })
+                                .reply(409, (uri, requestBody) => {
+                                    hooksDataRequest1 = requestBody;
+                                    return {
+                                        error: 'Hooks data for the task already exist. Delete previous data first.',
+                                        status: 409,
+                                        title: 'ConflictError'
+                                    };
+                                });
+
+                            // sailor removes data in order to resolve conflict
+                            const hooksDataDeleteNock = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .delete('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data')
+                                .reply(204);
+
+                            // sailor persists startup data via sailor-support API
+                            const hooksDataNock2 = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .post('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data', {
+                                    subscriptionResult: {
+                                        status: 'ok'
+                                    }
+                                })
+                                .reply(201, (uri, requestBody) => {
+                                    hooksDataRequest2 = requestBody;
+                                    return requestBody;
+                                });
+
+                            // response for a subscription request, which performed inside of init method
+                            nock('https://api.acme.com')
+                                .post('/subscribe')
+                                .reply(200, {
+                                    id: 'subscription_12345'
+                                })
+                                .get('/customers')
+                                .reply(200, customers);
+
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
+
+                            runSailor(sailorSettings);
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                            const { body } = decrypt(encryptedBody, encoding);
+                            expect(type).to.eql('data');
+
+                            expect(startupRegistrationRequest).to.deep.equal({
+                                data: 'startup'
+                            });
+
+                            expect(startupRegistrationNock.isDone()).to.be.ok;
+                            expect(hooksDataNock1.isDone()).to.be.ok;
+                            expect(hooksDataNock2.isDone()).to.be.ok;
+                            expect(hooksDataDeleteNock.isDone()).to.be.ok;
+
+                            expect(hooksDataRequest1).to.deep.equal({
+                                subscriptionResult: {
+                                    status: 'ok'
+                                }
+                            });
+
+                            expect(hooksDataRequest2).to.deep.equal({
+                                subscriptionResult: {
+                                    status: 'ok'
+                                }
+                            });
+
+
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
+
+                            expect(metadata).to.eql({
+                                execId: env.ELASTICIO_EXEC_ID,
+                                taskId: env.ELASTICIO_FLOW_ID,
+                                workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                                containerId: env.ELASTICIO_CONTAINER_ID,
+                                userId: env.ELASTICIO_USER_ID,
+                                stepId: env.ELASTICIO_STEP_ID,
+                                compId: env.ELASTICIO_COMP_ID,
+                                function: env.ELASTICIO_FUNCTION,
+                                protocolVersion: protocolVersion,
+                                threadId,
+                                parentMessageId: incomingMessageId
+                            });
+
+                            expect(body).to.deep.equal({
+                                originalMsg: inputMessage,
+                                customers: customers,
+                                subscription: {
+                                    id: 'subscription_12345',
+                                    cfg: {
+                                        apiKey: 'secret'
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                    describe('when startup method returns empty data', () => {
+                        it('should store an empty object as data and execute trigger successfully', async () => {
+                            let startupRegistrationRequest;
+
+                            sailorSettings = { ...sailorSettings, FUNCTION: 'startup_with_empty_data' };
+
+                            const startupRegistrationNock = nock('http://example.com/')
+                                .post('/subscriptions/enable')
+                                .reply(200, (uri, requestBody) => {
+                                    startupRegistrationRequest = requestBody;
+                                    return {
+                                        status: 'ok'
+                                    };
+                                });
+
+                            helpers.mockApiTaskStepResponse(env);
+
+                            // sailor persists startup data via sailor-support API
+                            const hooksDataNock = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .post('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data', {})
+                                .reply(201);
+
+                            // sailor removes data in order to resolve conflict
+                            const hooksDataDeleteNock = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .delete('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data')
+                                .reply(400);
+
+                            // response for a subscription request, which performed inside of init method
+                            nock('https://api.acme.com')
+                                .post('/subscribe')
+                                .reply(200, {
+                                    id: 'subscription_12345'
+                                })
+                                .get('/customers')
+                                .reply(200, customers);
+
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
+
+                            runSailor(sailorSettings);
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                            const { body } = decrypt(encryptedBody, encoding);
+                            expect(type).to.eql('data');
+
+                            expect(startupRegistrationRequest).to.deep.equal({
+                                data: 'startup'
+                            });
+
+                            expect(startupRegistrationNock.isDone()).to.be.ok;
+                            expect(hooksDataNock.isDone()).to.be.ok;
+                            expect(hooksDataDeleteNock.isDone()).to.not.be.ok;
+
+
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
+
+                            expect(metadata).to.eql({
+                                execId: env.ELASTICIO_EXEC_ID,
+                                taskId: env.ELASTICIO_FLOW_ID,
+                                workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                                containerId: env.ELASTICIO_CONTAINER_ID,
+                                userId: env.ELASTICIO_USER_ID,
+                                stepId: env.ELASTICIO_STEP_ID,
+                                compId: env.ELASTICIO_COMP_ID,
+                                function: sailorSettings.FUNCTION,
+                                protocolVersion: protocolVersion,
+                                threadId,
+                                parentMessageId: incomingMessageId
+                            });
+
+                            expect(body).to.deep.equal({
+                                originalMsg: inputMessage,
+                                customers: customers,
+                                subscription: {
+                                    id: 'subscription_12345',
+                                    cfg: {
+                                        apiKey: 'secret'
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                    describe('when startup method does not exist', () => {
+                        it('should store an empty hooks data and run trigger successfully', async () => {
+                            sailorSettings = { ...sailorSettings, FUNCTION: 'trigger_with_no_hooks' };
+
+                            helpers.mockApiTaskStepResponse(env);
+
+                            // sailor persists startup data via sailor-support API
+                            const hooksDataNock = nock(env.ELASTICIO_API_URI!)
+                                .matchHeader('Connection', 'Keep-Alive')
+                                .post('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data', {})
+                                .reply(201);
+
+                            // response for a subscription request, which performed inside of init method
+                            nock('https://api.acme.com')
+                                .get('/customers')
+                                .reply(200, customers);
+
+                            const { messageId: incomingMessageId } = proxyHelper.queueMessage(
+                                inputMessage, { threadId }
+                            );
+
+                            runSailor(sailorSettings);
+                            const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                            const { body } = decrypt(encryptedBody, encoding);
+                            expect(type).to.eql('data');
+
+
+                            delete metadata.start;
+                            delete metadata.end;
+                            delete metadata.cid;
+                            delete metadata.messageId;
+
+                            expect(metadata).to.eql({
+                                execId: env.ELASTICIO_EXEC_ID,
+                                taskId: env.ELASTICIO_FLOW_ID,
+                                workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                                containerId: env.ELASTICIO_CONTAINER_ID,
+                                userId: env.ELASTICIO_USER_ID,
+                                stepId: env.ELASTICIO_STEP_ID,
+                                compId: env.ELASTICIO_COMP_ID,
+                                function: sailorSettings.FUNCTION,
+                                protocolVersion: protocolVersion,
+                                threadId,
+                                parentMessageId: incomingMessageId
+                            });
+
+                            expect(body).to.deep.equal({
+                                originalMsg: inputMessage,
+                                customers: customers
+                            });
+
+                            expect(hooksDataNock.isDone()).to.be.ok;
+                        });
+                    });
+                });
+
+                describe('when env ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS is set', () => {
+                    beforeEach(() => {
+                        env.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS
+                            = 'ELASTICIO_FIRST, ELASTICIO_SECOND_ELASTICIO_ENV ,' +
+                            'ELASTICIO_NOT_PRESENT';
+
+                        env.ELASTICIO_RANDOM = 'random';
+                        env.ELASTICIO_FIRST = 'first';
+                        env.ELASTICIO_SECOND_ELASTICIO_ENV = 'second';
+                    });
+
+                    afterEach(() => {
+                        delete env.ELASTICIO_ADDITIONAL_VARS_FOR_HEADERS;
+                        delete env.ELASTICIO_RANDOM;
+                        delete env.FIRST;
+                        delete env.ELASTICIO_SECOND_ELASTICIO_ENV;
+                    });
+
+                    it('should run trigger successfully and pass additional vars to headers', async () => {
+                        helpers.mockApiTaskStepResponse(env);
+
+                        nock('https://api.acme.com')
+                            .post('/subscribe')
+                            .reply(200, {
+                                id: 'subscription_12345'
+                            })
+                            .get('/customers')
+                            .reply(200, customers);
+
+                        const { messageId: incomingMessageId } = proxyHelper.queueMessage(inputMessage, {
+                            parentMessageId,
+                            threadId
+                        });
+
+                        runSailor(settings.readFrom(env));
+                        const { metadata, body: encryptedBody, type } = await receiveMessage();
+
+                        const { body } = decrypt(encryptedBody, encoding);
+                        expect(type).to.eql('data');
+
+
+                        delete metadata.start;
+                        delete metadata.end;
+                        delete metadata.cid;
+                        delete metadata.messageId;
+
+                        expect(metadata).to.deep.equal({
+                            first: 'first',
+                            second_elasticio_env: 'second',
+                            execId: env.ELASTICIO_EXEC_ID,
+                            taskId: env.ELASTICIO_FLOW_ID,
+                            workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                            containerId: env.ELASTICIO_CONTAINER_ID,
+                            userId: env.ELASTICIO_USER_ID,
+                            stepId: env.ELASTICIO_STEP_ID,
+                            compId: env.ELASTICIO_COMP_ID,
+                            function: env.ELASTICIO_FUNCTION,
+                            threadId,
+                            parentMessageId: incomingMessageId,
+                            protocolVersion
+                        });
+
+                        expect(body).to.deep.equal({
+                            originalMsg: inputMessage,
+                            customers: customers,
+                            subscription: {
+                                id: 'subscription_12345',
+                                cfg: {
+                                    apiKey: 'secret'
+                                }
+                            }
+                        });
+                    });
+                });
+
+                describe('when reply_to header is set', () => {
+                    it('should send http reply successfully', async () => {
+                        env.ELASTICIO_FUNCTION = 'http_reply_action';
+
+                        helpers.mockApiTaskStepResponse(env);
+
+                        const { messageId: incomingMessageId } = proxyHelper.queueMessage(inputMessage, {}, {
+                            reply_to: HTTP_REPLY_ROUTING_KEY,
+                            threadId
+                        });
+
+                        runSailor(settings.readFrom(env));
+                        const { metadata, body, type } = await receiveMessage();
+
+                        const emittedMessage = decrypt(body, 'base64');
+                        expect(type).to.eql('http-reply');
+
+                        delete metadata.start;
+
+                        expect(metadata).to.eql({
+                            execId: env.ELASTICIO_EXEC_ID,
+                            taskId: env.ELASTICIO_FLOW_ID,
+                            workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                            containerId: env.ELASTICIO_CONTAINER_ID,
+                            userId: env.ELASTICIO_USER_ID,
+                            stepId: env.ELASTICIO_STEP_ID,
+                            compId: env.ELASTICIO_COMP_ID,
+                            function: env.ELASTICIO_FUNCTION,
+                            reply_to: HTTP_REPLY_ROUTING_KEY,
+                            protocolVersion: 1,
+                            threadId,
+                            parentMessageId: incomingMessageId
+                        });
+
+                        expect(emittedMessage).to.eql({
+                            headers: {
+                                'content-type': 'text/plain'
+                            },
+                            body: 'Ok',
+                            statusCode: 200
+                        });
+                    });
+                });
+
+                describe('when sailor could not init the module', () => {
+                    it('should publish init errors to Sailor Proxy', async () => {
+                        // NOTICE, don't touch this.
+                        // it produces side effect, disabling exit at error
+                        // see lib/logging.js
+                        sinon.stub(logging, 'criticalErrorAndExit');
+
+                        env.ELASTICIO_FUNCTION = 'fails_to_init';
+
+                        helpers.mockApiTaskStepResponse(env);
+
+                        runSailor(settings.readFrom(env));
+                        const { metadata, body, type } = await receiveMessage();
+
+                        const emittedMessage = JSON.parse(body.toString());
+                        const error = decrypt(emittedMessage.error, 'base64');
+                        expect(type).to.eql('error');
+                        expect(error.message).to.equal('OMG. I cannot init');
+                        expect(metadata).to.deep.include({
+                            execId: env.ELASTICIO_EXEC_ID,
+                            taskId: env.ELASTICIO_FLOW_ID,
+                            workspaceId: env.ELASTICIO_WORKSPACE_ID,
+                            containerId: env.ELASTICIO_CONTAINER_ID,
+                            userId: env.ELASTICIO_USER_ID,
+                            stepId: env.ELASTICIO_STEP_ID,
+                            compId: env.ELASTICIO_COMP_ID,
+                            function: env.ELASTICIO_FUNCTION
+                        });
+                    });
+                });
+            });
+        }
+
+        it('should make all HTTP requests with keep alive agent', async () => {
+            env.ELASTICIO_STEP_ID = 'step_2';
+            env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+            env.ELASTICIO_FUNCTION = 'trigger_with_keep_alive';
+
+            helpers.mockApiTaskStepResponse(env);
+
+            nock('http://api.acme.com')
+                .get('/customers')
+                .reply(200, customers);
+
+            proxyHelper.queueMessage(inputMessage, {
+                parentMessageId,
+                threadId
+            });
+            runSailor(settings.readFrom(env));
+            const { body: encryptedBody } = await receiveMessage();
+
+            const { body } = decrypt(encryptedBody, 'base64');
+
+            expect(body).to.deep.equal({
+                originalMsg: inputMessage,
+                customers,
+                keepAlive: true
+            });
+        });
+
+        it('should make all HTTPS requests with keep alive agent', async () => {
+            env.ELASTICIO_STEP_ID = 'step_2';
+            env.ELASTICIO_FLOW_ID = '5559edd38968ec0736000003';
+            env.ELASTICIO_FUNCTION = 'trigger_with_keep_alive';
+
+            inputMessage.body.isHttps = true;
+
+            helpers.mockApiTaskStepResponse(env);
+
+            nock('https://api.acme.com')
+                .get('/customers')
+                .reply(200, customers);
+
+            proxyHelper.queueMessage(inputMessage, {
+                parentMessageId,
+                threadId
+            });
+            runSailor(settings.readFrom(env));
+            const { body: encryptedBody } = await receiveMessage();
+
+            const { body } = decrypt(encryptedBody, 'base64');
+
+            expect(body).to.deep.equal({
+                originalMsg: inputMessage,
+                customers,
+                keepAlive: true
+            });
+        });
+    });
+
+    describe('when sailor is being invoked for start', () => {
+        describe('when error connecting to Sailor Proxy', () => {
+            it('should not report error when connection fails', async () => {
+                // NOTICE, don't touch this.
+                // it produces side effect, disabling exit at error
+                // see lib/logging.js
+                const fakeLogging = sinon.stub(logging, 'criticalErrorAndExit');
+
+                const sailorSettings = settings.readFrom(env);
+                const error = new Error('Error connecting to Sailor Proxy');
+                sinon.stub(Sailor.prototype, 'connect').rejects(error);
+                const reportError = sinon.spy(Sailor.prototype, 'reportError');
+
+                await runSailor(sailorSettings);
+
+                expect(fakeLogging).to.have.been.calledOnce.and.calledWith('putOutToSea.catch', error);
+                expect(reportError).to.not.have.been.called;
+            });
+        });
+    });
+
+    describe('when sailor is being invoked for shutdown', () => {
+        describe('when hooksdata is found', () => {
+            it('should execute shutdown hook successfully', async () => {
+                const sailorSettings = { ...settings.readFrom(env), HOOK_SHUTDOWN: true };
+
+                const subsriptionResponse = {
+                    subId: '507'
+                };
+
+                let requestFromShutdownHook;
+                const requestFromShutdownNock = nock('http://example.com/')
+                    .post('/subscriptions/disable')
+                    .reply(200, (uri, requestBody) => {
+                        requestFromShutdownHook = requestBody;
+                        return {
+                            status: 'ok'
+                        };
+                    });
+
+                // sailor retrieves startup data via sailor-support API
+                const hooksDataGetNock = nock(sailorSettings.API_URI)
+                    .matchHeader('Connection', 'Keep-Alive')
+                    .get('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data')
+                    .reply(200, subsriptionResponse);
+
+                // sailor removes startup data via sailor-support API
+                const hooksDataDeleteNock = nock(sailorSettings.API_URI)
+                    .matchHeader('Connection', 'Keep-Alive')
+                    .delete('/sailor-support/hooks/task/5559edd38968ec0736000003/startup/data')
+                    .reply(204);
+
+                helpers.mockApiTaskStepResponse(env);
+
+                runSailor(sailorSettings);
+                await new Promise<void>(resolve =>
+                    hooksDataDeleteNock.on('replied', () => resolve()));
+
+                expect(hooksDataGetNock.isDone()).to.be.ok;
+
+                expect(requestFromShutdownHook).to.deep.equal({
+                    cfg: {
+                        apiKey: 'secret'
+                    },
+                    startupData: subsriptionResponse
+                });
+
+                expect(requestFromShutdownNock.isDone()).to.be.ok;
+                expect(hooksDataDeleteNock.isDone()).to.be.ok;
+            });
+        });
+
+        describe('when request for hooksdata is failed with an error', () => {
+            // @todo
+            it('should not execute shutdown hook');
+        });
+
+        describe('when shutdown hook method is not found', () => {
+            // @todo
+            it('should not thrown error and just finish process');
+        });
+    });
+});

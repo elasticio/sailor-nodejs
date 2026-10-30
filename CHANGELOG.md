@@ -1,6 +1,98 @@
 <<<<<<< HEAD
 ## 3.0.0
-// TODO: write changelog
+
+Sailor no longer connects to RabbitMQ: it talks to the platform through **Sailor Proxy** over HTTP/2.
+It is also rewritten in TypeScript.
+
+### Sailor Proxy
+
+* Messages are fetched from and sent to Sailor Proxy (`ELASTICIO_SAILOR_PROXY_URI`), which mediates between sailors
+  and the message broker. Requests are signed with a JWT (`ELASTICIO_SAILOR_PROXY_JWT_SECRET`)
+* One HTTP/2 session with PING keepalive (`ELASTICIO_PROXY_PING_INTERVAL_MS`) and reconnect with jittered
+  exponential backoff (`ELASTICIO_PROXY_RECONNECT_*`); request retries via `ELASTICIO_PROXY_OBJECT_REQUEST_*`
+* Prefetch: `ELASTICIO_PROXY_PREFETCH_SAILOR`
+* Removed env vars (broker handling moved to the proxy), all with the `ELASTICIO_` prefix:
+  * connection: `AMQP_URI`, `AMQP_RECONNECT_ATTEMPTS`, `AMQP_RECONNECT_TIMEOUT`
+  * queues/routing: `LISTEN_MESSAGES_ON`, `PUBLISH_MESSAGES_TO`, `DATA_ROUTING_KEY`, `ERROR_ROUTING_KEY`,
+    `REBOUND_ROUTING_KEY`, `SNAPSHOT_ROUTING_KEY`
+  * publishing: `AMQP_PUBLISH_RETRY_ATTEMPTS`, `AMQP_PUBLISH_RETRY_DELAY`, `AMQP_PUBLISH_MAX_RETRY_DELAY`,
+    `AMQP_PERSISTENT_MESSAGES`, `PROCESS_AMQP_DRAIN`
+  * consuming: `RABBITMQ_PREFETCH_SAILOR` (now `PROXY_PREFETCH_SAILOR`), `WAIT_MESSAGES_TIMEOUT`
+  * rebounds/errors: `REBOUND_LIMIT`, `REBOUND_INITIAL_EXPIRATION`, `NO_ERROR_REPLIES`
+* Lightweight message bodies still go directly to object storage (Maester)
+
+### Breaking changes for components
+
+* `this.__getAmqp()` is removed: sailor has no direct access to AMQP any more.
+* New emit type `customType` replaces publishing to exchanges yourself:
+  ```javascript
+  await this.emit('customType', { type: '{TYPE_STRING}', payload: { body: {}, headers: {} } });
+  ```
+  Sailor sends the payload as `POST /message?type={TYPE_STRING}` and does not interpret `type`, so new custom
+  types only need a change in Sailor Proxy, not in sailor. Currently the only type is `pub-sub`.
+
+  Migrating a pub-sub publisher, before:
+  ```javascript
+  const amqp = this.__getAmqp();
+  const encryptedBody = amqp.encryptMessageContent({ body: msg.body }, 2);
+  await amqp.sendToExchange(pubSubExchange, topic, encryptedBody, {
+      contentType: 'application/json',
+      contentEncoding: 'utf8',
+      mandatory: true,
+      headers: {
+          protocolVersion: 2,
+          messageId: uuid.v4(),
+          pubSubOriginalMessageId: msg.headers.messageId
+      }
+  });
+  ```
+  After (the topic goes into the `x-eio-routing-key` header; encryption and message ids are handled by sailor):
+  ```javascript
+  await this.emit('customType', {
+      type: 'pub-sub',
+      payload: {
+          body: msg.body,
+          headers: { 'x-eio-routing-key': topic }
+      }
+  });
+  ```
+
+### Requirements
+
+* Node.js `>=24.22.1`
+* Sailor no longer installs `q`, `co`, `uuid`, `event-to-promise` or `debug` (`lodash` is kept). Components that used
+  them without declaring them (e.g. `q` coming in transitively) must add them to their own `package.json`.
+
+### Added
+
+* Written in TypeScript; types are bundled (`TaskExecContext`, `IncomingMessage`, hook types, `Settings`, …)
+* ESM components: triggers, actions and `verifyCredentials` are loaded with `import()`. CommonJS components work as before
+* Hooks (`startup`/`init`/`shutdown`) get `this`: `logger`, `getApiClient()`, `getConfig()`
+* `ELASTICIO_OBJECT_STORAGE_RETRY_ATTEMPTS` (default 2, 0–4) and `ELASTICIO_OBJECT_STORAGE_REQUEST_TIMEOUT`
+  (default 10000, 500–20000 ms) for object storage (Maester) requests
+
+### Breaking changes
+
+* Env vars are validated at startup, an invalid value stops the sailor:
+  * numeric mandatory settings (`OUTGOING_MESSAGE_SIZE_LIMIT`) are parsed as positive integers
+  * optional numbers: `"0"` is honoured where allowed, a non-numeric value throws `ELASTICIO_X must be a number`
+  * booleans: only `true`/`1`/`false`/`0` (case-insensitive) or empty; `"no"`, `"yes"` etc. throw
+* `NO_SELF_PASSTRHOUGH` (typo) is ignored: use `ELASTICIO_NO_SELF_PASSTHROUGH`
+* `runService`: env is parsed by the same typed settings parser; `this.getConfig()` returns the parsed settings,
+  not `process.env`
+* `/resume-processing` failure goes through the fatal error path (logged as fatal, still exit code 1)
+* Startup data 409: re-created with the same normalised state (`{}` for empty), not the raw hook result
+* Graceful shutdown failure exits with code 1 (was 255)
+* `verifyCredentials` load errors (syntax error, missing dependency) report `verified: false` with the reason.
+  The always-verified stub is used only when the component has no `verifyCredentials`
+* `scheduleShutdown` is idempotent: every call gets the same promise, resolved when no message is in flight
+* `DEBUG=sailor` is gone; use `LOG_LEVEL=trace`
+
+### Fixed
+
+* Graceful shutdown no longer waits forever after a trigger failed to load or a lightweight body could not be fetched
+* Outgoing size check counts bytes, not characters (non-ASCII snapshots)
+* A failed success POST in `runService` is no longer re-sent as an `error` result
 
 ## 2.7.9 (August 27, 2026)
 

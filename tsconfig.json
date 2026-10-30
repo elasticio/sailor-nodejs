@@ -1,23 +1,19 @@
 {
     "compilerOptions": {
-        "experimentalDecorators": true,
-        "emitDecoratorMetadata": true,
-        "lib": [
-            "es2020"
-        ],
+        "target": "ES2024",
+        "lib": ["ES2024"],
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
         "types": ["node", "mocha"],
-        "module": "commonjs",
-        "esModuleInterop": true,
-        "target": "es2019",
-        "noImplicitAny": false,
-        "moduleResolution": "node",
+        "strict": true,
+        "erasableSyntaxOnly": true,
+        "verbatimModuleSyntax": true,
+        "rewriteRelativeImportExtensions": true,
         "resolveJsonModule": true,
-        "sourceMap": true,
-        "outDir": "dist",
+        "noImplicitOverride": true,
+        "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
-        "typeRoots": ["./node_modules/@types", "./src/@types"]
+        "noEmit": true
     },
-    "include": [
-        "src/**/*"
-    ]
+    "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
 }
